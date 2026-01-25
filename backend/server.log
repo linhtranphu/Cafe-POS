@@ -1,0 +1,45 @@
+2026/01/25 21:42:37 🔄 Stopping existing processes on port 8080...
+[GIN-debug] [WARNING] Creating an Engine instance with the Logger and Recovery middleware already attached.
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] POST   /api/login                --> cafe-pos/backend/interfaces/http.(*AuthHandler).Login-fm (4 handlers)
+[GIN-debug] GET    /api/waiter/profile       --> main.main.func2 (6 handlers)
+[GIN-debug] GET    /api/waiter/ingredients   --> cafe-pos/backend/interfaces/http.(*IngredientHandler).GetAllIngredients-fm (6 handlers)
+[GIN-debug] GET    /api/waiter/facilities    --> cafe-pos/backend/interfaces/http.(*FacilityHandler).GetAllFacilities-fm (6 handlers)
+[GIN-debug] GET    /api/waiter/facilities/search --> cafe-pos/backend/interfaces/http.(*FacilityHandler).SearchFacilities-fm (6 handlers)
+[GIN-debug] POST   /api/waiter/issues        --> cafe-pos/backend/interfaces/http.(*FacilityHandler).CreateIssueReport-fm (6 handlers)
+[GIN-debug] GET    /api/manager/reports      --> main.main.func3 (6 handlers)
+[GIN-debug] POST   /api/manager/menu         --> cafe-pos/backend/interfaces/http.(*MenuHandler).CreateMenuItem-fm (6 handlers)
+[GIN-debug] GET    /api/manager/menu         --> cafe-pos/backend/interfaces/http.(*MenuHandler).GetAllMenuItems-fm (6 handlers)
+[GIN-debug] GET    /api/manager/menu/:id     --> cafe-pos/backend/interfaces/http.(*MenuHandler).GetMenuItem-fm (6 handlers)
+[GIN-debug] PUT    /api/manager/menu/:id     --> cafe-pos/backend/interfaces/http.(*MenuHandler).UpdateMenuItem-fm (6 handlers)
+[GIN-debug] DELETE /api/manager/menu/:id     --> cafe-pos/backend/interfaces/http.(*MenuHandler).DeleteMenuItem-fm (6 handlers)
+[GIN-debug] POST   /api/manager/ingredients  --> cafe-pos/backend/interfaces/http.(*IngredientHandler).CreateIngredient-fm (6 handlers)
+[GIN-debug] GET    /api/manager/ingredients  --> cafe-pos/backend/interfaces/http.(*IngredientHandler).GetAllIngredients-fm (6 handlers)
+[GIN-debug] GET    /api/manager/ingredients/low-stock --> cafe-pos/backend/interfaces/http.(*IngredientHandler).GetLowStock-fm (6 handlers)
+[GIN-debug] GET    /api/manager/ingredients/:id --> cafe-pos/backend/interfaces/http.(*IngredientHandler).GetIngredient-fm (6 handlers)
+[GIN-debug] GET    /api/manager/ingredients/:id/history --> cafe-pos/backend/interfaces/http.(*IngredientHandler).GetStockHistory-fm (6 handlers)
+[GIN-debug] PUT    /api/manager/ingredients/:id --> cafe-pos/backend/interfaces/http.(*IngredientHandler).UpdateIngredient-fm (6 handlers)
+[GIN-debug] DELETE /api/manager/ingredients/:id --> cafe-pos/backend/interfaces/http.(*IngredientHandler).DeleteIngredient-fm (6 handlers)
+[GIN-debug] POST   /api/manager/ingredients/:id/adjust --> cafe-pos/backend/interfaces/http.(*IngredientHandler).AdjustStock-fm (6 handlers)
+[GIN-debug] GET    /api/manager/facilities   --> cafe-pos/backend/interfaces/http.(*FacilityHandler).GetAllFacilities-fm (6 handlers)
+[GIN-debug] GET    /api/manager/facilities/search --> cafe-pos/backend/interfaces/http.(*FacilityHandler).SearchFacilities-fm (6 handlers)
+[GIN-debug] GET    /api/manager/facilities/:id --> cafe-pos/backend/interfaces/http.(*FacilityHandler).GetFacility-fm (6 handlers)
+[GIN-debug] POST   /api/manager/facilities   --> cafe-pos/backend/interfaces/http.(*FacilityHandler).CreateFacility-fm (6 handlers)
+[GIN-debug] PUT    /api/manager/facilities/:id --> cafe-pos/backend/interfaces/http.(*FacilityHandler).UpdateFacility-fm (6 handlers)
+[GIN-debug] DELETE /api/manager/facilities/:id --> cafe-pos/backend/interfaces/http.(*FacilityHandler).DeleteFacility-fm (6 handlers)
+[GIN-debug] GET    /api/manager/facilities/:id/history --> cafe-pos/backend/interfaces/http.(*FacilityHandler).GetFacilityHistory-fm (6 handlers)
+[GIN-debug] GET    /api/manager/facilities/history --> cafe-pos/backend/interfaces/http.(*FacilityHandler).GetHistoryWithFilter-fm (6 handlers)
+[GIN-debug] GET    /api/manager/facilities/:id/maintenance --> cafe-pos/backend/interfaces/http.(*FacilityHandler).GetMaintenanceHistory-fm (6 handlers)
+[GIN-debug] POST   /api/manager/maintenance  --> cafe-pos/backend/interfaces/http.(*FacilityHandler).CreateMaintenanceRecord-fm (6 handlers)
+[GIN-debug] GET    /api/manager/issues       --> cafe-pos/backend/interfaces/http.(*FacilityHandler).GetIssueReports-fm (6 handlers)
+[GIN-debug] POST   /api/manager/issues       --> cafe-pos/backend/interfaces/http.(*FacilityHandler).CreateIssueReport-fm (6 handlers)
+2026/01/25 21:42:40 Server starting on :8080
+[GIN-debug] [WARNING] You trusted all proxies, this is NOT safe. We recommend you to set a value.
+Please check https://pkg.go.dev/github.com/gin-gonic/gin#readme-don-t-trust-all-proxies for details.
+[GIN-debug] Listening and serving HTTP on :8080
+[GIN] 2026/01/25 - 21:43:08 | 204 |      18.007µs |             ::1 | OPTIONS  "/api/login"
+[GIN] 2026/01/25 - 21:43:08 | 400 |     359.101µs |             ::1 | POST     "/api/login"

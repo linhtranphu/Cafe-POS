@@ -1,0 +1,98 @@
+import { defineStore } from 'pinia'
+import { ingredientService } from '../services/ingredient'
+
+export const useIngredientStore = defineStore('ingredient', {
+  state: () => ({
+    items: [],
+    loading: false,
+    error: null
+  }),
+
+  actions: {
+    async fetchIngredients() {
+      this.loading = true
+      this.error = null
+      try {
+        this.items = await ingredientService.getIngredients() || []
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi tải nguyên liệu'
+        this.items = []
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async createIngredient(ingredient) {
+      this.error = null
+      try {
+        const newItem = await ingredientService.createIngredient(ingredient)
+        this.items.push(newItem)
+        return true
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi tạo nguyên liệu'
+        return false
+      }
+    },
+
+    async updateIngredient(id, ingredient) {
+      this.error = null
+      try {
+        const updatedItem = await ingredientService.updateIngredient(id, ingredient)
+        const index = this.items.findIndex(i => i.id === id)
+        if (index !== -1) {
+          this.items[index] = updatedItem
+        }
+        return true
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi cập nhật nguyên liệu'
+        return false
+      }
+    },
+
+    async deleteIngredient(id) {
+      this.error = null
+      try {
+        await ingredientService.deleteIngredient(id)
+        this.items = this.items.filter(i => i.id !== id)
+        return true
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi xóa nguyên liệu'
+        return false
+      }
+    },
+
+    async fetchLowStockItems() {
+      try {
+        return await ingredientService.getLowStockItems() || []
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi tải nguyên liệu sắp hết'
+        return []
+      }
+    },
+
+    async fetchStockHistory(id) {
+      try {
+        return await ingredientService.getStockHistory(id) || []
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi tải lịch sử tồn kho'
+        return []
+      }
+    },
+
+    async adjustStock(adjustment) {
+      this.error = null
+      try {
+        await ingredientService.adjustStock(adjustment)
+        // Refresh the ingredient data
+        const ingredient = this.items.find(i => i.id === adjustment.ingredient_id)
+        if (ingredient) {
+          ingredient.quantity += adjustment.quantity
+        }
+        return true
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi điều chỉnh tồn kho'
+        return false
+      }
+    }
+  }
+})
