@@ -1,0 +1,26 @@
+# Git
+.git
+.gitignore
+
+# Logs
+*.log
+server.log
+
+# IDE
+.vscode
+.idea
+
+# Build artifacts
+cafe-pos-server
+*.exe
+
+# Test files
+*_test.go
+
+# Documentation
+*.md
+README.md
+
+# Environment files
+.env
+.env.local
