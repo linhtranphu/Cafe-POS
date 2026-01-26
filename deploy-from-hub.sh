@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Deploy Café POS from Docker Hub
-# Usage: curl -fsSL https://raw.githubusercontent.com/YOUR-REPO/main/deploy-from-hub.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/linhtranphu/Cafe-POS/main/deploy-from-hub.sh | bash
 # Or: ./deploy-from-hub.sh
 
 set -e

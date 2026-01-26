@@ -5,13 +5,13 @@
 ### Trên EC2 hoặc bất kỳ server Linux nào:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR-REPO/main/deploy-from-hub.sh | bash
+curl -fsSL https://raw.githubusercontent.com/linhtranphu/Cafe-POS/main/deploy-from-hub.sh | bash
 ```
 
 Hoặc:
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/YOUR-REPO/main/deploy-from-hub.sh | bash
+wget -qO- https://raw.githubusercontent.com/linhtranphu/Cafe-POS/main/deploy-from-hub.sh | bash
 ```
 
 ## 📦 Docker Hub Images
