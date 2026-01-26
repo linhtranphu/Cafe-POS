@@ -50,6 +50,9 @@ func main() {
 	facilityRepo := mongodb.NewFacilityRepository(db)
 	facilityService := services.NewFacilityService(facilityRepo)
 	facilityHandler := http.NewFacilityHandler(facilityService)
+	expenseRepo := mongodb.NewExpenseRepository(db)
+	expenseService := services.NewExpenseService(expenseRepo)
+	expenseHandler := http.NewExpenseHandler(expenseService)
 
 	// Router
 	r := gin.Default()
@@ -133,6 +136,21 @@ func main() {
 				manager.GET("/maintenance/due", facilityHandler.GetMaintenanceDue)
 				manager.GET("/issues", facilityHandler.GetIssueReports)
 				manager.POST("/issues", facilityHandler.CreateIssueReport)
+				
+				// Expense management routes
+				manager.POST("/expenses", expenseHandler.CreateExpense)
+				manager.GET("/expenses", expenseHandler.GetExpenses)
+				manager.PUT("/expenses/:id", expenseHandler.UpdateExpense)
+				manager.DELETE("/expenses/:id", expenseHandler.DeleteExpense)
+				manager.POST("/expense-categories", expenseHandler.CreateCategory)
+				manager.GET("/expense-categories", expenseHandler.GetCategories)
+				manager.DELETE("/expense-categories/:id", expenseHandler.DeleteCategory)
+				manager.POST("/recurring-expenses", expenseHandler.CreateRecurring)
+				manager.GET("/recurring-expenses", expenseHandler.GetRecurring)
+				manager.DELETE("/recurring-expenses/:id", expenseHandler.DeleteRecurring)
+				manager.POST("/prepaid-expenses", expenseHandler.CreatePrepaid)
+				manager.GET("/prepaid-expenses", expenseHandler.GetPrepaid)
+				manager.DELETE("/prepaid-expenses/:id", expenseHandler.DeletePrepaid)
 			}
 		}
 	}

@@ -1,47 +1,90 @@
 <template>
-  <nav class="navbar">
+  <nav class="bg-white shadow-md px-4 lg:px-5 flex items-center justify-between h-16 relative z-50">
     <div class="nav-brand">
-      <router-link to="/dashboard" class="brand-link">
+      <router-link to="/dashboard" class="text-xl font-bold text-blue-600 no-underline">
         ☕ Café POS
       </router-link>
     </div>
     
     <!-- Mobile hamburger button -->
-    <button class="mobile-menu-btn" @click="toggleMobileMenu" :class="{ active: isMobileMenuOpen }">
-      <span></span>
-      <span></span>
-      <span></span>
+    <button 
+      class="lg:hidden flex flex-col bg-transparent border-none cursor-pointer p-1 z-50" 
+      @click="toggleMobileMenu" 
+      :class="{ 'active': isMobileMenuOpen }"
+    >
+      <span class="w-6 h-0.5 bg-gray-800 my-0.5 transition-all duration-300 rounded-sm" :class="{ 'rotate-45 translate-y-2': isMobileMenuOpen }"></span>
+      <span class="w-6 h-0.5 bg-gray-800 my-0.5 transition-all duration-300 rounded-sm" :class="{ 'opacity-0': isMobileMenuOpen }"></span>
+      <span class="w-6 h-0.5 bg-gray-800 my-0.5 transition-all duration-300 rounded-sm" :class="{ '-rotate-45 -translate-y-2': isMobileMenuOpen }"></span>
     </button>
     
     <!-- Navigation overlay for mobile -->
-    <div class="nav-overlay" :class="{ active: isMobileMenuOpen }" @click="closeMobileMenu"></div>
+    <div 
+      class="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden transition-opacity duration-300" 
+      :class="{ 'opacity-100 pointer-events-auto': isMobileMenuOpen, 'opacity-0 pointer-events-none': !isMobileMenuOpen }" 
+      @click="closeMobileMenu"
+    ></div>
     
     <!-- Navigation menu -->
-    <div class="nav-menu" :class="{ active: isMobileMenuOpen }">
-      <div class="nav-links">
-        <router-link to="/dashboard" class="nav-link" @click="closeMobileMenu">
+    <div class="hidden lg:flex items-center justify-between flex-1 mx-5 nav-menu" :class="{ 'active': isMobileMenuOpen }">
+      <div class="flex items-center gap-5">
+        <router-link to="/dashboard" class="text-gray-600 no-underline px-4 py-2 rounded-md transition-all duration-200 hover:bg-gray-100 hover:text-gray-800" @click="closeMobileMenu">
           🏠 Dashboard
         </router-link>
         
-        <div v-if="userRole === 'manager'" class="manager-links">
-          <router-link to="/menu" class="nav-link" @click="closeMobileMenu">
+        <div v-if="userRole === 'manager'" class="flex gap-5">
+          <router-link to="/menu" class="text-gray-600 no-underline px-4 py-2 rounded-md transition-all duration-200 hover:bg-gray-100 hover:text-gray-800" @click="closeMobileMenu">
             🍽️ Menu
           </router-link>
-          <router-link to="/ingredients" class="nav-link" @click="closeMobileMenu">
+          <router-link to="/ingredients" class="text-gray-600 no-underline px-4 py-2 rounded-md transition-all duration-200 hover:bg-gray-100 hover:text-gray-800" @click="closeMobileMenu">
             🥬 Nguyên liệu
           </router-link>
-          <router-link to="/facilities" class="nav-link" @click="closeMobileMenu">
+          <router-link to="/facilities" class="text-gray-600 no-underline px-4 py-2 rounded-md transition-all duration-200 hover:bg-gray-100 hover:text-gray-800" @click="closeMobileMenu">
             🏢 Cơ sở vật chất
           </router-link>
-          <router-link to="/expenses" class="nav-link" @click="closeMobileMenu">
+          <router-link to="/expenses" class="text-gray-600 no-underline px-4 py-2 rounded-md transition-all duration-200 hover:bg-gray-100 hover:text-gray-800" @click="closeMobileMenu">
             💰 Chi phí
           </router-link>
         </div>
       </div>
 
-      <div class="nav-user">
-        <span class="user-name">{{ userName }}</span>
-        <button @click="logout" class="logout-btn">Đăng xuất</button>
+      <div class="flex items-center gap-4">
+        <span class="text-gray-600 font-medium">{{ userName }}</span>
+        <button @click="logout" class="bg-red-600 text-white border-none px-4 py-2 rounded-md cursor-pointer text-sm hover:bg-red-700 transition-colors duration-200">
+          Đăng xuất
+        </button>
+      </div>
+    </div>
+    
+    <!-- Mobile menu -->
+    <div class="fixed top-16 right-0 w-72 h-screen bg-white shadow-xl transition-transform duration-300 flex flex-col justify-start p-5 z-40 lg:hidden" :class="{ 'translate-x-0': isMobileMenuOpen, 'translate-x-full': !isMobileMenuOpen }">
+      <div class="flex flex-col gap-0 w-full mb-8">
+        <router-link to="/dashboard" class="text-gray-600 no-underline py-4 px-5 rounded-lg mb-1 text-base border border-gray-200 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200" @click="closeMobileMenu">
+          🏠 Dashboard
+        </router-link>
+        
+        <div v-if="userRole === 'manager'" class="flex flex-col gap-0 w-full">
+          <router-link to="/menu" class="text-gray-600 no-underline py-4 px-5 rounded-lg mb-1 text-base border border-gray-200 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200" @click="closeMobileMenu">
+            🍽️ Menu
+          </router-link>
+          <router-link to="/ingredients" class="text-gray-600 no-underline py-4 px-5 rounded-lg mb-1 text-base border border-gray-200 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200" @click="closeMobileMenu">
+            🥬 Nguyên liệu
+          </router-link>
+          <router-link to="/facilities" class="text-gray-600 no-underline py-4 px-5 rounded-lg mb-1 text-base border border-gray-200 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200" @click="closeMobileMenu">
+            🏢 Cơ sở vật chất
+          </router-link>
+          <router-link to="/expenses" class="text-gray-600 no-underline py-4 px-5 rounded-lg mb-1 text-base border border-gray-200 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200" @click="closeMobileMenu">
+            💰 Chi phí
+          </router-link>
+        </div>
+      </div>
+      
+      <div class="flex flex-col gap-4 w-full pt-5 border-t border-gray-200">
+        <div class="text-center text-base p-2 bg-gray-100 rounded-lg">
+          {{ userName }}
+        </div>
+        <button @click="logout" class="bg-red-600 text-white border-none py-3 px-5 rounded-lg cursor-pointer text-base w-full hover:bg-red-700 transition-colors duration-200">
+          Đăng xuất
+        </button>
       </div>
     </div>
   </nav>
@@ -90,226 +133,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.navbar {
-  background: white;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  padding: 0 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 60px;
-  position: relative;
-  z-index: 1000;
-}
-
-.nav-brand .brand-link {
-  font-size: 20px;
-  font-weight: bold;
-  color: #667eea;
-  text-decoration: none;
-}
-
-/* Mobile hamburger button */
-.mobile-menu-btn {
-  display: none;
-  flex-direction: column;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 5px;
-  z-index: 1001;
-}
-
-.mobile-menu-btn span {
-  width: 25px;
-  height: 3px;
-  background: #333;
-  margin: 3px 0;
-  transition: 0.3s;
-  border-radius: 2px;
-}
-
-.mobile-menu-btn.active span:nth-child(1) {
-  transform: rotate(-45deg) translate(-5px, 6px);
-}
-
-.mobile-menu-btn.active span:nth-child(2) {
-  opacity: 0;
-}
-
-.mobile-menu-btn.active span:nth-child(3) {
-  transform: rotate(45deg) translate(-5px, -6px);
-}
-
-/* Navigation overlay */
-.nav-overlay {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 998;
-}
-
-.nav-overlay.active {
-  display: block;
-}
-
-/* Navigation menu */
-.nav-menu {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex: 1;
-  margin: 0 20px;
-}
-
-.nav-links {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.manager-links {
-  display: flex;
-  gap: 20px;
-}
-
-.nav-link {
-  color: #666;
-  text-decoration: none;
-  padding: 8px 16px;
-  border-radius: 6px;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.nav-link:hover {
-  background: #f5f6fa;
-  color: #333;
-}
-
-.nav-link.router-link-active {
-  background: #667eea;
-  color: white;
-}
-
-.nav-user {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.user-name {
-  color: #666;
-  font-weight: 500;
-}
-
-.logout-btn {
-  background: #e74c3c;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  white-space: nowrap;
-}
-
-.logout-btn:hover {
-  background: #c0392b;
-}
-
-/* Mobile styles */
-@media (max-width: 768px) {
-  .navbar {
-    padding: 0 15px;
-  }
-  
-  .mobile-menu-btn {
-    display: flex;
-  }
-  
-  .nav-menu {
-    position: fixed;
-    top: 60px;
-    right: -100%;
-    width: 280px;
-    height: calc(100vh - 60px);
-    background: white;
-    box-shadow: -2px 0 10px rgba(0,0,0,0.1);
-    transition: right 0.3s ease;
-    flex-direction: column;
-    justify-content: flex-start;
-    padding: 20px;
-    margin: 0;
-    z-index: 999;
-  }
-  
-  .nav-menu.active {
-    right: 0;
-  }
-  
-  .nav-links {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0;
-    width: 100%;
-    margin-bottom: 30px;
-  }
-  
-  .manager-links {
-    flex-direction: column;
-    gap: 0;
-    width: 100%;
-  }
-  
-  .nav-link {
-    padding: 15px 20px;
-    border-radius: 8px;
-    margin-bottom: 5px;
-    font-size: 16px;
-    border: 1px solid #eee;
-  }
-  
-  .nav-user {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 15px;
-    width: 100%;
-    padding-top: 20px;
-    border-top: 1px solid #eee;
-  }
-  
-  .user-name {
-    text-align: center;
-    font-size: 16px;
-    padding: 10px;
-    background: #f8f9fa;
-    border-radius: 8px;
-  }
-  
-  .logout-btn {
-    padding: 12px 20px;
-    font-size: 16px;
-    width: 100%;
-  }
-}
-
-@media (max-width: 480px) {
-  .nav-brand .brand-link {
-    font-size: 18px;
-  }
-  
-  .nav-menu {
-    width: 100%;
-    right: -100%;
-  }
-  
-  .nav-menu.active {
-    right: 0;
-  }
+.router-link-active {
+  @apply bg-blue-600 text-white;
 }
 </style>

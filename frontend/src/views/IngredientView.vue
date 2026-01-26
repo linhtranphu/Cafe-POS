@@ -1,91 +1,165 @@
 <template>
-  <div class="ingredient-management">
+  <div class="min-h-screen bg-gray-100">
     <Navigation />
-    <div class="content">
-        <div class="header">
-        <h2>🥬 Quản lý Nguyên liệu</h2>
-        <div class="header-actions">
-          <button @click="fetchLowStock" class="btn-warning">⚠️ Sắp hết hàng</button>
-          <button v-if="isManager" @click="showCreateForm = true" class="btn-primary">+ Thêm nguyên liệu</button>
+    <div class="p-4">
+      <div class="flex flex-col lg:flex-row justify-between items-center mb-6">
+        <h2 class="text-xl lg:text-2xl font-semibold text-gray-800 mb-4 lg:mb-0">
+          🥬 Quản lý Nguyên liệu
+        </h2>
+        <div class="flex flex-wrap gap-2">
+          <button @click="showCategoryForm = true" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            📁 Quản lý danh mục
+          </button>
+          <button v-if="isManager" @click="showCreateForm = true" class="btn-primary text-sm px-4 py-2">
+            + Thêm nguyên liệu
+          </button>
         </div>
       </div>
 
-      <div v-if="loading" class="loading">Đang tải...</div>
-      <div v-if="error" class="error">{{ error }}</div>
+      <div v-if="loading" class="text-center py-10 text-gray-600 text-lg">Đang tải...</div>
+      <div v-if="error" class="text-center py-10 text-red-600 bg-red-50 border border-red-200 rounded-lg">{{ error }}</div>
 
       <!-- Filters Section -->
-      <div class="filters-section">
-        <div class="filters-row">
-          <div class="form-group">
-            <label>Tìm kiếm</label>
-            <input v-model="searchQuery" type="text" placeholder="Tìm theo tên nguyên liệu..." class="search-input" />
-          </div>
-          <div class="form-group">
-            <label>Lọc theo danh mục</label>
-            <select v-model="filterCategory" class="filter-select">
-              <option value="">Tất cả danh mục</option>
-              <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Lọc theo trạng thái</label>
-            <select v-model="filterStatus" class="filter-select">
-              <option value="">Tất cả trạng thái</option>
-              <option value="in-stock">Còn hàng</option>
-              <option value="low-stock">Sắp hết</option>
-              <option value="out-of-stock">Hết hàng</option>
-            </select>
-          </div>
+      <div class="bg-white rounded-xl p-4 mb-4 shadow-sm">
+        <div class="grid grid-cols-1 gap-3">
+          <input v-model="searchQuery" type="text" placeholder="Tìm theo tên nguyên liệu..." class="w-full p-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-blue-500" />
+          <select v-model="filterCategory" class="p-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-blue-500">
+            <option value="">Tất cả danh mục</option>
+            <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
+          </select>
+          <select v-model="filterStatus" class="p-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-blue-500">
+            <option value="">Tất cả trạng thái</option>
+            <option value="in-stock">Còn hàng</option>
+            <option value="low-stock">Sắp hết</option>
+            <option value="out-of-stock">Hết hàng</option>
+          </select>
         </div>
       </div>
 
       <!-- Low Stock Alert -->
-      <div v-if="lowStockItems && lowStockItems.length > 0" class="low-stock-alert">
-        <h3>⚠️ Nguyên liệu sắp hết ({{ lowStockItems.length }} món)</h3>
-        <div class="low-stock-items">
-          <span v-for="item in lowStockItems" :key="item.id" class="low-stock-item">
+      <div v-if="lowStockItems && lowStockItems.length > 0" class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4">
+        <h3 class="text-yellow-800 font-semibold mb-2">⚠️ Nguyên liệu sắp hết ({{ lowStockItems.length }} món)</h3>
+        <div class="flex flex-wrap gap-2">
+          <span v-for="item in lowStockItems" :key="item.id" class="bg-yellow-200 text-yellow-800 px-2 py-1 rounded text-xs">
             {{ item.name }}: {{ item.quantity }} {{ item.unit }}
           </span>
         </div>
       </div>
 
-      <div class="ingredient-grid">
-      <div v-for="category in groupedItems" :key="category.name" class="category-section">
-        <h3 class="category-title">{{ category.name }}</h3>
-        <div class="category-items">
-          <div v-for="item in category.items" :key="item.id" class="ingredient-card">
-            <div class="ingredient-info">
-              <h4>{{ item.name }}</h4>
-              <div class="stock-info">
-                <div class="current-stock" :class="{ 'low-stock': item.quantity <= item.min_stock }">
-                  <strong>{{ item.quantity }} {{ item.unit }}</strong>
+      <div class="grid grid-cols-1 gap-4">
+        <div v-for="category in groupedItems" :key="category.name" class="bg-white rounded-xl p-4 shadow-sm">
+          <h3 class="text-lg font-bold text-gray-800 mb-4 pb-2 border-b-2 border-blue-500">{{ category.name }}</h3>
+          <div class="space-y-3">
+            <div v-for="item in category.items" :key="item.id" class="rounded-xl p-4" :class="isLowStock(item) ? 'bg-yellow-50 border-2 border-yellow-400' : 'bg-gray-50'">
+              <!-- Ingredient Header -->
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center space-x-3">
+                  <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl" :class="getCategoryColor(item.category)">
+                    {{ getCategoryIcon(item.category) }}
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-gray-800 flex items-center gap-2">
+                      {{ item.name }}
+                      <span v-if="isLowStock(item)" class="text-yellow-600 text-lg">⚠️</span>
+                    </h4>
+                    <p class="text-sm text-gray-500">{{ item.supplier || 'Chưa có nhà cung cấp' }}</p>
+                  </div>
                 </div>
-                <div class="min-stock">Tối thiểu: {{ item.min_stock }} {{ item.unit }}</div>
+                <div class="text-right">
+                  <span class="px-3 py-1 rounded-full text-xs font-medium" :class="getStockBadge(item)">
+                    {{ getStockStatus(item) }}
+                  </span>
+                </div>
               </div>
-              <div class="cost-info" v-if="item.cost_per_unit && item.cost_per_unit > 0">
-                Giá: {{ formatPrice(item.cost_per_unit) }}/{{ item.unit }}
+
+              <!-- Stock Info Grid -->
+              <div class="grid grid-cols-2 gap-3 mb-4">
+                <div class="bg-white rounded-lg p-3 text-center">
+                  <div class="text-2xl font-bold" :class="item.quantity <= item.min_stock ? 'text-red-600' : 'text-green-600'">
+                    {{ item.quantity }}
+                  </div>
+                  <div class="text-xs text-gray-500">{{ item.unit }} hiện tại</div>
+                </div>
+                <div class="bg-white rounded-lg p-3 text-center">
+                  <div class="text-lg font-semibold text-gray-600">{{ item.min_stock }}</div>
+                  <div class="text-xs text-gray-500">{{ item.unit }} tối thiểu</div>
+                </div>
+                <div class="bg-white rounded-lg p-3 text-center col-span-2" v-if="item.cost_per_unit">
+                  <div class="text-lg font-semibold text-blue-600">{{ formatPrice(item.cost_per_unit) }}</div>
+                  <div class="text-xs text-gray-500">Giá/{{ item.unit }}</div>
+                </div>
               </div>
-              <div class="supplier" v-if="item.supplier">
-                Nhà cung cấp: {{ item.supplier }}
+
+              <!-- Quick Actions -->
+              <div class="grid grid-cols-2 gap-2 mb-3">
+                <button @click="showHistory(item)" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-3 rounded-xl text-sm font-medium transition-colors flex items-center justify-center space-x-2">
+                  <span>📈</span>
+                  <span>Lịch sử</span>
+                </button>
+                <button v-if="isManager" @click="showAdjustStock(item)" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-xl text-sm font-medium transition-colors flex items-center justify-center space-x-2">
+                  <span>📦</span>
+                  <span>Điều chỉnh</span>
+                </button>
               </div>
-            </div>
-            <div class="ingredient-actions">
-              <button @click="showHistory(item)" class="btn-history" title="Xem lịch sử">
-                📈 Lịch sử
+
+              <!-- More Actions Toggle -->
+              <button @click="item.showMore = !item.showMore" class="w-full py-2 text-blue-600 text-sm font-medium border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors">
+                {{ item.showMore ? '▲ Ẩn bớt' : '▼ Thêm tùy chọn' }}
               </button>
-              <button v-if="isManager" @click="showAdjustStock(item)" class="btn-adjust" title="Điều chỉnh tồn kho">
-                📦 Điều chỉnh
-              </button>
-              <button v-if="isManager" @click="editItem(item)" class="btn-edit" title="Sửa nguyên liệu">
-                📝 Sửa
-              </button>
-              <button v-if="isManager" @click="deleteItem(item.id)" class="btn-delete" title="Xóa nguyên liệu">
-                🗑️ Xóa
-              </button>
+
+              <!-- Extended Actions -->
+              <div v-if="item.showMore" class="grid grid-cols-2 gap-2 mt-3">
+                <button v-if="isManager" @click="editItem(item)" class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+                  📝 Sửa
+                </button>
+                <button v-if="isManager" @click="deleteItem(item.id)" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+                  🗑️ Xóa
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      <!-- Category Management Modal -->
+      <div v-if="showCategoryForm" class="modal">
+        <div class="modal-content">
+          <h3>📁 Quản lý Danh mục Nguyên liệu</h3>
+          
+          <!-- Add New Category -->
+          <div class="bg-gray-50 rounded-lg p-4 mb-4">
+            <h4 class="font-semibold text-gray-800 mb-3">Thêm danh mục mới</h4>
+            <form @submit.prevent="addCategory">
+              <div class="form-group">
+                <label>Tên danh mục *</label>
+                <input v-model="categoryForm.name" type="text" required placeholder="Ví dụ: Cà phê" />
+              </div>
+              <button type="submit" class="btn-primary w-full">+ Thêm danh mục</button>
+            </form>
+          </div>
+
+          <!-- Category List -->
+          <div class="space-y-2 max-h-96 overflow-y-auto">
+            <div v-for="cat in ingredientCategories" :key="cat.id" class="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between">
+              <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl" :class="getCategoryColor(cat.name)">
+                  {{ getCategoryIcon(cat.name) }}
+                </div>
+                <div>
+                  <div class="font-medium text-gray-800">{{ cat.name }}</div>
+                  <div class="text-xs text-gray-500">{{ getIngredientCountByCategory(cat.name) }} nguyên liệu</div>
+                </div>
+              </div>
+              <button @click="deleteCategory(cat.id, cat.name)" class="text-red-500 hover:text-red-700 p-2">
+                🗑️
+              </button>
+            </div>
+          </div>
+
+          <div class="form-actions mt-4">
+            <button type="button" @click="showCategoryForm = false" class="btn-cancel">Đóng</button>
+          </div>
+        </div>
       </div>
 
       <!-- Create/Edit Form Modal -->
@@ -101,13 +175,7 @@
             <label>Danh mục *</label>
             <select v-model="form.category" required>
               <option value="">Chọn danh mục</option>
-              <option value="Cà phê">Cà phê</option>
-              <option value="Trà">Trà</option>
-              <option value="Sữa">Sữa</option>
-              <option value="Đường">Đường</option>
-              <option value="Trái cây">Trái cây</option>
-              <option value="Bánh">Bánh</option>
-              <option value="Khác">Khác</option>
+              <option v-for="cat in ingredientCategories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
             </select>
           </div>
           <div class="form-group">
@@ -230,6 +298,7 @@ import Navigation from '../components/Navigation.vue'
 const ingredientStore = useIngredientStore()
 
 const showCreateForm = ref(false)
+const showCategoryForm = ref(false)
 const editingItem = ref(null)
 const adjustingItem = ref(null)
 const historyItem = ref(null)
@@ -247,6 +316,21 @@ const stockForm = ref({
   quantity: 0,
   reason: ''
 })
+
+const categoryForm = ref({
+  name: ''
+})
+
+// Ingredient Categories (FR-IM-09)
+const ingredientCategories = ref([
+  { id: '1', name: 'Cà phê' },
+  { id: '2', name: 'Trà' },
+  { id: '3', name: 'Sữa' },
+  { id: '4', name: 'Đường' },
+  { id: '5', name: 'Trái cây' },
+  { id: '6', name: 'Bánh' },
+  { id: '7', name: 'Khác' }
+])
 
 const searchQuery = ref('')
 const filterCategory = ref('')
@@ -328,12 +412,8 @@ const formatPrice = (price) => {
   }).format(price)
 }
 
-const fetchLowStock = async () => {
-  try {
-    await ingredientStore.fetchLowStock()
-  } catch (error) {
-    console.error('Error fetching low stock items:', error)
-  }
+const isLowStock = (item) => {
+  return item.quantity <= item.min_stock
 }
 
 const editItem = (item) => {
@@ -454,6 +534,77 @@ const getHistoryTypeClass = (type) => {
     'waste': 'type-waste'
   }
   return classes[type] || 'type-default'
+}
+
+const getCategoryIcon = (category) => {
+  const iconMap = {
+    'Cà phê': '☕',
+    'Trà': '🍵',
+    'Sữa': '🥛',
+    'Đường': '🍯',
+    'Trái cây': '🍎',
+    'Bánh': '🍰',
+    'Khác': '📦'
+  }
+  return iconMap[category] || '📦'
+}
+
+const getCategoryColor = (category) => {
+  const colorMap = {
+    'Cà phê': 'bg-amber-100 text-amber-600',
+    'Trà': 'bg-green-100 text-green-600',
+    'Sữa': 'bg-blue-100 text-blue-600',
+    'Đường': 'bg-pink-100 text-pink-600',
+    'Trái cây': 'bg-orange-100 text-orange-600',
+    'Bánh': 'bg-yellow-100 text-yellow-600',
+    'Khác': 'bg-gray-100 text-gray-600'
+  }
+  return colorMap[category] || 'bg-gray-100 text-gray-600'
+}
+
+const getStockStatus = (item) => {
+  if (item.quantity === 0) return 'Hết hàng'
+  if (item.quantity <= item.min_stock) return 'Sắp hết'
+  return 'Còn hàng'
+}
+
+const getStockBadge = (item) => {
+  if (item.quantity === 0) return 'bg-red-100 text-red-800'
+  if (item.quantity <= item.min_stock) return 'bg-yellow-100 text-yellow-800'
+  return 'bg-green-100 text-green-800'
+}
+
+const isManager = computed(() => {
+  // Add your role check logic here
+  return true // For now, assume manager role
+})
+
+const addCategory = () => {
+  if (!categoryForm.value.name) return
+  
+  ingredientCategories.value.push({
+    id: Date.now().toString(),
+    name: categoryForm.value.name
+  })
+  
+  categoryForm.value = { name: '' }
+}
+
+const deleteCategory = (id, name) => {
+  const hasIngredients = items.value.some(item => item.category === name)
+  
+  if (hasIngredients) {
+    alert('Không thể xóa danh mục đã có nguyên liệu!')
+    return
+  }
+  
+  if (confirm(`Bạn có chắc muốn xóa danh mục "${name}"?`)) {
+    ingredientCategories.value = ingredientCategories.value.filter(c => c.id !== id)
+  }
+}
+
+const getIngredientCountByCategory = (categoryName) => {
+  return items.value.filter(item => item.category === categoryName).length
 }
 </script>
 

@@ -5,5 +5,8 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     port: 3000
+  },
+  css: {
+    postcss: './postcss.config.js'
   }
 })

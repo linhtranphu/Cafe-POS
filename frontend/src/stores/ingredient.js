@@ -4,6 +4,7 @@ import { ingredientService } from '../services/ingredient'
 export const useIngredientStore = defineStore('ingredient', {
   state: () => ({
     items: [],
+    lowStockItems: [],
     loading: false,
     error: null
   }),
@@ -58,6 +59,15 @@ export const useIngredientStore = defineStore('ingredient', {
       } catch (error) {
         this.error = error.response?.data?.error || 'Lỗi xóa nguyên liệu'
         return false
+      }
+    },
+
+    async fetchLowStock() {
+      try {
+        this.lowStockItems = await ingredientService.getLowStockItems() || []
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi tải nguyên liệu sắp hết'
+        this.lowStockItems = []
       }
     },
 

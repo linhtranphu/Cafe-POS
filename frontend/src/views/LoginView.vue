@@ -1,51 +1,68 @@
 <template>
-  <div class="login-container">
-    <div class="login-card">
-      <div class="logo">
-        <h1>☕ Café POS</h1>
-        <p>Hệ thống quản lý quán cà phê</p>
+  <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 to-purple-700 p-5">
+    <div class="bg-white p-8 lg:p-10 rounded-xl shadow-2xl w-full max-w-md">
+      <div class="text-center mb-8">
+        <h1 class="text-3xl lg:text-4xl font-bold text-gray-800 mb-2">☕ Café POS</h1>
+        <p class="text-gray-600 text-sm">Hệ thống quản lý quán cà phê</p>
       </div>
 
-      <form @submit.prevent="handleLogin" class="login-form">
-        <div class="form-group">
-          <label>Tên đăng nhập</label>
+      <form @submit.prevent="handleLogin" class="space-y-5">
+        <div>
+          <label class="block mb-2 text-gray-700 font-medium">Tên đăng nhập</label>
           <input 
             v-model="username" 
             type="text" 
             required 
             placeholder="Nhập tên đăng nhập"
             :disabled="loading"
+            class="w-full p-3 border-2 border-gray-300 rounded-lg text-base transition-colors focus:outline-none focus:border-blue-600 disabled:bg-gray-100 disabled:cursor-not-allowed"
           />
         </div>
 
-        <div class="form-group">
-          <label>Mật khẩu</label>
+        <div>
+          <label class="block mb-2 text-gray-700 font-medium">Mật khẩu</label>
           <input 
             v-model="password" 
             type="password" 
             required 
             placeholder="Nhập mật khẩu"
             :disabled="loading"
+            class="w-full p-3 border-2 border-gray-300 rounded-lg text-base transition-colors focus:outline-none focus:border-blue-600 disabled:bg-gray-100 disabled:cursor-not-allowed"
           />
         </div>
 
-        <button type="submit" :disabled="loading" class="login-btn">
+        <button 
+          type="submit" 
+          :disabled="loading" 
+          class="w-full p-4 bg-blue-600 text-white border-none rounded-lg text-base font-semibold cursor-pointer transition-colors hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+        >
           {{ loading ? 'Đang đăng nhập...' : 'Đăng nhập' }}
         </button>
 
-        <div v-if="error" class="error">{{ error }}</div>
+        <div v-if="error" class="text-red-600 text-center mt-4 p-3 bg-red-50 rounded-lg border border-red-200">
+          {{ error }}
+        </div>
       </form>
 
-      <div class="demo-accounts">
-        <h3>Tài khoản demo:</h3>
-        <div class="demo-item" @click="quickLogin('admin', 'admin123')">
-          <strong>Manager:</strong> admin / admin123
+      <div class="mt-8 pt-5 border-t border-gray-200">
+        <h3 class="text-gray-600 text-sm mb-3">Tài khoản demo:</h3>
+        <div 
+          class="p-2 bg-gray-100 my-1 rounded-lg cursor-pointer text-xs transition-colors hover:bg-gray-200" 
+          @click="quickLogin('admin', 'admin123')"
+        >
+          <strong class="text-gray-700">Manager:</strong> admin / admin123
         </div>
-        <div class="demo-item" @click="quickLogin('waiter1', 'waiter123')">
-          <strong>Waiter:</strong> waiter1 / waiter123
+        <div 
+          class="p-2 bg-gray-100 my-1 rounded-lg cursor-pointer text-xs transition-colors hover:bg-gray-200" 
+          @click="quickLogin('waiter1', 'waiter123')"
+        >
+          <strong class="text-gray-700">Waiter:</strong> waiter1 / waiter123
         </div>
-        <div class="demo-item" @click="quickLogin('cashier1', 'cashier123')">
-          <strong>Cashier:</strong> cashier1 / cashier123
+        <div 
+          class="p-2 bg-gray-100 my-1 rounded-lg cursor-pointer text-xs transition-colors hover:bg-gray-200" 
+          @click="quickLogin('cashier1', 'cashier123')"
+        >
+          <strong class="text-gray-700">Cashier:</strong> cashier1 / cashier123
         </div>
       </div>
     </div>
@@ -91,129 +108,5 @@ const quickLogin = (user, pass) => {
 </script>
 
 <style scoped>
-.login-container {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px;
-}
-
-.login-card {
-  background: white;
-  padding: 40px;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-  width: 100%;
-  max-width: 400px;
-}
-
-.logo {
-  text-align: center;
-  margin-bottom: 30px;
-}
-
-.logo h1 {
-  color: #333;
-  margin-bottom: 8px;
-  font-size: 2.2em;
-}
-
-.logo p {
-  color: #666;
-  font-size: 0.9em;
-}
-
-.form-group {
-  margin-bottom: 20px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 8px;
-  color: #333;
-  font-weight: 500;
-}
-
-.form-group input {
-  width: 100%;
-  padding: 12px;
-  border: 2px solid #e1e5e9;
-  border-radius: 8px;
-  font-size: 16px;
-  transition: border-color 0.3s;
-}
-
-.form-group input:focus {
-  outline: none;
-  border-color: #667eea;
-}
-
-.form-group input:disabled {
-  background: #f5f5f5;
-  cursor: not-allowed;
-}
-
-.login-btn {
-  width: 100%;
-  padding: 14px;
-  background: #667eea;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.3s;
-}
-
-.login-btn:hover:not(:disabled) {
-  background: #5a6fd8;
-}
-
-.login-btn:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-}
-
-.error {
-  color: #e74c3c;
-  text-align: center;
-  margin-top: 15px;
-  padding: 10px;
-  background: #fdf2f2;
-  border-radius: 6px;
-  border: 1px solid #fecaca;
-}
-
-.demo-accounts {
-  margin-top: 30px;
-  padding-top: 20px;
-  border-top: 1px solid #eee;
-}
-
-.demo-accounts h3 {
-  color: #666;
-  font-size: 14px;
-  margin-bottom: 10px;
-}
-
-.demo-item {
-  padding: 8px 12px;
-  background: #f8f9fa;
-  margin: 5px 0;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  transition: background 0.2s;
-}
-
-.demo-item:hover {
-  background: #e9ecef;
-}
-
-.demo-item strong {
-  color: #495057;
-}
+/* Tailwind handles all styling */
 </style>
