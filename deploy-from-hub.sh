@@ -14,15 +14,15 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
+# Detect OS first
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    OS=$ID
+fi
+
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then
     echo "Installing Docker..."
-    
-    # Detect OS
-    if [ -f /etc/os-release ]; then
-        . /etc/os-release
-        OS=$ID
-    fi
     
     # Install Docker based on OS
     if [ "$OS" = "amzn" ]; then
@@ -33,7 +33,7 @@ if ! command -v docker &> /dev/null; then
         sudo systemctl enable docker
         sudo usermod -aG docker $USER
     else
-        # Use Docker's official script for other distros
+        echo "Detected $OS"
         curl -fsSL https://get.docker.com | sh
         sudo usermod -aG docker $USER
     fi
