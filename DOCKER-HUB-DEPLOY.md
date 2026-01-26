@@ -24,6 +24,26 @@ wget -qO- https://raw.githubusercontent.com/linhtranphu/Cafe-POS/main/deploy-fro
 
 ### Bước 1: Cài đặt Docker & Docker Compose
 
+#### Trên Amazon Linux 2023:
+
+```bash
+# Install Docker
+sudo yum update -y
+sudo yum install -y docker
+sudo systemctl start docker
+sudo systemctl enable docker
+sudo usermod -aG docker $USER
+
+# Install Docker Compose
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+
+# Logout and login again for group changes to take effect
+# Or use: newgrp docker
+```
+
+#### Trên Ubuntu/Debian:
+
 ```bash
 # Install Docker
 curl -fsSL https://get.docker.com | sh

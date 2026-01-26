@@ -17,8 +17,26 @@ NC='\033[0m'
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then
     echo "Installing Docker..."
-    curl -fsSL https://get.docker.com | sh
-    sudo usermod -aG docker $USER
+    
+    # Detect OS
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        OS=$ID
+    fi
+    
+    # Install Docker based on OS
+    if [ "$OS" = "amzn" ]; then
+        echo "Detected Amazon Linux"
+        sudo yum update -y
+        sudo yum install -y docker
+        sudo systemctl start docker
+        sudo systemctl enable docker
+        sudo usermod -aG docker $USER
+    else
+        # Use Docker's official script for other distros
+        curl -fsSL https://get.docker.com | sh
+        sudo usermod -aG docker $USER
+    fi
 fi
 
 # Check if Docker Compose is installed
