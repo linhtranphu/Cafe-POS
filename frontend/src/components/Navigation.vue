@@ -1,139 +1,107 @@
 <template>
-  <nav class="bg-white shadow-md px-4 lg:px-5 flex items-center justify-between h-16 relative z-50">
-    <div class="nav-brand">
-      <router-link to="/dashboard" class="text-xl font-bold text-blue-600 no-underline">
-        ☕ Café POS
-      </router-link>
-    </div>
-    
-    <!-- Mobile hamburger button -->
-    <button 
-      class="lg:hidden flex flex-col bg-transparent border-none cursor-pointer p-1 z-50" 
-      @click="toggleMobileMenu" 
-      :class="{ 'active': isMobileMenuOpen }"
-    >
-      <span class="w-6 h-0.5 bg-gray-800 my-0.5 transition-all duration-300 rounded-sm" :class="{ 'rotate-45 translate-y-2': isMobileMenuOpen }"></span>
-      <span class="w-6 h-0.5 bg-gray-800 my-0.5 transition-all duration-300 rounded-sm" :class="{ 'opacity-0': isMobileMenuOpen }"></span>
-      <span class="w-6 h-0.5 bg-gray-800 my-0.5 transition-all duration-300 rounded-sm" :class="{ '-rotate-45 -translate-y-2': isMobileMenuOpen }"></span>
-    </button>
-    
-    <!-- Navigation overlay for mobile -->
-    <div 
-      class="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden transition-opacity duration-300" 
-      :class="{ 'opacity-100 pointer-events-auto': isMobileMenuOpen, 'opacity-0 pointer-events-none': !isMobileMenuOpen }" 
-      @click="closeMobileMenu"
-    ></div>
-    
-    <!-- Navigation menu -->
-    <div class="hidden lg:flex items-center justify-between flex-1 mx-5 nav-menu" :class="{ 'active': isMobileMenuOpen }">
-      <div class="flex items-center gap-5">
-        <router-link to="/dashboard" class="text-gray-600 no-underline px-4 py-2 rounded-md transition-all duration-200 hover:bg-gray-100 hover:text-gray-800" @click="closeMobileMenu">
-          🏠 Dashboard
-        </router-link>
-        
-        <div v-if="userRole === 'manager'" class="flex gap-5">
-          <router-link to="/menu" class="text-gray-600 no-underline px-4 py-2 rounded-md transition-all duration-200 hover:bg-gray-100 hover:text-gray-800" @click="closeMobileMenu">
-            🍽️ Menu
-          </router-link>
-          <router-link to="/ingredients" class="text-gray-600 no-underline px-4 py-2 rounded-md transition-all duration-200 hover:bg-gray-100 hover:text-gray-800" @click="closeMobileMenu">
-            🥬 Nguyên liệu
-          </router-link>
-          <router-link to="/facilities" class="text-gray-600 no-underline px-4 py-2 rounded-md transition-all duration-200 hover:bg-gray-100 hover:text-gray-800" @click="closeMobileMenu">
-            🏢 Cơ sở vật chất
-          </router-link>
-          <router-link to="/expenses" class="text-gray-600 no-underline px-4 py-2 rounded-md transition-all duration-200 hover:bg-gray-100 hover:text-gray-800" @click="closeMobileMenu">
-            💰 Chi phí
-          </router-link>
-        </div>
+  <nav class="bg-white shadow-lg">
+    <!-- Top bar with logo and user info -->
+    <div class="px-4 py-3 flex items-center justify-between border-b border-gray-200">
+      <div class="flex items-center">
+        <h1 class="text-xl font-bold text-blue-600">☕ Café POS</h1>
       </div>
+      <div class="flex items-center gap-3">
+        <span class="text-sm text-gray-600 hidden sm:block">{{ userName }}</span>
+        <button @click="logout" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm transition-colors">
+          Đăng xuất
+        </button>
+      </div>
+    </div>
 
-      <div class="flex items-center gap-4">
-        <span class="text-gray-600 font-medium">{{ userName }}</span>
-        <button @click="logout" class="bg-red-600 text-white border-none px-4 py-2 rounded-md cursor-pointer text-sm hover:bg-red-700 transition-colors duration-200">
-          Đăng xuất
-        </button>
-      </div>
-    </div>
-    
-    <!-- Mobile menu -->
-    <div class="fixed top-16 right-0 w-72 h-screen bg-white shadow-xl transition-transform duration-300 flex flex-col justify-start p-5 z-40 lg:hidden" :class="{ 'translate-x-0': isMobileMenuOpen, 'translate-x-full': !isMobileMenuOpen }">
-      <div class="flex flex-col gap-0 w-full mb-8">
-        <router-link to="/dashboard" class="text-gray-600 no-underline py-4 px-5 rounded-lg mb-1 text-base border border-gray-200 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200" @click="closeMobileMenu">
-          🏠 Dashboard
+    <!-- Card-based navigation -->
+    <div class="p-4">
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+        <!-- Dashboard -->
+        <router-link to="/dashboard" @click="handleNavClick" 
+          class="bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl p-4 flex flex-col items-center justify-center min-h-[100px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+          <div class="text-2xl mb-2">🏠</div>
+          <span class="text-sm font-medium text-center">Dashboard</span>
         </router-link>
-        
-        <div v-if="userRole === 'manager'" class="flex flex-col gap-0 w-full">
-          <router-link to="/menu" class="text-gray-600 no-underline py-4 px-5 rounded-lg mb-1 text-base border border-gray-200 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200" @click="closeMobileMenu">
-            🍽️ Menu
+
+        <!-- Shift -->
+        <router-link to="/shifts" @click="handleNavClick"
+          class="bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl p-4 flex flex-col items-center justify-center min-h-[100px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+          <div class="text-2xl mb-2">⏰</div>
+          <span class="text-sm font-medium text-center">Ca làm việc</span>
+        </router-link>
+
+        <!-- Orders -->
+        <router-link to="/orders" @click="handleNavClick"
+          class="bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl p-4 flex flex-col items-center justify-center min-h-[100px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+          <div class="text-2xl mb-2">📋</div>
+          <span class="text-sm font-medium text-center">Orders</span>
+        </router-link>
+
+        <!-- Tables -->
+        <router-link to="/tables" @click="handleNavClick"
+          class="bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-xl p-4 flex flex-col items-center justify-center min-h-[100px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+          <div class="text-2xl mb-2">🪑</div>
+          <span class="text-sm font-medium text-center">Bàn</span>
+        </router-link>
+
+        <!-- Manager only cards -->
+        <template v-if="userRole === 'manager'">
+          <!-- Menu -->
+          <router-link to="/menu" @click="handleNavClick"
+            class="bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl p-4 flex flex-col items-center justify-center min-h-[100px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+            <div class="text-2xl mb-2">🍽️</div>
+            <span class="text-sm font-medium text-center">Menu</span>
           </router-link>
-          <router-link to="/ingredients" class="text-gray-600 no-underline py-4 px-5 rounded-lg mb-1 text-base border border-gray-200 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200" @click="closeMobileMenu">
-            🥬 Nguyên liệu
+
+          <!-- Ingredients -->
+          <router-link to="/ingredients" @click="handleNavClick"
+            class="bg-gradient-to-br from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white rounded-xl p-4 flex flex-col items-center justify-center min-h-[100px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+            <div class="text-2xl mb-2">🥬</div>
+            <span class="text-sm font-medium text-center">Nguyên liệu</span>
           </router-link>
-          <router-link to="/facilities" class="text-gray-600 no-underline py-4 px-5 rounded-lg mb-1 text-base border border-gray-200 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200" @click="closeMobileMenu">
-            🏢 Cơ sở vật chất
+
+          <!-- Facilities -->
+          <router-link to="/facilities" @click="handleNavClick"
+            class="bg-gradient-to-br from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white rounded-xl p-4 flex flex-col items-center justify-center min-h-[100px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+            <div class="text-2xl mb-2">🏢</div>
+            <span class="text-sm font-medium text-center">Cơ sở vật chất</span>
           </router-link>
-          <router-link to="/expenses" class="text-gray-600 no-underline py-4 px-5 rounded-lg mb-1 text-base border border-gray-200 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200" @click="closeMobileMenu">
-            💰 Chi phí
+
+          <!-- Expenses -->
+          <router-link to="/expenses" @click="handleNavClick"
+            class="bg-gradient-to-br from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white rounded-xl p-4 flex flex-col items-center justify-center min-h-[100px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+            <div class="text-2xl mb-2">💰</div>
+            <span class="text-sm font-medium text-center">Chi phí</span>
           </router-link>
-        </div>
-      </div>
-      
-      <div class="flex flex-col gap-4 w-full pt-5 border-t border-gray-200">
-        <div class="text-center text-base p-2 bg-gray-100 rounded-lg">
-          {{ userName }}
-        </div>
-        <button @click="logout" class="bg-red-600 text-white border-none py-3 px-5 rounded-lg cursor-pointer text-base w-full hover:bg-red-700 transition-colors duration-200">
-          Đăng xuất
-        </button>
+        </template>
       </div>
     </div>
   </nav>
 </template>
 
 <script setup>
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
 const authStore = useAuthStore()
-const isMobileMenuOpen = ref(false)
 
 const userRole = computed(() => authStore.user?.role)
 const userName = computed(() => authStore.user?.name)
 
-const toggleMobileMenu = () => {
-  isMobileMenuOpen.value = !isMobileMenuOpen.value
-}
-
-const closeMobileMenu = () => {
-  isMobileMenuOpen.value = false
+const handleNavClick = () => {
+  // Optional: Add any navigation handling logic here
 }
 
 const logout = () => {
   authStore.logout()
   router.push('/login')
-  closeMobileMenu()
 }
-
-// Close mobile menu on window resize
-const handleResize = () => {
-  if (window.innerWidth > 768) {
-    closeMobileMenu()
-  }
-}
-
-onMounted(() => {
-  window.addEventListener('resize', handleResize)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', handleResize)
-})
 </script>
 
 <style scoped>
 .router-link-active {
-  @apply bg-blue-600 text-white;
+  @apply ring-2 ring-white ring-opacity-50;
 }
 </style>

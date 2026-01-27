@@ -1,4 +1,4 @@
-2026/01/25 21:42:37 🔄 Stopping existing processes on port 8080...
+2026/01/27 22:36:59 🔄 Stopping existing processes on port 8080...
 [GIN-debug] [WARNING] Creating an Engine instance with the Logger and Recovery middleware already attached.
 
 [GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
@@ -6,11 +6,32 @@
  - using code:	gin.SetMode(gin.ReleaseMode)
 
 [GIN-debug] POST   /api/login                --> cafe-pos/backend/interfaces/http.(*AuthHandler).Login-fm (4 handlers)
+[GIN-debug] POST   /api/waiter/shifts/start  --> cafe-pos/backend/interfaces/http.(*ShiftHandler).StartShift-fm (6 handlers)
+[GIN-debug] POST   /api/waiter/shifts/:id/end --> cafe-pos/backend/interfaces/http.(*ShiftHandler).EndShift-fm (6 handlers)
+[GIN-debug] GET    /api/waiter/shifts/current --> cafe-pos/backend/interfaces/http.(*ShiftHandler).GetCurrentShift-fm (6 handlers)
+[GIN-debug] GET    /api/waiter/shifts        --> cafe-pos/backend/interfaces/http.(*ShiftHandler).GetMyShifts-fm (6 handlers)
+[GIN-debug] POST   /api/waiter/orders        --> cafe-pos/backend/interfaces/http.(*OrderHandler).CreateOrder-fm (6 handlers)
+[GIN-debug] PUT    /api/waiter/orders/:id/confirm --> cafe-pos/backend/interfaces/http.(*OrderHandler).ConfirmOrder-fm (6 handlers)
+[GIN-debug] POST   /api/waiter/orders/:id/payment --> cafe-pos/backend/interfaces/http.(*OrderHandler).PayOrder-fm (6 handlers)
+[GIN-debug] POST   /api/waiter/orders/:id/send --> cafe-pos/backend/interfaces/http.(*OrderHandler).SendToKitchen-fm (6 handlers)
+[GIN-debug] POST   /api/waiter/orders/:id/serve --> cafe-pos/backend/interfaces/http.(*OrderHandler).ServeOrder-fm (6 handlers)
+[GIN-debug] GET    /api/waiter/orders        --> cafe-pos/backend/interfaces/http.(*OrderHandler).GetMyOrders-fm (6 handlers)
+[GIN-debug] GET    /api/waiter/orders/:id    --> cafe-pos/backend/interfaces/http.(*OrderHandler).GetOrder-fm (6 handlers)
+[GIN-debug] GET    /api/waiter/tables        --> cafe-pos/backend/interfaces/http.(*TableHandler).GetAllTables-fm (6 handlers)
+[GIN-debug] GET    /api/waiter/menu          --> cafe-pos/backend/interfaces/http.(*MenuHandler).GetAllMenuItems-fm (6 handlers)
 [GIN-debug] GET    /api/waiter/profile       --> main.main.func2 (6 handlers)
 [GIN-debug] GET    /api/waiter/ingredients   --> cafe-pos/backend/interfaces/http.(*IngredientHandler).GetAllIngredients-fm (6 handlers)
 [GIN-debug] GET    /api/waiter/facilities    --> cafe-pos/backend/interfaces/http.(*FacilityHandler).GetAllFacilities-fm (6 handlers)
 [GIN-debug] GET    /api/waiter/facilities/search --> cafe-pos/backend/interfaces/http.(*FacilityHandler).SearchFacilities-fm (6 handlers)
 [GIN-debug] POST   /api/waiter/issues        --> cafe-pos/backend/interfaces/http.(*FacilityHandler).CreateIssueReport-fm (6 handlers)
+[GIN-debug] GET    /api/cashier/orders       --> cafe-pos/backend/interfaces/http.(*OrderHandler).GetAllOrders-fm (6 handlers)
+[GIN-debug] GET    /api/cashier/orders/:id   --> cafe-pos/backend/interfaces/http.(*OrderHandler).GetOrder-fm (6 handlers)
+[GIN-debug] POST   /api/cashier/orders/:id/cancel --> cafe-pos/backend/interfaces/http.(*OrderHandler).CancelOrder-fm (6 handlers)
+[GIN-debug] POST   /api/cashier/orders/:id/refund --> cafe-pos/backend/interfaces/http.(*OrderHandler).RefundOrder-fm (6 handlers)
+[GIN-debug] POST   /api/cashier/orders/:id/lock --> cafe-pos/backend/interfaces/http.(*OrderHandler).LockOrder-fm (6 handlers)
+[GIN-debug] POST   /api/cashier/shifts/:id/close --> cafe-pos/backend/interfaces/http.(*ShiftHandler).CloseShift-fm (6 handlers)
+[GIN-debug] GET    /api/cashier/shifts       --> cafe-pos/backend/interfaces/http.(*ShiftHandler).GetAllShifts-fm (6 handlers)
+[GIN-debug] GET    /api/cashier/shifts/:id   --> cafe-pos/backend/interfaces/http.(*ShiftHandler).GetShift-fm (6 handlers)
 [GIN-debug] GET    /api/manager/reports      --> main.main.func3 (6 handlers)
 [GIN-debug] POST   /api/manager/menu         --> cafe-pos/backend/interfaces/http.(*MenuHandler).CreateMenuItem-fm (6 handlers)
 [GIN-debug] GET    /api/manager/menu         --> cafe-pos/backend/interfaces/http.(*MenuHandler).GetAllMenuItems-fm (6 handlers)
@@ -32,14 +53,98 @@
 [GIN-debug] PUT    /api/manager/facilities/:id --> cafe-pos/backend/interfaces/http.(*FacilityHandler).UpdateFacility-fm (6 handlers)
 [GIN-debug] DELETE /api/manager/facilities/:id --> cafe-pos/backend/interfaces/http.(*FacilityHandler).DeleteFacility-fm (6 handlers)
 [GIN-debug] GET    /api/manager/facilities/:id/history --> cafe-pos/backend/interfaces/http.(*FacilityHandler).GetFacilityHistory-fm (6 handlers)
+[GIN-debug] GET    /api/manager/facilities/:id/next-maintenance --> cafe-pos/backend/interfaces/http.(*FacilityHandler).GetNextMaintenanceDate-fm (6 handlers)
+[GIN-debug] GET    /api/manager/facilities/:id/maintenance-stats --> cafe-pos/backend/interfaces/http.(*FacilityHandler).GetMaintenanceStats-fm (6 handlers)
+[GIN-debug] GET    /api/manager/facilities/:id/status-history --> cafe-pos/backend/interfaces/http.(*FacilityHandler).GetStatusHistory-fm (6 handlers)
 [GIN-debug] GET    /api/manager/facilities/history --> cafe-pos/backend/interfaces/http.(*FacilityHandler).GetHistoryWithFilter-fm (6 handlers)
 [GIN-debug] GET    /api/manager/facilities/:id/maintenance --> cafe-pos/backend/interfaces/http.(*FacilityHandler).GetMaintenanceHistory-fm (6 handlers)
 [GIN-debug] POST   /api/manager/maintenance  --> cafe-pos/backend/interfaces/http.(*FacilityHandler).CreateMaintenanceRecord-fm (6 handlers)
+[GIN-debug] GET    /api/manager/maintenance/scheduled --> cafe-pos/backend/interfaces/http.(*FacilityHandler).GetScheduledMaintenance-fm (6 handlers)
+[GIN-debug] GET    /api/manager/maintenance/due --> cafe-pos/backend/interfaces/http.(*FacilityHandler).GetMaintenanceDue-fm (6 handlers)
 [GIN-debug] GET    /api/manager/issues       --> cafe-pos/backend/interfaces/http.(*FacilityHandler).GetIssueReports-fm (6 handlers)
 [GIN-debug] POST   /api/manager/issues       --> cafe-pos/backend/interfaces/http.(*FacilityHandler).CreateIssueReport-fm (6 handlers)
-2026/01/25 21:42:40 Server starting on :8080
+[GIN-debug] POST   /api/manager/expenses     --> cafe-pos/backend/interfaces/http.(*ExpenseHandler).CreateExpense-fm (6 handlers)
+[GIN-debug] GET    /api/manager/expenses     --> cafe-pos/backend/interfaces/http.(*ExpenseHandler).GetExpenses-fm (6 handlers)
+[GIN-debug] PUT    /api/manager/expenses/:id --> cafe-pos/backend/interfaces/http.(*ExpenseHandler).UpdateExpense-fm (6 handlers)
+[GIN-debug] DELETE /api/manager/expenses/:id --> cafe-pos/backend/interfaces/http.(*ExpenseHandler).DeleteExpense-fm (6 handlers)
+[GIN-debug] POST   /api/manager/expense-categories --> cafe-pos/backend/interfaces/http.(*ExpenseHandler).CreateCategory-fm (6 handlers)
+[GIN-debug] GET    /api/manager/expense-categories --> cafe-pos/backend/interfaces/http.(*ExpenseHandler).GetCategories-fm (6 handlers)
+[GIN-debug] DELETE /api/manager/expense-categories/:id --> cafe-pos/backend/interfaces/http.(*ExpenseHandler).DeleteCategory-fm (6 handlers)
+[GIN-debug] POST   /api/manager/recurring-expenses --> cafe-pos/backend/interfaces/http.(*ExpenseHandler).CreateRecurring-fm (6 handlers)
+[GIN-debug] GET    /api/manager/recurring-expenses --> cafe-pos/backend/interfaces/http.(*ExpenseHandler).GetRecurring-fm (6 handlers)
+[GIN-debug] DELETE /api/manager/recurring-expenses/:id --> cafe-pos/backend/interfaces/http.(*ExpenseHandler).DeleteRecurring-fm (6 handlers)
+[GIN-debug] POST   /api/manager/prepaid-expenses --> cafe-pos/backend/interfaces/http.(*ExpenseHandler).CreatePrepaid-fm (6 handlers)
+[GIN-debug] GET    /api/manager/prepaid-expenses --> cafe-pos/backend/interfaces/http.(*ExpenseHandler).GetPrepaid-fm (6 handlers)
+[GIN-debug] DELETE /api/manager/prepaid-expenses/:id --> cafe-pos/backend/interfaces/http.(*ExpenseHandler).DeletePrepaid-fm (6 handlers)
+[GIN-debug] POST   /api/manager/tables       --> cafe-pos/backend/interfaces/http.(*TableHandler).CreateTable-fm (6 handlers)
+[GIN-debug] GET    /api/manager/tables       --> cafe-pos/backend/interfaces/http.(*TableHandler).GetAllTables-fm (6 handlers)
+[GIN-debug] GET    /api/manager/tables/:id   --> cafe-pos/backend/interfaces/http.(*TableHandler).GetTable-fm (6 handlers)
+[GIN-debug] PUT    /api/manager/tables/:id   --> cafe-pos/backend/interfaces/http.(*TableHandler).UpdateTable-fm (6 handlers)
+[GIN-debug] DELETE /api/manager/tables/:id   --> cafe-pos/backend/interfaces/http.(*TableHandler).DeleteTable-fm (6 handlers)
+[GIN-debug] GET    /api/manager/orders       --> cafe-pos/backend/interfaces/http.(*OrderHandler).GetAllOrders-fm (6 handlers)
+[GIN-debug] GET    /api/manager/orders/:id   --> cafe-pos/backend/interfaces/http.(*OrderHandler).GetOrder-fm (6 handlers)
+[GIN-debug] POST   /api/manager/orders       --> cafe-pos/backend/interfaces/http.(*OrderHandler).CreateOrder-fm (6 handlers)
+[GIN-debug] POST   /api/manager/orders/:id/cancel --> cafe-pos/backend/interfaces/http.(*OrderHandler).CancelOrder-fm (6 handlers)
+[GIN-debug] POST   /api/manager/orders/:id/refund --> cafe-pos/backend/interfaces/http.(*OrderHandler).RefundOrder-fm (6 handlers)
+[GIN-debug] GET    /api/manager/shifts       --> cafe-pos/backend/interfaces/http.(*ShiftHandler).GetAllShifts-fm (6 handlers)
+[GIN-debug] GET    /api/manager/shifts/:id   --> cafe-pos/backend/interfaces/http.(*ShiftHandler).GetShift-fm (6 handlers)
+2026/01/27 22:37:01 Server starting on :8080
 [GIN-debug] [WARNING] You trusted all proxies, this is NOT safe. We recommend you to set a value.
 Please check https://pkg.go.dev/github.com/gin-gonic/gin#readme-don-t-trust-all-proxies for details.
 [GIN-debug] Listening and serving HTTP on :8080
-[GIN] 2026/01/25 - 21:43:08 | 204 |      18.007µs |             ::1 | OPTIONS  "/api/login"
-[GIN] 2026/01/25 - 21:43:08 | 400 |     359.101µs |             ::1 | POST     "/api/login"
+[GIN] 2026/01/27 - 22:37:27 | 200 |  1.009042461s |             ::1 | POST     "/api/login"
+[GIN] 2026/01/27 - 22:37:34 | 404 |     1.74268ms |             ::1 | GET      "/api/waiter/shifts/current"
+[GIN] 2026/01/27 - 22:37:54 | 204 |       7.936µs |             ::1 | OPTIONS  "/api/login"
+[GIN] 2026/01/27 - 22:37:55 | 200 |  1.004537148s |             ::1 | POST     "/api/login"
+[GIN] 2026/01/27 - 22:37:57 | 204 |       6.753µs |             ::1 | OPTIONS  "/api/waiter/shifts/current"
+[GIN] 2026/01/27 - 22:37:57 | 204 |       7.987µs |             ::1 | OPTIONS  "/api/waiter/orders"
+[GIN] 2026/01/27 - 22:37:57 | 204 |       7.527µs |             ::1 | OPTIONS  "/api/waiter/tables"
+[GIN] 2026/01/27 - 22:37:57 | 204 |    1.204912ms |             ::1 | OPTIONS  "/api/waiter/menu"
+[GIN] 2026/01/27 - 22:37:57 | 404 |    2.538896ms |             ::1 | GET      "/api/waiter/shifts/current"
+[GIN] 2026/01/27 - 22:37:57 | 200 |     43.8273ms |             ::1 | GET      "/api/waiter/tables"
+[GIN] 2026/01/27 - 22:37:57 | 200 |   54.074756ms |             ::1 | GET      "/api/waiter/orders"
+[GIN] 2026/01/27 - 22:37:57 | 200 |   56.851415ms |             ::1 | GET      "/api/waiter/menu"
+[GIN] 2026/01/27 - 22:38:55 | 204 |        7.93µs |             ::1 | OPTIONS  "/api/waiter/menu"
+[GIN] 2026/01/27 - 22:38:55 | 204 |       3.641µs |             ::1 | OPTIONS  "/api/waiter/tables"
+[GIN] 2026/01/27 - 22:38:55 | 204 |       3.191µs |             ::1 | OPTIONS  "/api/waiter/orders"
+[GIN] 2026/01/27 - 22:38:55 | 204 |       2.807µs |             ::1 | OPTIONS  "/api/waiter/shifts/current"
+[GIN] 2026/01/27 - 22:38:55 | 200 |   10.407468ms |             ::1 | GET      "/api/waiter/tables"
+[GIN] 2026/01/27 - 22:38:55 | 404 |   11.837128ms |             ::1 | GET      "/api/waiter/shifts/current"
+[GIN] 2026/01/27 - 22:38:55 | 200 |   15.771789ms |             ::1 | GET      "/api/waiter/orders"
+[GIN] 2026/01/27 - 22:38:55 | 200 |   21.554937ms |             ::1 | GET      "/api/waiter/menu"
+[GIN] 2026/01/27 - 22:39:25 | 204 |       8.493µs |             ::1 | OPTIONS  "/api/login"
+[GIN] 2026/01/27 - 22:39:26 | 200 |  1.031702137s |             ::1 | POST     "/api/login"
+[GIN] 2026/01/27 - 22:39:29 | 204 |       6.031µs |             ::1 | OPTIONS  "/api/waiter/shifts/current"
+[GIN] 2026/01/27 - 22:39:29 | 204 |       6.899µs |             ::1 | OPTIONS  "/api/waiter/orders"
+[GIN] 2026/01/27 - 22:39:29 | 204 |       7.207µs |             ::1 | OPTIONS  "/api/waiter/menu"
+[GIN] 2026/01/27 - 22:39:29 | 204 |       16.46µs |             ::1 | OPTIONS  "/api/waiter/tables"
+[GIN] 2026/01/27 - 22:39:29 | 200 |    3.210046ms |             ::1 | GET      "/api/waiter/orders"
+[GIN] 2026/01/27 - 22:39:29 | 200 |    3.768764ms |             ::1 | GET      "/api/waiter/tables"
+[GIN] 2026/01/27 - 22:39:29 | 404 |   10.882469ms |             ::1 | GET      "/api/waiter/shifts/current"
+[GIN] 2026/01/27 - 22:39:29 | 200 |   15.374629ms |             ::1 | GET      "/api/waiter/menu"
+[GIN] 2026/01/27 - 22:40:17 | 204 |      10.687µs |             ::1 | OPTIONS  "/api/login"
+[GIN] 2026/01/27 - 22:40:18 | 200 |   1.00724168s |             ::1 | POST     "/api/login"
+[GIN] 2026/01/27 - 22:40:20 | 204 |       7.104µs |             ::1 | OPTIONS  "/api/waiter/shifts/current"
+[GIN] 2026/01/27 - 22:40:20 | 204 |       7.621µs |             ::1 | OPTIONS  "/api/waiter/orders"
+[GIN] 2026/01/27 - 22:40:20 | 204 |       5.302µs |             ::1 | OPTIONS  "/api/waiter/tables"
+[GIN] 2026/01/27 - 22:40:20 | 204 |      10.501µs |             ::1 | OPTIONS  "/api/waiter/menu"
+[GIN] 2026/01/27 - 22:40:20 | 404 |   26.309609ms |             ::1 | GET      "/api/waiter/shifts/current"
+[GIN] 2026/01/27 - 22:40:20 | 200 |    7.179564ms |             ::1 | GET      "/api/waiter/orders"
+[GIN] 2026/01/27 - 22:40:20 | 200 |    7.413881ms |             ::1 | GET      "/api/waiter/tables"
+[GIN] 2026/01/27 - 22:40:20 | 200 |   32.564819ms |             ::1 | GET      "/api/waiter/menu"
+[GIN] 2026/01/27 - 22:40:36 | 204 |        8.76µs |             ::1 | OPTIONS  "/api/waiter/shifts/current"
+[GIN] 2026/01/27 - 22:40:36 | 204 |       5.646µs |             ::1 | OPTIONS  "/api/waiter/orders"
+[GIN] 2026/01/27 - 22:40:36 | 204 |       6.897µs |             ::1 | OPTIONS  "/api/waiter/tables"
+[GIN] 2026/01/27 - 22:40:36 | 204 |       6.646µs |             ::1 | OPTIONS  "/api/waiter/menu"
+[GIN] 2026/01/27 - 22:40:36 | 404 |   10.549965ms |             ::1 | GET      "/api/waiter/shifts/current"
+[GIN] 2026/01/27 - 22:40:36 | 200 |    10.69883ms |             ::1 | GET      "/api/waiter/orders"
+[GIN] 2026/01/27 - 22:40:36 | 200 |   14.273479ms |             ::1 | GET      "/api/waiter/tables"
+[GIN] 2026/01/27 - 22:40:36 | 200 |   19.951377ms |             ::1 | GET      "/api/waiter/menu"
+[GIN] 2026/01/27 - 22:41:14 | 204 |       8.816µs |             ::1 | OPTIONS  "/api/waiter/shifts/current"
+[GIN] 2026/01/27 - 22:41:14 | 204 |       6.611µs |             ::1 | OPTIONS  "/api/waiter/orders"
+[GIN] 2026/01/27 - 22:41:14 | 204 |       8.427µs |             ::1 | OPTIONS  "/api/waiter/tables"
+[GIN] 2026/01/27 - 22:41:14 | 204 |       4.251µs |             ::1 | OPTIONS  "/api/waiter/menu"
+[GIN] 2026/01/27 - 22:41:14 | 200 |    2.499242ms |             ::1 | GET      "/api/waiter/tables"
+[GIN] 2026/01/27 - 22:41:14 | 200 |    4.333487ms |             ::1 | GET      "/api/waiter/orders"
+[GIN] 2026/01/27 - 22:41:14 | 404 |    5.058199ms |             ::1 | GET      "/api/waiter/shifts/current"
+[GIN] 2026/01/27 - 22:41:14 | 200 |    8.914581ms |             ::1 | GET      "/api/waiter/menu"

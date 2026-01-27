@@ -6,6 +6,9 @@ import MenuView from '../views/MenuView.vue'
 import IngredientView from '../views/IngredientView.vue'
 import FacilityView from '../views/FacilityView.vue'
 import ExpenseView from '../views/ExpenseView.vue'
+import OrderView from '../views/OrderView.vue'
+import TableView from '../views/TableView.vue'
+import ShiftView from '../views/ShiftView.vue'
 
 const routes = [
   {
@@ -47,6 +50,24 @@ const routes = [
     name: 'Expenses',
     component: ExpenseView,
     meta: { requiresAuth: true, requiresManager: true }
+  },
+  {
+    path: '/orders',
+    name: 'Orders',
+    component: OrderView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/tables',
+    name: 'Tables',
+    component: TableView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/shifts',
+    name: 'Shifts',
+    component: ShiftView,
+    meta: { requiresAuth: true }
   }
 ]
 

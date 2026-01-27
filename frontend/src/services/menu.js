@@ -1,8 +1,8 @@
-import api from './auth'
+import api from './api'
 
 export const menuService = {
   async getMenuItems() {
-    const response = await api.get('/manager/menu')
+    const response = await api.get('/waiter/menu')
     return response.data
   },
 

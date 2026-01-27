@@ -33,13 +33,22 @@ func main() {
 
 	// Repositories
 	userRepo := mongodb.NewUserRepository(db)
+	orderRepo := mongodb.NewOrderRepository(db)
+	tableRepo := mongodb.NewTableRepository(db)
+	shiftRepo := mongodb.NewShiftRepository(db)
 
 	// Services
 	jwtService := services.NewJWTService("your-secret-key")
 	authService := services.NewAuthService(userRepo, jwtService)
+	orderService := services.NewOrderService(orderRepo, shiftRepo, tableRepo)
+	tableService := services.NewTableService(tableRepo)
+	shiftService := services.NewShiftService(shiftRepo, orderRepo)
 
 	// Handlers
 	authHandler := http.NewAuthHandler(authService)
+	orderHandler := http.NewOrderHandler(orderService)
+	tableHandler := http.NewTableHandler(tableService)
+	shiftHandler := http.NewShiftHandler(shiftService)
 	menuRepo := mongodb.NewMenuRepository(db)
 	menuService := services.NewMenuService(menuRepo)
 	menuHandler := http.NewMenuHandler(menuService)
@@ -82,6 +91,27 @@ func main() {
 			waiter := protected.Group("/waiter")
 			waiter.Use(http.RequireRole(user.RoleWaiter, user.RoleCashier, user.RoleManager))
 			{
+				// Shift management
+				waiter.POST("/shifts/start", shiftHandler.StartShift)
+				waiter.POST("/shifts/:id/end", shiftHandler.EndShift)
+				waiter.GET("/shifts/current", shiftHandler.GetCurrentShift)
+				waiter.GET("/shifts", shiftHandler.GetMyShifts)
+				
+				// Order management
+				waiter.POST("/orders", orderHandler.CreateOrder)
+				waiter.PUT("/orders/:id/confirm", orderHandler.ConfirmOrder)
+				waiter.POST("/orders/:id/payment", orderHandler.PayOrder)
+				waiter.POST("/orders/:id/send", orderHandler.SendToKitchen)
+				waiter.POST("/orders/:id/serve", orderHandler.ServeOrder)
+				waiter.GET("/orders", orderHandler.GetMyOrders)
+				waiter.GET("/orders/:id", orderHandler.GetOrder)
+				
+				// Tables (read-only)
+				waiter.GET("/tables", tableHandler.GetAllTables)
+				
+				// Menu (read-only)
+				waiter.GET("/menu", menuHandler.GetAllMenuItems)
+				
 				waiter.GET("/profile", func(c *gin.Context) {
 					c.JSON(200, gin.H{"message": "waiter access"})
 				})
@@ -91,6 +121,23 @@ func main() {
 				waiter.GET("/facilities", facilityHandler.GetAllFacilities)
 				waiter.GET("/facilities/search", facilityHandler.SearchFacilities)
 				waiter.POST("/issues", facilityHandler.CreateIssueReport)
+			}
+
+			// Cashier routes
+			cashier := protected.Group("/cashier")
+			cashier.Use(http.RequireRole(user.RoleCashier, user.RoleManager))
+			{
+				// Order management
+				cashier.GET("/orders", orderHandler.GetAllOrders)
+				cashier.GET("/orders/:id", orderHandler.GetOrder)
+				cashier.POST("/orders/:id/cancel", orderHandler.CancelOrder)
+				cashier.POST("/orders/:id/refund", orderHandler.RefundOrder)
+				cashier.POST("/orders/:id/lock", orderHandler.LockOrder)
+				
+				// Shift management
+				cashier.POST("/shifts/:id/close", shiftHandler.CloseShift)
+				cashier.GET("/shifts", shiftHandler.GetAllShifts)
+				cashier.GET("/shifts/:id", shiftHandler.GetShift)
 			}
 
 			// Manager routes
@@ -151,6 +198,24 @@ func main() {
 				manager.POST("/prepaid-expenses", expenseHandler.CreatePrepaid)
 				manager.GET("/prepaid-expenses", expenseHandler.GetPrepaid)
 				manager.DELETE("/prepaid-expenses/:id", expenseHandler.DeletePrepaid)
+				
+				// Table management routes
+				manager.POST("/tables", tableHandler.CreateTable)
+				manager.GET("/tables", tableHandler.GetAllTables)
+				manager.GET("/tables/:id", tableHandler.GetTable)
+				manager.PUT("/tables/:id", tableHandler.UpdateTable)
+				manager.DELETE("/tables/:id", tableHandler.DeleteTable)
+				
+				// Order management routes (full access)
+				manager.GET("/orders", orderHandler.GetAllOrders)
+				manager.GET("/orders/:id", orderHandler.GetOrder)
+				manager.POST("/orders", orderHandler.CreateOrder)
+				manager.POST("/orders/:id/cancel", orderHandler.CancelOrder)
+				manager.POST("/orders/:id/refund", orderHandler.RefundOrder)
+				
+				// Shift management routes
+				manager.GET("/shifts", shiftHandler.GetAllShifts)
+				manager.GET("/shifts/:id", shiftHandler.GetShift)
 			}
 		}
 	}

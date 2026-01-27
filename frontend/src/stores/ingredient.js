@@ -89,15 +89,15 @@ export const useIngredientStore = defineStore('ingredient', {
       }
     },
 
-    async adjustStock(adjustment) {
+    async adjustStock(id, adjustment) {
       this.error = null
       try {
-        await ingredientService.adjustStock(adjustment)
-        // Refresh the ingredient data
-        const ingredient = this.items.find(i => i.id === adjustment.ingredient_id)
-        if (ingredient) {
-          ingredient.quantity += adjustment.quantity
+        const updatedItem = await ingredientService.adjustStock(id, adjustment)
+        const index = this.items.findIndex(i => i.id === id)
+        if (index !== -1) {
+          this.items[index] = updatedItem
         }
+        await this.fetchLowStock()
         return true
       } catch (error) {
         this.error = error.response?.data?.error || 'Lỗi điều chỉnh tồn kho'

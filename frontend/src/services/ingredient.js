@@ -26,17 +26,17 @@ export const ingredientService = {
   },
 
   async getLowStockItems() {
-    const response = await api.get('/ingredients/low-stock')
+    const response = await api.get('/manager/ingredients/low-stock')
     return response.data
   },
 
   async getStockHistory(id) {
-    const response = await api.get(`/ingredients/${id}/history`)
+    const response = await api.get(`/manager/ingredients/${id}/history`)
     return response.data
   },
 
-  async adjustStock(adjustment) {
-    const response = await api.post('/manager/ingredients/adjust-stock', adjustment)
+  async adjustStock(id, adjustment) {
+    const response = await api.post(`/manager/ingredients/${id}/adjust`, adjustment)
     return response.data
   }
 }
