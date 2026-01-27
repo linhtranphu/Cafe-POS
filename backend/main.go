@@ -36,6 +36,10 @@ func main() {
 	orderRepo := mongodb.NewOrderRepository(db)
 	tableRepo := mongodb.NewTableRepository(db)
 	shiftRepo := mongodb.NewShiftRepository(db)
+	// Cashier repositories
+	cashReconciliationRepo := mongodb.NewCashReconciliationRepository(db)
+	paymentDiscrepancyRepo := mongodb.NewPaymentDiscrepancyRepository(db)
+	paymentAuditRepo := mongodb.NewPaymentAuditRepository(db)
 
 	// Services
 	jwtService := services.NewJWTService("your-secret-key")
@@ -43,12 +47,18 @@ func main() {
 	orderService := services.NewOrderService(orderRepo, shiftRepo, tableRepo)
 	tableService := services.NewTableService(tableRepo)
 	shiftService := services.NewShiftService(shiftRepo, orderRepo)
+	// Cashier services
+	cashReconciliationService := services.NewCashReconciliationService(cashReconciliationRepo, shiftRepo, orderRepo)
+	paymentOversightService := services.NewPaymentOversightService(orderRepo, paymentDiscrepancyRepo, paymentAuditRepo)
+	cashierReportService := services.NewCashierReportService(orderRepo, cashReconciliationRepo, shiftRepo, paymentAuditRepo)
 
 	// Handlers
 	authHandler := http.NewAuthHandler(authService)
 	orderHandler := http.NewOrderHandler(orderService)
 	tableHandler := http.NewTableHandler(tableService)
 	shiftHandler := http.NewShiftHandler(shiftService)
+	// Cashier handler
+	cashierHandler := http.NewCashierHandler(cashReconciliationService, paymentOversightService, cashierReportService)
 	menuRepo := mongodb.NewMenuRepository(db)
 	menuService := services.NewMenuService(menuRepo)
 	menuHandler := http.NewMenuHandler(menuService)
@@ -132,12 +142,25 @@ func main() {
 				cashier.GET("/orders/:id", orderHandler.GetOrder)
 				cashier.POST("/orders/:id/cancel", orderHandler.CancelOrder)
 				cashier.POST("/orders/:id/refund", orderHandler.RefundOrder)
-				cashier.POST("/orders/:id/lock", orderHandler.LockOrder)
 				
 				// Shift management
 				cashier.POST("/shifts/:id/close", shiftHandler.CloseShift)
 				cashier.GET("/shifts", shiftHandler.GetAllShifts)
 				cashier.GET("/shifts/:id", shiftHandler.GetShift)
+				
+				// Cashier-specific routes
+				cashier.GET("/shifts/:id/status", cashierHandler.GetShiftStatus)
+				cashier.GET("/shifts/:id/payments", cashierHandler.GetPaymentsByShift)
+				cashier.POST("/discrepancies", cashierHandler.ReportDiscrepancy)
+				cashier.GET("/discrepancies/pending", cashierHandler.GetPendingDiscrepancies)
+				cashier.POST("/discrepancies/:id/resolve", cashierHandler.ResolveDiscrepancy)
+				cashier.POST("/reconcile/cash", cashierHandler.ReconcileCash)
+				cashier.POST("/orders/:id/override", cashierHandler.OverridePayment)
+				cashier.POST("/orders/:id/lock", cashierHandler.LockOrder)
+				cashier.GET("/reports/shift/:id", cashierHandler.GenerateShiftReport)
+				cashier.GET("/reports/daily", cashierHandler.GetDailyReport)
+				cashier.POST("/handover", cashierHandler.HandoverShift)
+				cashier.GET("/orders/:id/audits", cashierHandler.GetOrderAudits)
 			}
 
 			// Manager routes

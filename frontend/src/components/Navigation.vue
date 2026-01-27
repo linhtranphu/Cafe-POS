@@ -44,6 +44,20 @@
           <span class="text-sm font-medium text-center">Bàn</span>
         </router-link>
 
+        <!-- Cashier Dashboard (Cashier & Manager only) -->
+        <router-link v-if="['cashier', 'manager'].includes(userRole)" to="/cashier" @click="handleNavClick"
+          class="bg-gradient-to-br from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white rounded-xl p-4 flex flex-col items-center justify-center min-h-[100px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+          <div class="text-2xl mb-2">💵</div>
+          <span class="text-sm font-medium text-center">Thu ngân</span>
+        </router-link>
+
+        <!-- Cashier Reports (Cashier & Manager only) -->
+        <router-link v-if="['cashier', 'manager'].includes(userRole)" to="/cashier/reports" @click="handleNavClick"
+          class="bg-gradient-to-br from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white rounded-xl p-4 flex flex-col items-center justify-center min-h-[100px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+          <div class="text-2xl mb-2">📊</div>
+          <span class="text-sm font-medium text-center">Báo cáo</span>
+        </router-link>
+
         <!-- Manager only cards -->
         <template v-if="userRole === 'manager'">
           <!-- Menu -->

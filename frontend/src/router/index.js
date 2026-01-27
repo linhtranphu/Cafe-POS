@@ -9,6 +9,8 @@ import ExpenseView from '../views/ExpenseView.vue'
 import OrderView from '../views/OrderView.vue'
 import TableView from '../views/TableView.vue'
 import ShiftView from '../views/ShiftView.vue'
+import CashierDashboard from '../views/CashierDashboard.vue'
+import CashierReports from '../views/CashierReports.vue'
 
 const routes = [
   {
@@ -68,6 +70,18 @@ const routes = [
     name: 'Shifts',
     component: ShiftView,
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/cashier',
+    name: 'CashierDashboard',
+    component: CashierDashboard,
+    meta: { requiresAuth: true, requiresCashier: true }
+  },
+  {
+    path: '/cashier/reports',
+    name: 'CashierReports',
+    component: CashierReports,
+    meta: { requiresAuth: true, requiresCashier: true }
   }
 ]
 
@@ -84,6 +98,8 @@ router.beforeEach((to, from, next) => {
   } else if (to.meta.requiresGuest && authStore.isAuthenticated) {
     next('/dashboard')
   } else if (to.meta.requiresManager && authStore.user?.role !== 'manager') {
+    next('/dashboard')
+  } else if (to.meta.requiresCashier && !['cashier', 'manager'].includes(authStore.user?.role)) {
     next('/dashboard')
   } else {
     next()
