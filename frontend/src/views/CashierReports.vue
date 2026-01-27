@@ -22,7 +22,7 @@
           <select v-model="selectedShiftForReport" class="w-full border rounded px-3 py-2 mb-3">
             <option value="">Chọn ca</option>
             <option v-for="shift in availableShifts" :key="shift.id" :value="shift.id">
-              {{ shift.type }} - {{ formatDate(shift.start_time) }}
+              {{ shift.type }} - {{ formatDate(shift.started_at) }}
             </option>
           </select>
           <button

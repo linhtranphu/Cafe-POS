@@ -21,9 +21,7 @@ export const useAuthStore = defineStore('auth', {
       this.loading = true
       this.error = null
       try {
-        console.log('Sending login request with:', credentials)
         const response = await authLogin(credentials)
-        console.log('Login response:', response)
         
         if (response && response.user && response.token) {
           this.user = response.user
@@ -39,7 +37,6 @@ export const useAuthStore = defineStore('auth', {
         }
       } catch (error) {
         console.error('Login error:', error)
-        console.error('Error response:', error.response?.data)
         this.error = error.response?.data?.error || error.message || 'Đăng nhập thất bại'
         return false
       } finally {

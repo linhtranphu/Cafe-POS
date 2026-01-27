@@ -52,7 +52,7 @@
         <select v-model="selectedShift" @change="loadPayments" class="border rounded px-3 py-1">
           <option value="">Chọn ca</option>
           <option v-for="shift in availableShifts" :key="shift.id" :value="shift.id">
-            {{ shift.type }} - {{ formatDate(shift.start_time) }}
+            {{ shift.type }} - {{ formatDate(shift.started_at) }}
           </option>
         </select>
       </div>
