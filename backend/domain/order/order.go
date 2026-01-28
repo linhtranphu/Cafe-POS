@@ -83,6 +83,13 @@ type EditOrderRequest struct {
 	Note     string      `json:"note"`
 }
 
+type EditOrderResponse struct {
+	Order        *Order  `json:"order"`
+	RefundAmount float64 `json:"refund_amount,omitempty"`
+	RefundReason string  `json:"refund_reason,omitempty"`
+	Message      string  `json:"message,omitempty"`
+}
+
 type RefundRequest struct {
 	Amount float64 `json:"amount" binding:"required,gt=0"`
 	Reason string  `json:"reason" binding:"required"`

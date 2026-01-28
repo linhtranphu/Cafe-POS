@@ -99,7 +99,7 @@ func (s *OrderService) CollectPayment(ctx context.Context, id primitive.ObjectID
 	return o, nil
 }
 
-func (s *OrderService) EditOrder(ctx context.Context, id primitive.ObjectID, req *order.EditOrderRequest) (*order.Order, error) {
+func (s *OrderService) EditOrder(ctx context.Context, id primitive.ObjectID, req *order.EditOrderRequest) (*order.EditOrderResponse, error) {
 	o, err := s.orderRepo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -109,6 +109,10 @@ func (s *OrderService) EditOrder(ctx context.Context, id primitive.ObjectID, req
 		return nil, errors.New("order is not editable in current state")
 	}
 
+	// Store old total for refund calculation
+	oldTotal := o.Total
+	oldAmountPaid := o.AmountPaid
+
 	// Update order details
 	o.Items = req.Items
 	o.Discount = req.Discount
@@ -117,10 +121,36 @@ func (s *OrderService) EditOrder(ctx context.Context, id primitive.ObjectID, req
 	// Recalculate totals
 	o.CalculateTotal()
 
+	response := &order.EditOrderResponse{
+		Order: o,
+	}
+
+	// Handle refund if new total is less than amount paid
+	if o.Total < oldAmountPaid {
+		excessAmount := oldAmountPaid - o.Total
+		o.RefundAmount += excessAmount
+		o.AmountPaid = o.Total // Adjust amount paid to match new total
+		o.RefundReason = fmt.Sprintf("Auto refund due to order edit. Old total: %.2f, New total: %.2f", oldTotal, o.Total)
+		
+		// Recalculate after refund adjustment
+		o.CalculateTotal()
+		
+		// Add refund info to response
+		response.RefundAmount = excessAmount
+		response.RefundReason = o.RefundReason
+		response.Message = fmt.Sprintf("Order updated. Refund amount: %.2f VND", excessAmount)
+	} else if o.Total > oldAmountPaid {
+		// Need additional payment
+		response.Message = fmt.Sprintf("Order updated. Additional payment needed: %.2f VND", o.AmountDue)
+	} else {
+		response.Message = "Order updated successfully"
+	}
+
 	if err := s.orderRepo.Update(ctx, id, o); err != nil {
 		return nil, err
 	}
-	return o, nil
+	
+	return response, nil
 }
 
 func (s *OrderService) RefundPartial(ctx context.Context, id primitive.ObjectID, req *order.RefundRequest) (*order.Order, error) {

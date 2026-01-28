@@ -29,7 +29,9 @@
       <div v-if="loading" class="text-center py-10">Đang tải...</div>
       <div v-else-if="filteredOrders.length === 0" class="text-center py-10 text-gray-500">Không có order nào</div>
       <div v-else class="grid gap-4">
-        <div v-for="order in filteredOrders" :key="order.id" class="bg-white rounded-xl p-4 shadow-sm">
+        <div v-for="order in filteredOrders" :key="order.id" 
+          :class="['bg-white rounded-xl p-4 shadow-sm transition-all duration-500', 
+                   order.refund_amount > 0 ? 'ring-2 ring-orange-200 bg-gradient-to-r from-white to-orange-50' : '']">
           <div class="flex justify-between items-start mb-3">
             <div>
               <h3 class="font-bold text-lg">{{ order.order_number }}</h3>
@@ -49,10 +51,22 @@
             </div>
           </div>
 
+          <!-- Refund Info -->
+          <div v-if="order.refund_amount > 0" class="mb-2 p-3 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-lg border-l-4 border-orange-400 shadow-sm">
+            <div class="flex items-center gap-2 text-orange-700 font-medium">
+              <span class="text-lg">💸</span>
+              <span>Đã hoàn tiền: <span class="font-bold text-orange-800">{{ formatPrice(order.refund_amount) }}</span></span>
+            </div>
+            <div v-if="order.refund_reason" class="text-sm text-orange-600 mt-1 ml-6">
+              {{ order.refund_reason }}
+            </div>
+          </div>
+
           <!-- Payment Status -->
-          <div v-if="order.status === 'PAID' && order.amount_due > 0" class="mb-2 p-2 bg-yellow-50 rounded">
-            <div class="text-sm text-yellow-700">
-              <span class="font-medium">Còn thiếu:</span> {{ formatPrice(order.amount_due) }}
+          <div v-if="order.status === 'PAID' && order.amount_due > 0" class="mb-2 p-3 bg-gradient-to-r from-yellow-50 to-amber-50 rounded-lg border-l-4 border-yellow-400 shadow-sm">
+            <div class="flex items-center gap-2 text-yellow-700 font-medium">
+              <span class="text-lg">⚠️</span>
+              <span>Còn thiếu: <span class="font-bold text-yellow-800">{{ formatPrice(order.amount_due) }}</span></span>
             </div>
           </div>
 
@@ -65,6 +79,10 @@
             <div v-if="order.amount_paid > 0" class="flex justify-between text-sm text-gray-600">
               <span>Đã thu:</span>
               <span>{{ formatPrice(order.amount_paid) }}</span>
+            </div>
+            <div v-if="order.refund_amount > 0" class="flex justify-between text-sm text-orange-600">
+              <span>Đã hoàn:</span>
+              <span>-{{ formatPrice(order.refund_amount) }}</span>
             </div>
           </div>
 
@@ -236,8 +254,13 @@
                 Hủy
               </button>
               <button type="submit" :disabled="editForm.items.length === 0" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
-                Cập nhật
+                Cập nhật Order
               </button>
+            </div>
+            
+            <!-- Warning about refund -->
+            <div class="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-700">
+              ⚠️ Lưu ý: Nếu tổng tiền mới thấp hơn số tiền đã thu, hệ thống sẽ tự động hoàn tiền phần chênh lệch.
             </div>
           </form>
         </div>
@@ -446,10 +469,13 @@ const removeItemFromEdit = (index) => {
 
 const editOrder = async () => {
   try {
-    await orderStore.editOrder(selectedOrder.value.id, editForm.value)
+    const response = await orderStore.editOrder(selectedOrder.value.id, editForm.value)
     showEdit.value = false
     selectedOrder.value = null
     editForm.value = { items: [], discount: 0, note: '' }
+    
+    // Refresh orders to show updated status
+    await orderStore.fetchOrders()
   } catch (error) {
     alert('Lỗi: ' + error.message)
   }

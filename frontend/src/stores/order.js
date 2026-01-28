@@ -63,9 +63,9 @@ export const useOrderStore = defineStore('order', {
     async editOrder(id, orderData) {
       this.error = null
       try {
-        const order = await orderService.editOrder(id, orderData)
-        this.updateOrderInList(order)
-        return order
+        const response = await orderService.editOrder(id, orderData)
+        this.updateOrderInList(response.order)
+        return response
       } catch (error) {
         this.error = error.response?.data?.error || 'Lỗi chỉnh sửa order'
         throw error

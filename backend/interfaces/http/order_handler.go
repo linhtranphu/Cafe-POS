@@ -77,13 +77,13 @@ func (h *OrderHandler) EditOrder(c *gin.Context) {
 		return
 	}
 
-	o, err := h.orderService.EditOrder(c.Request.Context(), id, &req)
+	response, err := h.orderService.EditOrder(c.Request.Context(), id, &req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, o)
+	c.JSON(http.StatusOK, response)
 }
 
 func (h *OrderHandler) RefundPartial(c *gin.Context) {
