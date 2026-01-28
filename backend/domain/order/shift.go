@@ -20,14 +20,57 @@ const (
 	ShiftEvening   ShiftType = "EVENING"
 )
 
+type RoleType string
+
+const (
+	RoleWaiter  RoleType = "waiter"
+	RoleCashier RoleType = "cashier"
+	RoleBarista RoleType = "barista"
+)
+
+// ParseRoleType converts a string to RoleType
+func ParseRoleType(role string) RoleType {
+	switch role {
+	case "waiter":
+		return RoleWaiter
+	case "cashier":
+		return RoleCashier
+	case "barista":
+		return RoleBarista
+	default:
+		return RoleWaiter // default fallback
+	}
+}
+
+// IsValid checks if the RoleType is valid
+func (r RoleType) IsValid() bool {
+	switch r {
+	case RoleWaiter, RoleCashier, RoleBarista:
+		return true
+	default:
+		return false
+	}
+}
+
+// String returns the string representation
+func (r RoleType) String() string {
+	return string(r)
+}
+
 type Shift struct {
 	ID            primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	Type          ShiftType          `bson:"type" json:"type"`
 	Status        ShiftStatus        `bson:"status" json:"status"`
-	WaiterID      primitive.ObjectID `bson:"waiter_id" json:"waiter_id"`
-	WaiterName    string             `bson:"waiter_name" json:"waiter_name"`
+	RoleType      RoleType           `bson:"role_type" json:"role_type"`
+	UserID        primitive.ObjectID `bson:"user_id" json:"user_id"`
+	UserName      string             `bson:"user_name" json:"user_name"`
+	
+	// Legacy fields - kept for backward compatibility
+	WaiterID      primitive.ObjectID `bson:"waiter_id,omitempty" json:"waiter_id,omitempty"`
+	WaiterName    string             `bson:"waiter_name,omitempty" json:"waiter_name,omitempty"`
 	CashierID     primitive.ObjectID `bson:"cashier_id,omitempty" json:"cashier_id,omitempty"`
 	CashierName   string             `bson:"cashier_name,omitempty" json:"cashier_name,omitempty"`
+	
 	StartCash     float64            `bson:"start_cash" json:"start_cash"`
 	EndCash       float64            `bson:"end_cash" json:"end_cash"`
 	TotalRevenue  float64            `bson:"total_revenue" json:"total_revenue"`
@@ -41,7 +84,8 @@ type Shift struct {
 type StartShiftRequest struct {
 	Type      ShiftType `json:"type" binding:"required"`
 	StartCash float64   `json:"start_cash" binding:"min=0"`
-	WaiterID  string    `json:"waiter_id"`
+	UserID    string    `json:"user_id"`
+	RoleType  RoleType  `json:"role_type"`
 }
 
 type EndShiftRequest struct {

@@ -105,6 +105,11 @@ func (s *OrderService) EditOrder(ctx context.Context, id primitive.ObjectID, req
 		return nil, err
 	}
 
+	// BR-07: Once order enters IN_PROGRESS, no modification or refund is allowed
+	if !o.CanModify() {
+		return nil, errors.New("order cannot be modified after being accepted by barista")
+	}
+
 	if !o.IsEditable() {
 		return nil, errors.New("order is not editable in current state")
 	}
@@ -159,8 +164,9 @@ func (s *OrderService) RefundPartial(ctx context.Context, id primitive.ObjectID,
 		return nil, err
 	}
 
-	if o.Status != order.StatusPaid {
-		return nil, errors.New("can only refund paid orders")
+	// BR-08: Refunds only allowed before QUEUED
+	if !o.CanRefund() {
+		return nil, errors.New("can only refund paid orders before they are sent to barista")
 	}
 
 	if req.Amount > o.AmountPaid {
@@ -181,6 +187,7 @@ func (s *OrderService) RefundPartial(ctx context.Context, id primitive.ObjectID,
 	return o, nil
 }
 
+// SendToBar - Waiter sends order to barista queue
 func (s *OrderService) SendToBar(ctx context.Context, id primitive.ObjectID) (*order.Order, error) {
 	o, err := s.orderRepo.FindByID(ctx, id)
 	if err != nil {
@@ -191,13 +198,13 @@ func (s *OrderService) SendToBar(ctx context.Context, id primitive.ObjectID) (*o
 		return nil, errors.New("order must be fully paid before sending to bar")
 	}
 
-	if !o.CanTransitionTo(order.StatusInProgress) {
+	if !o.CanTransitionTo(order.StatusQueued) {
 		return nil, errors.New("cannot send order to bar in current state")
 	}
 
 	now := time.Now()
-	o.Status = order.StatusInProgress
-	o.SentToBarAt = &now
+	o.Status = order.StatusQueued
+	o.QueuedAt = &now
 
 	if err := s.orderRepo.Update(ctx, id, o); err != nil {
 		return nil, err
@@ -205,6 +212,59 @@ func (s *OrderService) SendToBar(ctx context.Context, id primitive.ObjectID) (*o
 	return o, nil
 }
 
+// AcceptOrder - BR-06: Only Barista can move order to IN_PROGRESS
+// BR-13: Barista must have an open shift to accept orders
+func (s *OrderService) AcceptOrder(ctx context.Context, id primitive.ObjectID, baristaID, baristaName string) (*order.Order, error) {
+	o, err := s.orderRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if !o.CanTransitionTo(order.StatusInProgress) {
+		return nil, errors.New("cannot accept order in current state")
+	}
+
+	// BR-13: Check if barista has an open shift
+	baristaOID, _ := primitive.ObjectIDFromHex(baristaID)
+	shift, err := s.shiftRepo.FindOpenShiftByUser(ctx, baristaOID, order.RoleBarista)
+	if err != nil || shift == nil {
+		return nil, errors.New("barista must open a shift before accepting orders")
+	}
+
+	now := time.Now()
+	o.Status = order.StatusInProgress
+	o.BaristaID = baristaOID
+	o.BaristaName = baristaName
+	o.AcceptedAt = &now
+
+	if err := s.orderRepo.Update(ctx, id, o); err != nil {
+		return nil, err
+	}
+	return o, nil
+}
+
+// FinishPreparing - BR-09: Barista marks drink as READY
+func (s *OrderService) FinishPreparing(ctx context.Context, id primitive.ObjectID) (*order.Order, error) {
+	o, err := s.orderRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if !o.CanTransitionTo(order.StatusReady) {
+		return nil, errors.New("cannot mark order as ready in current state")
+	}
+
+	now := time.Now()
+	o.Status = order.StatusReady
+	o.ReadyAt = &now
+
+	if err := s.orderRepo.Update(ctx, id, o); err != nil {
+		return nil, err
+	}
+	return o, nil
+}
+
+// ServeOrder - Waiter delivers drink to customer
 func (s *OrderService) ServeOrder(ctx context.Context, id primitive.ObjectID) (*order.Order, error) {
 	o, err := s.orderRepo.FindByID(ctx, id)
 	if err != nil {
@@ -231,6 +291,11 @@ func (s *OrderService) CancelOrder(ctx context.Context, id primitive.ObjectID, r
 		return nil, err
 	}
 
+	// BR-07: Cannot cancel once barista has accepted
+	if o.Status == order.StatusInProgress || o.Status == order.StatusReady {
+		return nil, errors.New("cannot cancel order after barista has started preparing")
+	}
+
 	if !o.CanTransitionTo(order.StatusCancelled) {
 		return nil, errors.New("cannot cancel order in current state")
 	}
@@ -243,6 +308,48 @@ func (s *OrderService) CancelOrder(ctx context.Context, id primitive.ObjectID, r
 	}
 
 	return o, nil
+}
+
+// GetQueuedOrders - Get orders waiting for barista
+func (s *OrderService) GetQueuedOrders(ctx context.Context) ([]*order.Order, error) {
+	return s.orderRepo.FindByStatus(ctx, order.StatusQueued)
+}
+
+// GetBaristaOrders - Get orders assigned to a barista
+func (s *OrderService) GetBaristaOrders(ctx context.Context, baristaID primitive.ObjectID) ([]*order.Order, error) {
+	// Get IN_PROGRESS, READY, and SERVED orders for barista
+	inProgress, err := s.orderRepo.FindByStatus(ctx, order.StatusInProgress)
+	if err != nil {
+		return nil, err
+	}
+	ready, err := s.orderRepo.FindByStatus(ctx, order.StatusReady)
+	if err != nil {
+		return nil, err
+	}
+	served, err := s.orderRepo.FindByStatus(ctx, order.StatusServed)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Combine and filter by barista
+	var result []*order.Order
+	for _, o := range inProgress {
+		if o.BaristaID == baristaID {
+			result = append(result, o)
+		}
+	}
+	for _, o := range ready {
+		if o.BaristaID == baristaID {
+			result = append(result, o)
+		}
+	}
+	for _, o := range served {
+		if o.BaristaID == baristaID {
+			result = append(result, o)
+		}
+	}
+	
+	return result, nil
 }
 
 func (s *OrderService) LockOrder(ctx context.Context, id primitive.ObjectID) (*order.Order, error) {

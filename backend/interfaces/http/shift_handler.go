@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"cafe-pos/backend/application/services"
 	"cafe-pos/backend/domain/order"
+	"cafe-pos/backend/domain/user"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -25,8 +26,12 @@ func (h *ShiftHandler) StartShift(c *gin.Context) {
 
 	userID, _ := c.Get("user_id")
 	username, _ := c.Get("username")
+	role, _ := c.Get("role")
+	
+	// Convert user.Role to order.RoleType
+	roleType := order.ParseRoleType(string(role.(user.Role)))
 
-	shift, err := h.shiftService.StartShift(c.Request.Context(), &req, userID.(string), username.(string))
+	shift, err := h.shiftService.StartShift(c.Request.Context(), &req, userID.(string), username.(string), roleType)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -83,9 +88,13 @@ func (h *ShiftHandler) CloseShift(c *gin.Context) {
 
 func (h *ShiftHandler) GetCurrentShift(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	waiterID, _ := primitive.ObjectIDFromHex(userID.(string))
+	role, _ := c.Get("role")
+	userOID, _ := primitive.ObjectIDFromHex(userID.(string))
+	
+	// Convert user.Role to order.RoleType
+	roleType := order.ParseRoleType(string(role.(user.Role)))
 
-	shift, err := h.shiftService.GetCurrentShift(c.Request.Context(), waiterID)
+	shift, err := h.shiftService.GetCurrentShift(c.Request.Context(), userOID, roleType)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "no open shift found"})
 		return
@@ -96,9 +105,13 @@ func (h *ShiftHandler) GetCurrentShift(c *gin.Context) {
 
 func (h *ShiftHandler) GetMyShifts(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	waiterID, _ := primitive.ObjectIDFromHex(userID.(string))
+	role, _ := c.Get("role")
+	userOID, _ := primitive.ObjectIDFromHex(userID.(string))
+	
+	// Convert user.Role to order.RoleType
+	roleType := order.ParseRoleType(string(role.(user.Role)))
 
-	shifts, err := h.shiftService.GetShiftsByWaiter(c.Request.Context(), waiterID)
+	shifts, err := h.shiftService.GetShiftsByUser(c.Request.Context(), userOID, roleType)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

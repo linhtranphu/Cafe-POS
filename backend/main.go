@@ -100,16 +100,21 @@ func main() {
 			protected.GET("/profile", userManagementHandler.GetCurrentUser)
 			protected.POST("/change-password", userManagementHandler.ChangePassword)
 			
+			// Shift management - available for all roles (waiter, barista, cashier)
+			shifts := protected.Group("/shifts")
+			{
+				shifts.POST("/start", shiftHandler.StartShift)
+				shifts.POST("/:id/end", shiftHandler.EndShift)
+				shifts.POST("/:id/close", shiftHandler.CloseShift)
+				shifts.GET("/current", shiftHandler.GetCurrentShift)
+				shifts.GET("/my", shiftHandler.GetMyShifts)
+				shifts.GET("/:id", shiftHandler.GetShift)
+			}
+			
 			// Waiter routes
 			waiter := protected.Group("/waiter")
 			waiter.Use(http.RequireRole(user.RoleWaiter, user.RoleCashier, user.RoleManager))
 			{
-				// Shift management
-				waiter.POST("/shifts/start", shiftHandler.StartShift)
-				waiter.POST("/shifts/:id/end", shiftHandler.EndShift)
-				waiter.GET("/shifts/current", shiftHandler.GetCurrentShift)
-				waiter.GET("/shifts", shiftHandler.GetMyShifts)
-				
 				// Order management
 				waiter.POST("/orders", orderHandler.CreateOrder)
 				waiter.POST("/orders/:id/payment", orderHandler.CollectPayment)
@@ -131,6 +136,22 @@ func main() {
 				waiter.GET("/facilities", facilityHandler.GetAllFacilities)
 				waiter.GET("/facilities/search", facilityHandler.SearchFacilities)
 				waiter.POST("/issues", facilityHandler.CreateIssueReport)
+			}
+
+			// Barista routes
+			barista := protected.Group("/barista")
+			barista.Use(http.RequireRole(user.RoleBarista, user.RoleManager))
+			{
+				// View queued orders
+				barista.GET("/orders/queue", orderHandler.GetQueuedOrders)
+				// View my orders (in progress + ready)
+				barista.GET("/orders/my", orderHandler.GetMyBaristaOrders)
+				// Accept order from queue
+				barista.POST("/orders/:id/accept", orderHandler.AcceptOrder)
+				// Mark order as ready
+				barista.POST("/orders/:id/ready", orderHandler.FinishPreparing)
+				// View order details
+				barista.GET("/orders/:id", orderHandler.GetOrder)
 			}
 
 			// Cashier routes
@@ -272,6 +293,7 @@ func createDefaultUsers(authService *services.AuthService, userRepo *mongodb.Use
 	}{
 		{"admin", "admin123", user.RoleManager, "Administrator"},
 		{"waiter1", "waiter123", user.RoleWaiter, "Waiter 1"},
+		{"barista1", "barista123", user.RoleBarista, "Barista 1"},
 		{"cashier1", "cashier123", user.RoleCashier, "Cashier 1"},
 	}
 

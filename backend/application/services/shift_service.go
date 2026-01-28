@@ -13,9 +13,12 @@ type ShiftRepository interface {
 	FindByID(ctx context.Context, id primitive.ObjectID) (*order.Shift, error)
 	Update(ctx context.Context, id primitive.ObjectID, s *order.Shift) error
 	FindOpenShiftByWaiter(ctx context.Context, waiterID primitive.ObjectID) (*order.Shift, error)
+	FindOpenShiftByUser(ctx context.Context, userID primitive.ObjectID, roleType order.RoleType) (*order.Shift, error)
 	FindOpenShifts(ctx context.Context) ([]*order.Shift, error)
 	FindByWaiterID(ctx context.Context, waiterID primitive.ObjectID) ([]*order.Shift, error)
+	FindByUserID(ctx context.Context, userID primitive.ObjectID, roleType order.RoleType) ([]*order.Shift, error)
 	FindByDateRange(ctx context.Context, startDate, endDate time.Time) ([]*order.Shift, error)
+	FindByRoleType(ctx context.Context, roleType order.RoleType) ([]*order.Shift, error)
 	FindAll(ctx context.Context) ([]*order.Shift, error)
 }
 
@@ -31,21 +34,32 @@ func NewShiftService(shiftRepo ShiftRepository, orderRepo OrderRepository) *Shif
 	}
 }
 
-func (s *ShiftService) StartShift(ctx context.Context, req *order.StartShiftRequest, waiterID, waiterName string) (*order.Shift, error) {
-	waiterOID, _ := primitive.ObjectIDFromHex(waiterID)
+func (s *ShiftService) StartShift(ctx context.Context, req *order.StartShiftRequest, userID, userName string, roleType order.RoleType) (*order.Shift, error) {
+	userOID, _ := primitive.ObjectIDFromHex(userID)
 	
-	existingShift, _ := s.shiftRepo.FindOpenShiftByWaiter(ctx, waiterOID)
+	// Check if user already has an open shift for this role
+	existingShift, _ := s.shiftRepo.FindOpenShiftByUser(ctx, userOID, roleType)
 	if existingShift != nil {
-		return nil, errors.New("waiter already has an open shift")
+		return nil, errors.New("user already has an open shift for this role")
 	}
 
 	shift := &order.Shift{
 		Type:       req.Type,
 		Status:     order.ShiftOpen,
-		WaiterID:   waiterOID,
-		WaiterName: waiterName,
+		RoleType:   roleType,
+		UserID:     userOID,
+		UserName:   userName,
 		StartCash:  req.StartCash,
 		StartedAt:  time.Now(),
+	}
+	
+	// Set legacy fields for backward compatibility
+	if roleType == order.RoleWaiter {
+		shift.WaiterID = userOID
+		shift.WaiterName = userName
+	} else if roleType == order.RoleCashier {
+		shift.CashierID = userOID
+		shift.CashierName = userName
 	}
 
 	if err := s.shiftRepo.Create(ctx, shift); err != nil {
@@ -89,16 +103,24 @@ func (s *ShiftService) EndShift(ctx context.Context, shiftID primitive.ObjectID,
 	return shift, nil
 }
 
-func (s *ShiftService) GetCurrentShift(ctx context.Context, waiterID primitive.ObjectID) (*order.Shift, error) {
-	return s.shiftRepo.FindOpenShiftByWaiter(ctx, waiterID)
+func (s *ShiftService) GetCurrentShift(ctx context.Context, userID primitive.ObjectID, roleType order.RoleType) (*order.Shift, error) {
+	return s.shiftRepo.FindOpenShiftByUser(ctx, userID, roleType)
 }
 
 func (s *ShiftService) GetOpenShifts(ctx context.Context) ([]*order.Shift, error) {
 	return s.shiftRepo.FindOpenShifts(ctx)
 }
 
+func (s *ShiftService) GetShiftsByUser(ctx context.Context, userID primitive.ObjectID, roleType order.RoleType) ([]*order.Shift, error) {
+	return s.shiftRepo.FindByUserID(ctx, userID, roleType)
+}
+
 func (s *ShiftService) GetShiftsByWaiter(ctx context.Context, waiterID primitive.ObjectID) ([]*order.Shift, error) {
 	return s.shiftRepo.FindByWaiterID(ctx, waiterID)
+}
+
+func (s *ShiftService) GetShiftsByRole(ctx context.Context, roleType order.RoleType) ([]*order.Shift, error) {
+	return s.shiftRepo.FindByRoleType(ctx, roleType)
 }
 
 func (s *ShiftService) GetAllShifts(ctx context.Context) ([]*order.Shift, error) {

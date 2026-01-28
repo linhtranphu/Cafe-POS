@@ -126,6 +126,45 @@ func (h *OrderHandler) SendToBar(c *gin.Context) {
 	c.JSON(http.StatusOK, o)
 }
 
+// AcceptOrder - Barista accepts order from queue
+func (h *OrderHandler) AcceptOrder(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	userID, _ := c.Get("user_id")
+	username, _ := c.Get("username")
+
+	o, err := h.orderService.AcceptOrder(c.Request.Context(), id, userID.(string), username.(string))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, o)
+}
+
+// FinishPreparing - Barista marks order as ready
+func (h *OrderHandler) FinishPreparing(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	o, err := h.orderService.FinishPreparing(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, o)
+}
+
 func (h *OrderHandler) ServeOrder(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := primitive.ObjectIDFromHex(idStr)
@@ -198,6 +237,31 @@ func (h *OrderHandler) GetMyOrders(c *gin.Context) {
 
 func (h *OrderHandler) GetAllOrders(c *gin.Context) {
 	orders, err := h.orderService.GetAllOrders(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, orders)
+}
+
+// GetQueuedOrders - Get orders waiting for barista
+func (h *OrderHandler) GetQueuedOrders(c *gin.Context) {
+	orders, err := h.orderService.GetQueuedOrders(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, orders)
+}
+
+// GetMyBaristaOrders - Get orders assigned to current barista
+func (h *OrderHandler) GetMyBaristaOrders(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	baristaID, _ := primitive.ObjectIDFromHex(userID.(string))
+
+	orders, err := h.orderService.GetBaristaOrders(c.Request.Context(), baristaID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -1,138 +1,180 @@
 <template>
-  <div class="min-h-screen bg-gray-100">
-    <Navigation />
-    <div class="p-4">
-      <!-- Header -->
-      <div class="flex justify-between items-center mb-6">
-        <h2 class="text-2xl font-bold text-gray-800">👤 Thông tin cá nhân</h2>
+  <div class="min-h-screen bg-gray-50">
+    <!-- Mobile Header - Fixed -->
+    <div class="sticky top-0 z-40 bg-white shadow-sm">
+      <div class="px-4 py-3">
+        <h1 class="text-xl font-bold text-gray-800">👤 Cá nhân</h1>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="px-4 py-4 pb-24">
+      <div v-if="loading" class="text-center py-10">
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
       </div>
 
-      <div class="max-w-2xl mx-auto space-y-6">
-        <!-- Profile Info Card -->
-        <div class="bg-white rounded-xl p-6 shadow-sm">
+      <div v-else-if="currentUser" class="space-y-4">
+        <!-- Profile Card -->
+        <div class="bg-gradient-to-br from-blue-500 to-purple-500 rounded-2xl p-6 text-white shadow-lg">
+          <div class="text-center mb-4">
+            <div class="w-20 h-20 bg-white rounded-full mx-auto mb-3 flex items-center justify-center text-4xl">
+              👤
+            </div>
+            <h2 class="text-2xl font-bold">{{ currentUser.name }}</h2>
+            <p class="text-blue-100">@{{ currentUser.username }}</p>
+          </div>
+          
+          <div class="flex justify-center gap-2">
+            <span :class="getRoleColor(currentUser.role)" 
+              class="px-4 py-2 rounded-full text-sm font-medium">
+              {{ getRoleText(currentUser.role) }}
+            </span>
+            <span :class="currentUser.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'" 
+              class="px-4 py-2 rounded-full text-sm font-medium">
+              {{ currentUser.active ? 'Hoạt động' : 'Tạm khóa' }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Info Card -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm">
           <h3 class="text-lg font-bold mb-4">Thông tin tài khoản</h3>
           
-          <div v-if="loading" class="text-center py-4">Đang tải...</div>
-          <div v-else-if="currentUser" class="space-y-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                <div class="p-3 bg-gray-50 rounded-lg">{{ currentUser.username }}</div>
+                <p class="text-xs text-gray-500">Username</p>
+                <p class="font-medium">{{ currentUser.username }}</p>
               </div>
-              
+              <span class="text-2xl">👤</span>
+            </div>
+            
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Tên hiển thị</label>
-                <div class="p-3 bg-gray-50 rounded-lg">{{ currentUser.name }}</div>
+                <p class="text-xs text-gray-500">Tên hiển thị</p>
+                <p class="font-medium">{{ currentUser.name }}</p>
               </div>
-              
+              <span class="text-2xl">✏️</span>
+            </div>
+            
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Vai trò</label>
-                <div class="p-3 bg-gray-50 rounded-lg">
-                  <span :class="getRoleColor(currentUser.role)" class="px-2 py-1 rounded-full text-xs font-medium">
-                    {{ getRoleText(currentUser.role) }}
-                  </span>
-                </div>
+                <p class="text-xs text-gray-500">Ngày tạo</p>
+                <p class="font-medium">{{ formatDate(currentUser.created_at) }}</p>
               </div>
-              
+              <span class="text-2xl">📅</span>
+            </div>
+            
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
-                <div class="p-3 bg-gray-50 rounded-lg">
-                  <span :class="currentUser.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'" 
-                    class="px-2 py-1 rounded-full text-xs font-medium">
-                    {{ currentUser.active ? 'Hoạt động' : 'Tạm khóa' }}
-                  </span>
-                </div>
-              </div>
-              
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Ngày tạo</label>
-                <div class="p-3 bg-gray-50 rounded-lg">{{ formatDate(currentUser.created_at) }}</div>
-              </div>
-              
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Đăng nhập cuối</label>
-                <div class="p-3 bg-gray-50 rounded-lg">
+                <p class="text-xs text-gray-500">Đăng nhập cuối</p>
+                <p class="font-medium">
                   {{ currentUser.last_login ? formatDate(currentUser.last_login) : 'Chưa có' }}
-                </div>
+                </p>
               </div>
+              <span class="text-2xl">🕐</span>
             </div>
           </div>
         </div>
 
+        <!-- Stats Card -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm">
+          <h3 class="text-lg font-bold mb-4">Thống kê hoạt động</h3>
+          <div class="grid grid-cols-3 gap-3">
+            <div class="text-center p-4 bg-blue-50 rounded-xl">
+              <div class="text-2xl mb-1">📋</div>
+              <div class="text-xl font-bold text-blue-600">--</div>
+              <div class="text-xs text-gray-600">Orders</div>
+            </div>
+            <div class="text-center p-4 bg-green-50 rounded-xl">
+              <div class="text-2xl mb-1">⏰</div>
+              <div class="text-xl font-bold text-green-600">--</div>
+              <div class="text-xs text-gray-600">Ca làm</div>
+            </div>
+            <div class="text-center p-4 bg-purple-50 rounded-xl">
+              <div class="text-2xl mb-1">💰</div>
+              <div class="text-xl font-bold text-purple-600">--</div>
+              <div class="text-xs text-gray-600">Doanh thu</div>
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 text-center mt-3">
+            * Thống kê chi tiết sẽ được cập nhật
+          </p>
+        </div>
+
         <!-- Change Password Card -->
-        <div class="bg-white rounded-xl p-6 shadow-sm">
-          <h3 class="text-lg font-bold mb-4">Đổi mật khẩu</h3>
+        <div class="bg-white rounded-2xl p-6 shadow-sm">
+          <h3 class="text-lg font-bold mb-4">🔒 Đổi mật khẩu</h3>
           
-          <form @submit.prevent="changePassword" class="space-y-4">
+          <button @click="showPasswordForm = !showPasswordForm"
+            class="w-full bg-blue-500 text-white py-3 rounded-xl font-medium active:scale-95 transition-transform">
+            {{ showPasswordForm ? 'Ẩn form' : 'Đổi mật khẩu' }}
+          </button>
+
+          <form v-if="showPasswordForm" @submit.prevent="changePassword" class="space-y-4 mt-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Mật khẩu hiện tại *</label>
+              <label class="block text-sm font-medium mb-2">Mật khẩu hiện tại *</label>
               <input v-model="passwordForm.currentPassword" type="password" required
-                class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Nhập mật khẩu hiện tại">
             </div>
             
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Mật khẩu mới *</label>
+              <label class="block text-sm font-medium mb-2">Mật khẩu mới *</label>
               <input v-model="passwordForm.newPassword" type="password" required minlength="6"
-                class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)">
+                class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Tối thiểu 6 ký tự">
             </div>
             
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Xác nhận mật khẩu mới *</label>
+              <label class="block text-sm font-medium mb-2">Xác nhận mật khẩu *</label>
               <input v-model="passwordForm.confirmPassword" type="password" required
-                class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Nhập lại mật khẩu mới">
               <div v-if="passwordForm.newPassword && passwordForm.confirmPassword && passwordForm.newPassword !== passwordForm.confirmPassword" 
                 class="text-red-500 text-sm mt-1">
-                Mật khẩu xác nhận không khớp
+                ⚠️ Mật khẩu xác nhận không khớp
               </div>
             </div>
             
             <div class="flex gap-2">
-              <button type="button" @click="resetPasswordForm" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+              <button type="button" @click="resetPasswordForm" 
+                class="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-xl font-medium">
                 Hủy
               </button>
               <button type="submit" :disabled="!isPasswordFormValid" 
-                class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
-                Đổi mật khẩu
+                class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                Xác nhận
               </button>
             </div>
           </form>
         </div>
 
-        <!-- Activity Summary Card (if available) -->
-        <div class="bg-white rounded-xl p-6 shadow-sm">
-          <h3 class="text-lg font-bold mb-4">Thống kê hoạt động</h3>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="text-center p-4 bg-blue-50 rounded-lg">
-              <div class="text-2xl font-bold text-blue-600">--</div>
-              <div class="text-sm text-gray-600">Orders hôm nay</div>
-            </div>
-            <div class="text-center p-4 bg-green-50 rounded-lg">
-              <div class="text-2xl font-bold text-green-600">--</div>
-              <div class="text-sm text-gray-600">Ca làm việc</div>
-            </div>
-            <div class="text-center p-4 bg-purple-50 rounded-lg">
-              <div class="text-2xl font-bold text-purple-600">--</div>
-              <div class="text-sm text-gray-600">Doanh thu</div>
-            </div>
-          </div>
-          <p class="text-sm text-gray-500 text-center mt-4">
-            * Thống kê chi tiết sẽ được cập nhật trong phiên bản tiếp theo
-          </p>
-        </div>
+        <!-- Logout Button -->
+        <button @click="logout" 
+          class="w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-bold active:scale-95 transition-transform">
+          🚪 Đăng xuất
+        </button>
       </div>
     </div>
+
+    <!-- Bottom Navigation -->
+    <BottomNav />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useUserStore } from '../stores/user'
-import Navigation from '../components/Navigation.vue'
+import { useAuthStore } from '../stores/auth'
+import { useRouter } from 'vue-router'
+import BottomNav from '../components/BottomNav.vue'
 
 const userStore = useUserStore()
+const authStore = useAuthStore()
+const router = useRouter()
+
+const showPasswordForm = ref(false)
 
 const passwordForm = ref({
   currentPassword: '',
@@ -167,10 +209,11 @@ const changePassword = async () => {
 
   try {
     await userStore.changePassword(passwordForm.value.currentPassword, passwordForm.value.newPassword)
-    alert('Đổi mật khẩu thành công!')
+    alert('✅ Đổi mật khẩu thành công!')
     resetPasswordForm()
+    showPasswordForm.value = false
   } catch (error) {
-    alert('Lỗi: ' + error.message)
+    alert('❌ Lỗi: ' + error.message)
   }
 }
 
@@ -179,6 +222,13 @@ const resetPasswordForm = () => {
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
+  }
+}
+
+const logout = async () => {
+  if (confirm('Bạn có chắc muốn đăng xuất?')) {
+    await authStore.logout()
+    router.push('/login')
   }
 }
 
@@ -201,11 +251,21 @@ const getRoleText = (role) => {
 }
 
 const formatDate = (date) => {
-  return new Date(date).toLocaleString('vi-VN')
+  return new Date(date).toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
 }
 </script>
 
 <style scoped>
+.active\:scale-95:active {
+  transform: scale(0.95);
+}
+
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;

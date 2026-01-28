@@ -8,12 +8,14 @@ import (
 type OrderStatus string
 
 const (
-	StatusCreated    OrderStatus = "CREATED"
-	StatusPaid       OrderStatus = "PAID"
-	StatusInProgress OrderStatus = "IN_PROGRESS"
-	StatusServed     OrderStatus = "SERVED"
-	StatusCancelled  OrderStatus = "CANCELLED"
-	StatusLocked     OrderStatus = "LOCKED"
+	StatusCreated    OrderStatus = "CREATED"     // Order chưa thanh toán
+	StatusPaid       OrderStatus = "PAID"        // Đã thu tiền, chưa giao cho pha chế
+	StatusQueued     OrderStatus = "QUEUED"      // Đã gửi cho barista, chờ nhận
+	StatusInProgress OrderStatus = "IN_PROGRESS" // Barista đã nhận và đang pha
+	StatusReady      OrderStatus = "READY"       // Pha xong, chờ giao
+	StatusServed     OrderStatus = "SERVED"      // Đã giao cho khách
+	StatusCancelled  OrderStatus = "CANCELLED"   // Đã hủy
+	StatusLocked     OrderStatus = "LOCKED"      // Đã chốt ca
 )
 
 type PaymentMethod string
@@ -39,6 +41,8 @@ type Order struct {
 	CustomerName    string             `bson:"customer_name,omitempty" json:"customer_name,omitempty"`
 	WaiterID        primitive.ObjectID `bson:"waiter_id" json:"waiter_id"`
 	WaiterName      string             `bson:"waiter_name" json:"waiter_name"`
+	BaristaID       primitive.ObjectID `bson:"barista_id,omitempty" json:"barista_id,omitempty"`
+	BaristaName     string             `bson:"barista_name,omitempty" json:"barista_name,omitempty"`
 	ShiftID         primitive.ObjectID `bson:"shift_id" json:"shift_id"`
 	Items           []OrderItem        `bson:"items" json:"items"`
 	Subtotal        float64            `bson:"subtotal" json:"subtotal"`
@@ -57,7 +61,9 @@ type Order struct {
 	CreatedAt       time.Time          `bson:"created_at" json:"created_at"`
 	UpdatedAt       time.Time          `bson:"updated_at" json:"updated_at"`
 	PaidAt          *time.Time         `bson:"paid_at,omitempty" json:"paid_at,omitempty"`
-	SentToBarAt     *time.Time         `bson:"sent_to_bar_at,omitempty" json:"sent_to_bar_at,omitempty"`
+	QueuedAt        *time.Time         `bson:"queued_at,omitempty" json:"queued_at,omitempty"`
+	AcceptedAt      *time.Time         `bson:"accepted_at,omitempty" json:"accepted_at,omitempty"`
+	ReadyAt         *time.Time         `bson:"ready_at,omitempty" json:"ready_at,omitempty"`
 	ServedAt        *time.Time         `bson:"served_at,omitempty" json:"served_at,omitempty"`
 	LockedAt        *time.Time         `bson:"locked_at,omitempty" json:"locked_at,omitempty"`
 }
@@ -116,10 +122,13 @@ func (o *Order) CalculateTotal() {
 }
 
 func (o *Order) CanTransitionTo(newStatus OrderStatus) bool {
+	// BR-01: State machine transitions
 	transitions := map[OrderStatus][]OrderStatus{
 		StatusCreated:    {StatusPaid, StatusCancelled},
-		StatusPaid:       {StatusPaid, StatusInProgress, StatusCancelled}, // Can stay PAID for edits/additional payments
-		StatusInProgress: {StatusServed},
+		StatusPaid:       {StatusPaid, StatusQueued, StatusCancelled}, // Can stay PAID for edits/additional payments
+		StatusQueued:     {StatusInProgress, StatusCancelled},         // Only barista can move to IN_PROGRESS
+		StatusInProgress: {StatusReady},                               // Only barista can mark as READY
+		StatusReady:      {StatusServed},                              // Only waiter can deliver
 		StatusServed:     {StatusLocked},
 		StatusCancelled:  {StatusLocked},
 		StatusLocked:     {},
@@ -139,6 +148,7 @@ func (o *Order) CanTransitionTo(newStatus OrderStatus) bool {
 }
 
 func (o *Order) IsEditable() bool {
+	// BR-08: Payment adjustments are allowed only before QUEUED
 	return o.Status == StatusCreated || o.Status == StatusPaid
 }
 
@@ -148,4 +158,14 @@ func (o *Order) IsLocked() bool {
 
 func (o *Order) IsFullyPaid() bool {
 	return o.AmountDue <= 0
+}
+
+func (o *Order) CanModify() bool {
+	// BR-07: Once order enters IN_PROGRESS, no modification or refund is allowed
+	return o.Status == StatusCreated || o.Status == StatusPaid || o.Status == StatusQueued
+}
+
+func (o *Order) CanRefund() bool {
+	// BR-08: Refunds only allowed before QUEUED
+	return o.Status == StatusPaid && o.AmountPaid > 0
 }

@@ -9,6 +9,7 @@ type Role string
 
 const (
 	RoleWaiter   Role = "waiter"
+	RoleBarista  Role = "barista"
 	RoleCashier  Role = "cashier"
 	RoleManager  Role = "manager"
 )
