@@ -58,6 +58,19 @@ func (r *ShiftRepository) FindOpenShiftByWaiter(ctx context.Context, waiterID pr
 	return &s, nil
 }
 
+func (r *ShiftRepository) FindOpenShiftByUser(ctx context.Context, userID primitive.ObjectID, roleType order.RoleType) (*order.Shift, error) {
+	var s order.Shift
+	err := r.collection.FindOne(ctx, bson.M{
+		"user_id":   userID,
+		"role_type": roleType,
+		"status":    order.ShiftOpen,
+	}).Decode(&s)
+	if err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
 func (r *ShiftRepository) FindOpenShifts(ctx context.Context) ([]*order.Shift, error) {
 	opts := options.Find().SetSort(bson.D{{"started_at", -1}})
 	cursor, err := r.collection.Find(ctx, bson.M{"status": order.ShiftOpen}, opts)
@@ -103,6 +116,24 @@ func (r *ShiftRepository) FindByWaiterID(ctx context.Context, waiterID primitive
 	return shifts, nil
 }
 
+func (r *ShiftRepository) FindByUserID(ctx context.Context, userID primitive.ObjectID, roleType order.RoleType) ([]*order.Shift, error) {
+	opts := options.Find().SetSort(bson.D{{"started_at", -1}})
+	cursor, err := r.collection.Find(ctx, bson.M{
+		"user_id":   userID,
+		"role_type": roleType,
+	}, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var shifts []*order.Shift
+	if err = cursor.All(ctx, &shifts); err != nil {
+		return nil, err
+	}
+	return shifts, nil
+}
+
 func (r *ShiftRepository) FindByDateRange(ctx context.Context, startDate, endDate time.Time) ([]*order.Shift, error) {
 	opts := options.Find().SetSort(bson.D{{"started_at", -1}})
 	cursor, err := r.collection.Find(ctx, bson.M{
@@ -111,6 +142,21 @@ func (r *ShiftRepository) FindByDateRange(ctx context.Context, startDate, endDat
 			"$lte": endDate,
 		},
 	}, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var shifts []*order.Shift
+	if err = cursor.All(ctx, &shifts); err != nil {
+		return nil, err
+	}
+	return shifts, nil
+}
+
+func (r *ShiftRepository) FindByRoleType(ctx context.Context, roleType order.RoleType) ([]*order.Shift, error) {
+	opts := options.Find().SetSort(bson.D{{"started_at", -1}})
+	cursor, err := r.collection.Find(ctx, bson.M{"role_type": roleType}, opts)
 	if err != nil {
 		return nil, err
 	}
