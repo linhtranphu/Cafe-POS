@@ -34,7 +34,6 @@ func main() {
 	// Repositories
 	userRepo := mongodb.NewUserRepository(db)
 	orderRepo := mongodb.NewOrderRepository(db)
-	tableRepo := mongodb.NewTableRepository(db)
 	shiftRepo := mongodb.NewShiftRepository(db)
 	// Cashier repositories
 	cashReconciliationRepo := mongodb.NewCashReconciliationRepository(db)
@@ -44,8 +43,8 @@ func main() {
 	// Services
 	jwtService := services.NewJWTService("your-secret-key")
 	authService := services.NewAuthService(userRepo, jwtService)
-	orderService := services.NewOrderService(orderRepo, shiftRepo, tableRepo)
-	tableService := services.NewTableService(tableRepo)
+	userManagementService := services.NewUserManagementService(userRepo, authService)
+	orderService := services.NewOrderService(orderRepo, shiftRepo)
 	shiftService := services.NewShiftService(shiftRepo, orderRepo)
 	// Cashier services
 	cashReconciliationService := services.NewCashReconciliationService(cashReconciliationRepo, shiftRepo, orderRepo)
@@ -54,8 +53,8 @@ func main() {
 
 	// Handlers
 	authHandler := http.NewAuthHandler(authService)
+	userManagementHandler := http.NewUserManagementHandler(userManagementService)
 	orderHandler := http.NewOrderHandler(orderService)
-	tableHandler := http.NewTableHandler(tableService)
 	shiftHandler := http.NewShiftHandler(shiftService)
 	// Cashier handler
 	cashierHandler := http.NewCashierHandler(cashReconciliationService, paymentOversightService, cashierReportService)
@@ -97,6 +96,10 @@ func main() {
 		protected := api.Group("/")
 		protected.Use(http.AuthMiddleware(jwtService))
 		{
+			// Common routes for all authenticated users
+			protected.GET("/profile", userManagementHandler.GetCurrentUser)
+			protected.POST("/change-password", userManagementHandler.ChangePassword)
+			
 			// Waiter routes
 			waiter := protected.Group("/waiter")
 			waiter.Use(http.RequireRole(user.RoleWaiter, user.RoleCashier, user.RoleManager))
@@ -109,15 +112,12 @@ func main() {
 				
 				// Order management
 				waiter.POST("/orders", orderHandler.CreateOrder)
-				waiter.PUT("/orders/:id/confirm", orderHandler.ConfirmOrder)
-				waiter.POST("/orders/:id/payment", orderHandler.PayOrder)
-				waiter.POST("/orders/:id/send", orderHandler.SendToKitchen)
+				waiter.POST("/orders/:id/payment", orderHandler.CollectPayment)
+				waiter.PUT("/orders/:id/edit", orderHandler.EditOrder)
+				waiter.POST("/orders/:id/send", orderHandler.SendToBar)
 				waiter.POST("/orders/:id/serve", orderHandler.ServeOrder)
 				waiter.GET("/orders", orderHandler.GetMyOrders)
 				waiter.GET("/orders/:id", orderHandler.GetOrder)
-				
-				// Tables (read-only)
-				waiter.GET("/tables", tableHandler.GetAllTables)
 				
 				// Menu (read-only)
 				waiter.GET("/menu", menuHandler.GetAllMenuItems)
@@ -141,7 +141,7 @@ func main() {
 				cashier.GET("/orders", orderHandler.GetAllOrders)
 				cashier.GET("/orders/:id", orderHandler.GetOrder)
 				cashier.POST("/orders/:id/cancel", orderHandler.CancelOrder)
-				cashier.POST("/orders/:id/refund", orderHandler.RefundOrder)
+				cashier.POST("/orders/:id/refund", orderHandler.RefundPartial)
 				
 				// Shift management
 				cashier.POST("/shifts/:id/close", shiftHandler.CloseShift)
@@ -222,19 +222,24 @@ func main() {
 				manager.GET("/prepaid-expenses", expenseHandler.GetPrepaid)
 				manager.DELETE("/prepaid-expenses/:id", expenseHandler.DeletePrepaid)
 				
-				// Table management routes
-				manager.POST("/tables", tableHandler.CreateTable)
-				manager.GET("/tables", tableHandler.GetAllTables)
-				manager.GET("/tables/:id", tableHandler.GetTable)
-				manager.PUT("/tables/:id", tableHandler.UpdateTable)
-				manager.DELETE("/tables/:id", tableHandler.DeleteTable)
+				// User management routes
+				manager.POST("/users", userManagementHandler.CreateUser)
+				manager.GET("/users", userManagementHandler.GetAllUsers)
+				manager.GET("/users/active", userManagementHandler.GetActiveUsers)
+				manager.GET("/users/by-role", userManagementHandler.GetUsersByRole)
+				manager.GET("/users/:id", userManagementHandler.GetUser)
+				manager.PUT("/users/:id", userManagementHandler.UpdateUser)
+				manager.POST("/users/:id/reset-password", userManagementHandler.ResetPassword)
+				manager.POST("/users/:id/toggle-status", userManagementHandler.ToggleUserStatus)
+				manager.DELETE("/users/:id", userManagementHandler.DeleteUser)
 				
 				// Order management routes (full access)
 				manager.GET("/orders", orderHandler.GetAllOrders)
 				manager.GET("/orders/:id", orderHandler.GetOrder)
 				manager.POST("/orders", orderHandler.CreateOrder)
 				manager.POST("/orders/:id/cancel", orderHandler.CancelOrder)
-				manager.POST("/orders/:id/refund", orderHandler.RefundOrder)
+				manager.POST("/orders/:id/refund", orderHandler.RefundPartial)
+				manager.PUT("/orders/:id/edit", orderHandler.EditOrder)
 				
 				// Shift management routes
 				manager.GET("/shifts", shiftHandler.GetAllShifts)

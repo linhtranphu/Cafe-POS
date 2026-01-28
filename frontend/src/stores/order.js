@@ -48,38 +48,38 @@ export const useOrderStore = defineStore('order', {
       }
     },
 
-    async confirmOrder(id, discount) {
+    async collectPayment(id, paymentData) {
       this.error = null
       try {
-        const order = await orderService.confirmOrder(id, discount)
+        const order = await orderService.collectPayment(id, paymentData)
         this.updateOrderInList(order)
         return order
       } catch (error) {
-        this.error = error.response?.data?.error || 'Lỗi xác nhận order'
+        this.error = error.response?.data?.error || 'Lỗi thu tiền'
         throw error
       }
     },
 
-    async payOrder(id, paymentMethod) {
+    async editOrder(id, orderData) {
       this.error = null
       try {
-        const order = await orderService.payOrder(id, paymentMethod)
+        const order = await orderService.editOrder(id, orderData)
         this.updateOrderInList(order)
         return order
       } catch (error) {
-        this.error = error.response?.data?.error || 'Lỗi thanh toán'
+        this.error = error.response?.data?.error || 'Lỗi chỉnh sửa order'
         throw error
       }
     },
 
-    async sendToKitchen(id) {
+    async sendToBar(id) {
       this.error = null
       try {
-        const order = await orderService.sendToKitchen(id)
+        const order = await orderService.sendToBar(id)
         this.updateOrderInList(order)
         return order
       } catch (error) {
-        this.error = error.response?.data?.error || 'Lỗi gửi pha chế'
+        this.error = error.response?.data?.error || 'Lỗi gửi quầy bar'
         throw error
       }
     },
@@ -108,10 +108,10 @@ export const useOrderStore = defineStore('order', {
       }
     },
 
-    async refundOrder(id, reason) {
+    async refundPartial(id, amount, reason) {
       this.error = null
       try {
-        const order = await orderService.refundOrder(id, reason)
+        const order = await orderService.refundPartial(id, amount, reason)
         this.updateOrderInList(order)
         return order
       } catch (error) {
@@ -141,8 +141,8 @@ export const useOrderStore = defineStore('order', {
       return state.orders.filter(o => o.status === status)
     },
 
-    unpaidOrders: (state) => {
-      return state.orders.filter(o => o.status === 'UNPAID')
+    createdOrders: (state) => {
+      return state.orders.filter(o => o.status === 'CREATED')
     },
 
     paidOrders: (state) => {
@@ -151,6 +151,10 @@ export const useOrderStore = defineStore('order', {
 
     inProgressOrders: (state) => {
       return state.orders.filter(o => o.status === 'IN_PROGRESS')
+    },
+
+    servedOrders: (state) => {
+      return state.orders.filter(o => o.status === 'SERVED')
     }
   }
 })

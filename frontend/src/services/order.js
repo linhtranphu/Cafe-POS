@@ -6,17 +6,17 @@ export const orderService = {
     return response.data
   },
 
-  async confirmOrder(id, discount = 0) {
-    const response = await api.put(`/waiter/orders/${id}/confirm`, { discount })
+  async collectPayment(id, paymentData) {
+    const response = await api.post(`/waiter/orders/${id}/payment`, paymentData)
     return response.data
   },
 
-  async payOrder(id, paymentMethod) {
-    const response = await api.post(`/waiter/orders/${id}/payment`, { payment_method: paymentMethod })
+  async editOrder(id, orderData) {
+    const response = await api.put(`/waiter/orders/${id}/edit`, orderData)
     return response.data
   },
 
-  async sendToKitchen(id) {
+  async sendToBar(id) {
     const response = await api.post(`/waiter/orders/${id}/send`)
     return response.data
   },
@@ -31,13 +31,8 @@ export const orderService = {
     return response.data
   },
 
-  async refundOrder(id, reason) {
-    const response = await api.post(`/cashier/orders/${id}/refund`, { reason })
-    return response.data
-  },
-
-  async lockOrder(id) {
-    const response = await api.post(`/cashier/orders/${id}/lock`)
+  async refundPartial(id, amount, reason) {
+    const response = await api.post(`/cashier/orders/${id}/refund`, { amount, reason })
     return response.data
   },
 

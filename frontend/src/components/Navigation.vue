@@ -6,7 +6,9 @@
         <h1 class="text-xl font-bold text-blue-600">☕ Café POS</h1>
       </div>
       <div class="flex items-center gap-3">
-        <span class="text-sm text-gray-600 hidden sm:block">{{ userName }}</span>
+        <router-link to="/profile" class="text-sm text-gray-600 hover:text-blue-600 hidden sm:block">
+          👤 {{ userName }}
+        </router-link>
         <button @click="logout" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm transition-colors">
           Đăng xuất
         </button>
@@ -37,13 +39,6 @@
           <span class="text-sm font-medium text-center">Orders</span>
         </router-link>
 
-        <!-- Tables -->
-        <router-link to="/tables" @click="handleNavClick"
-          class="bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-xl p-4 flex flex-col items-center justify-center min-h-[100px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
-          <div class="text-2xl mb-2">🪑</div>
-          <span class="text-sm font-medium text-center">Bàn</span>
-        </router-link>
-
         <!-- Cashier Dashboard (Cashier & Manager only) -->
         <router-link v-if="['cashier', 'manager'].includes(userRole)" to="/cashier" @click="handleNavClick"
           class="bg-gradient-to-br from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white rounded-xl p-4 flex flex-col items-center justify-center min-h-[100px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
@@ -60,6 +55,13 @@
 
         <!-- Manager only cards -->
         <template v-if="userRole === 'manager'">
+          <!-- User Management -->
+          <router-link to="/users" @click="handleNavClick"
+            class="bg-gradient-to-br from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white rounded-xl p-4 flex flex-col items-center justify-center min-h-[100px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+            <div class="text-2xl mb-2">👥</div>
+            <span class="text-sm font-medium text-center">Quản lý User</span>
+          </router-link>
+
           <!-- Menu -->
           <router-link to="/menu" @click="handleNavClick"
             class="bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl p-4 flex flex-col items-center justify-center min-h-[100px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">

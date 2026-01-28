@@ -7,10 +7,11 @@ import IngredientView from '../views/IngredientView.vue'
 import FacilityView from '../views/FacilityView.vue'
 import ExpenseView from '../views/ExpenseView.vue'
 import OrderView from '../views/OrderView.vue'
-import TableView from '../views/TableView.vue'
 import ShiftView from '../views/ShiftView.vue'
 import CashierDashboard from '../views/CashierDashboard.vue'
 import CashierReports from '../views/CashierReports.vue'
+import UserManagementView from '../views/UserManagementView.vue'
+import ProfileView from '../views/ProfileView.vue'
 
 const routes = [
   {
@@ -60,15 +61,21 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
-    path: '/tables',
-    name: 'Tables',
-    component: TableView,
-    meta: { requiresAuth: true }
-  },
-  {
     path: '/shifts',
     name: 'Shifts',
     component: ShiftView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/users',
+    name: 'UserManagement',
+    component: UserManagementView,
+    meta: { requiresAuth: true, requiresManager: true }
+  },
+  {
+    path: '/profile',
+    name: 'Profile',
+    component: ProfileView,
     meta: { requiresAuth: true }
   },
   {

@@ -35,32 +35,7 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 	c.JSON(http.StatusCreated, o)
 }
 
-func (h *OrderHandler) ConfirmOrder(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := primitive.ObjectIDFromHex(idStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
-	}
-
-	var req struct {
-		Discount float64 `json:"discount"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	o, err := h.orderService.ConfirmOrder(c.Request.Context(), id, req.Discount)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, o)
-}
-
-func (h *OrderHandler) PayOrder(c *gin.Context) {
+func (h *OrderHandler) CollectPayment(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := primitive.ObjectIDFromHex(idStr)
 	if err != nil {
@@ -79,7 +54,7 @@ func (h *OrderHandler) PayOrder(c *gin.Context) {
 	req.CollectorID = userID.(string)
 	req.CollectorName = username.(string)
 
-	o, err := h.orderService.PayOrder(c.Request.Context(), id, &req)
+	o, err := h.orderService.CollectPayment(c.Request.Context(), id, &req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -88,7 +63,7 @@ func (h *OrderHandler) PayOrder(c *gin.Context) {
 	c.JSON(http.StatusOK, o)
 }
 
-func (h *OrderHandler) SendToKitchen(c *gin.Context) {
+func (h *OrderHandler) EditOrder(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := primitive.ObjectIDFromHex(idStr)
 	if err != nil {
@@ -96,7 +71,53 @@ func (h *OrderHandler) SendToKitchen(c *gin.Context) {
 		return
 	}
 
-	o, err := h.orderService.SendToKitchen(c.Request.Context(), id)
+	var req order.EditOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	o, err := h.orderService.EditOrder(c.Request.Context(), id, &req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, o)
+}
+
+func (h *OrderHandler) RefundPartial(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	var req order.RefundRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	o, err := h.orderService.RefundPartial(c.Request.Context(), id, &req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, o)
+}
+
+func (h *OrderHandler) SendToBar(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	o, err := h.orderService.SendToBar(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -137,29 +158,6 @@ func (h *OrderHandler) CancelOrder(c *gin.Context) {
 	}
 
 	o, err := h.orderService.CancelOrder(c.Request.Context(), id, &req)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, o)
-}
-
-func (h *OrderHandler) RefundOrder(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := primitive.ObjectIDFromHex(idStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
-	}
-
-	var req order.RefundOrderRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	o, err := h.orderService.RefundOrder(c.Request.Context(), id, &req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

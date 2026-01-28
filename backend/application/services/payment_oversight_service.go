@@ -31,7 +31,7 @@ func NewPaymentOversightService(
 
 type PaymentSummary struct {
 	OrderID       string    `json:"order_id"`
-	TableName     string    `json:"table_name"`
+	OrderNumber   string    `json:"order_number"`
 	Amount        float64   `json:"amount"`
 	PaymentMethod string    `json:"payment_method"`
 	Status        string    `json:"status"`
@@ -55,7 +55,7 @@ func (s *PaymentOversightService) GetPaymentsByShift(shiftID string) ([]*Payment
 		if ord.Status == order.StatusPaid || ord.Status == order.StatusInProgress || ord.Status == order.StatusServed {
 			payment := &PaymentSummary{
 				OrderID:       ord.ID.Hex(),
-				TableName:     ord.TableName,
+				OrderNumber:   ord.OrderNumber,
 				Amount:        ord.Total,
 				PaymentMethod: string(ord.PaymentMethod),
 				Status:        string(ord.Status),
@@ -118,7 +118,7 @@ func (s *PaymentOversightService) OverridePayment(orderID, reason string, cashie
 		cashierID,
 		reason,
 		oldStatus,
-		string(order.StatusUnpaid), // Reset to unpaid for override
+		string(order.StatusCreated), // Reset to CREATED for override
 		ord.Total,
 	)
 
@@ -128,9 +128,10 @@ func (s *PaymentOversightService) OverridePayment(orderID, reason string, cashie
 	}
 
 	// Update order status
-	ord.Status = order.StatusUnpaid
+	ord.Status = order.StatusCreated
 	ord.PaymentMethod = ""
 	ord.PaidAt = nil
+	ord.AmountPaid = 0
 	ord.UpdatedAt = time.Now()
 
 	return s.orderRepo.Update(context.Background(), ord.ID, ord)

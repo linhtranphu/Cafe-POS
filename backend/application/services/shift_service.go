@@ -117,7 +117,8 @@ func (s *ShiftService) CloseShiftAndLockOrders(ctx context.Context, shiftID prim
 
 	orders, _ := s.orderRepo.FindByShiftID(ctx, shiftID)
 	for _, o := range orders {
-		if o.Status == order.StatusServed || o.Status == order.StatusCancelled || o.Status == order.StatusRefunded {
+		// Lock orders that are completed (served or cancelled)
+		if o.Status == order.StatusServed || o.Status == order.StatusCancelled {
 			now := time.Now()
 			o.Status = order.StatusLocked
 			o.LockedAt = &now
