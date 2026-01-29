@@ -65,10 +65,10 @@
           <strong class="text-blue-700">🍹 Barista:</strong> barista1 / barista123
         </div>
         <div 
-          class="p-2 bg-gray-100 my-1 rounded-lg cursor-pointer text-xs transition-colors hover:bg-gray-200" 
+          class="p-2 bg-yellow-50 my-1 rounded-lg cursor-pointer text-xs transition-colors hover:bg-yellow-100 border border-yellow-200" 
           @click="quickLogin('cashier1', 'cashier123')"
         >
-          <strong class="text-gray-700">Cashier:</strong> cashier1 / cashier123
+          <strong class="text-yellow-700">💵 Cashier:</strong> cashier1 / cashier123
         </div>
       </div>
     </div>

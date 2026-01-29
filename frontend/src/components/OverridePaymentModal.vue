@@ -1,35 +1,45 @@
 <template>
-  <div v-if="show" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg p-6 w-96">
-      <h3 class="text-lg font-semibold mb-4">Điều chỉnh thanh toán</h3>
+  <div v-if="show" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md">
+      <h3 class="text-xl font-bold text-gray-800 mb-4">✏️ Điều chỉnh thanh toán</h3>
       
-      <div class="mb-4">
-        <p class="text-sm text-gray-600 mb-2">Order: {{ payment?.order_id }}</p>
-        <p class="text-sm text-gray-600 mb-2">Bàn: {{ payment?.table_name }}</p>
-        <p class="text-sm text-gray-600 mb-4">Số tiền: {{ formatCurrency(payment?.amount) }}</p>
+      <div class="bg-gray-50 rounded-xl p-4 mb-4 space-y-2">
+        <div class="flex justify-between items-center">
+          <span class="text-sm text-gray-600">Order:</span>
+          <span class="font-mono text-sm font-medium">#{{ payment?.order_id?.slice(-6) }}</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-sm text-gray-600">Khách hàng:</span>
+          <span class="font-medium">{{ payment?.customer_name || 'Khách lẻ' }}</span>
+        </div>
+        <div class="flex justify-between items-center pt-2 border-t border-gray-200">
+          <span class="text-sm text-gray-600">Số tiền:</span>
+          <span class="font-bold text-green-600">{{ formatPrice(payment?.amount) }}</span>
+        </div>
       </div>
 
-      <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-2">Lý do điều chỉnh</label>
+      <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Lý do điều chỉnh *</label>
         <textarea
           v-model="reason"
-          class="w-full border border-gray-300 rounded-lg px-3 py-2 h-20 resize-none"
-          placeholder="Nhập lý do điều chỉnh..."
+          class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base resize-none focus:outline-none focus:border-orange-500"
+          rows="4"
+          placeholder="Nhập lý do điều chỉnh thanh toán..."
           required
         ></textarea>
       </div>
 
-      <div class="flex justify-end space-x-3">
+      <div class="flex gap-3">
         <button
           @click="close"
-          class="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+          class="flex-1 py-3 text-gray-700 bg-gray-100 rounded-xl font-medium active:scale-95 transition-transform"
         >
           Hủy
         </button>
         <button
           @click="confirm"
           :disabled="!reason.trim()"
-          class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+          class="flex-1 py-3 bg-orange-500 text-white rounded-xl font-medium active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Xác nhận
         </button>
@@ -38,55 +48,53 @@
   </div>
 </template>
 
-<script>
+<script setup>
 import { ref, watch } from 'vue'
 
-export default {
-  name: 'OverridePaymentModal',
-  props: {
-    show: {
-      type: Boolean,
-      default: false
-    },
-    payment: {
-      type: Object,
-      default: null
-    }
+const props = defineProps({
+  show: {
+    type: Boolean,
+    default: false
   },
-  emits: ['close', 'confirm'],
-  setup(props, { emit }) {
-    const reason = ref('')
+  payment: {
+    type: Object,
+    default: null
+  }
+})
 
-    watch(() => props.show, (newVal) => {
-      if (newVal) {
-        reason.value = ''
-      }
-    })
+const emit = defineEmits(['close', 'confirm'])
 
-    const close = () => {
-      emit('close')
-    }
+const reason = ref('')
 
-    const confirm = () => {
-      if (reason.value.trim()) {
-        emit('confirm', reason.value.trim())
-        reason.value = ''
-      }
-    }
+watch(() => props.show, (newVal) => {
+  if (newVal) {
+    reason.value = ''
+  }
+})
 
-    const formatCurrency = (amount) => {
-      return new Intl.NumberFormat('vi-VN', {
-        style: 'currency',
-        currency: 'VND'
-      }).format(amount)
-    }
+const close = () => {
+  emit('close')
+}
 
-    return {
-      reason,
-      close,
-      confirm,
-      formatCurrency
-    }
+const confirm = () => {
+  if (reason.value.trim()) {
+    emit('confirm', reason.value.trim())
+    reason.value = ''
   }
 }
+
+const formatPrice = (amount) => {
+  if (!amount && amount !== 0) return '0₫'
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
+    maximumFractionDigits: 0
+  }).format(amount)
+}
 </script>
+
+<style scoped>
+.active\:scale-95:active {
+  transform: scale(0.95);
+}
+</style>

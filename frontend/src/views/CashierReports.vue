@@ -1,440 +1,461 @@
 <template>
-  <div class="min-h-screen bg-gray-100">
-    <Navigation />
-    <div class="p-6 space-y-6">
-    <div class="flex justify-between items-center">
-      <h1 class="text-2xl font-bold text-gray-900">Báo cáo Thu ngân</h1>
+  <div class="min-h-screen bg-gray-50">
+    <!-- Mobile Header - Fixed -->
+    <div class="sticky top-0 z-40 bg-white shadow-sm">
+      <div class="px-4 py-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h1 class="text-2xl font-bold text-gray-800">📊 Báo cáo</h1>
+            <p class="text-sm text-gray-600">Thu ngân & doanh thu</p>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Error Alert -->
-    <div v-if="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-      {{ error }}
-      <button @click="clearError" class="float-right font-bold">&times;</button>
-    </div>
+    <!-- Content -->
+    <div class="px-4 py-4 pb-24">
+      <!-- Error Alert -->
+      <div v-if="error" class="bg-red-50 border-2 border-red-200 rounded-2xl p-4 mb-4">
+        <div class="flex items-start justify-between">
+          <div class="flex items-start gap-3">
+            <span class="text-2xl">⚠️</span>
+            <div>
+              <p class="font-medium text-red-800">Lỗi</p>
+              <p class="text-sm text-red-600">{{ error }}</p>
+            </div>
+          </div>
+          <button @click="clearError" class="text-red-600 text-xl font-bold">×</button>
+        </div>
+      </div>
 
-    <!-- Report Generation -->
-    <div class="bg-white rounded-lg shadow p-6">
-      <h2 class="text-lg font-semibold mb-4">Tạo báo cáo</h2>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <!-- Report Generation Cards -->
+      <div class="space-y-3 mb-4">
         <!-- Shift Report -->
-        <div class="border rounded-lg p-4">
-          <h3 class="font-medium mb-3">Báo cáo ca</h3>
-          <select v-model="selectedShiftForReport" class="w-full border rounded px-3 py-2 mb-3">
-            <option value="">Chọn ca</option>
+        <div class="bg-white rounded-2xl p-4 shadow-sm">
+          <h3 class="font-bold text-gray-800 mb-3">📋 Báo cáo ca</h3>
+          <select 
+            v-model="selectedShiftForReport" 
+            class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base mb-3 focus:outline-none focus:border-blue-500"
+          >
+            <option value="">-- Chọn ca --</option>
             <option v-for="shift in availableShifts" :key="shift.id" :value="shift.id">
-              {{ shift.type }} - {{ formatDate(shift.started_at) }}
+              {{ getShiftTypeText(shift.type) }} - {{ formatDate(shift.started_at) }} - {{ shift.user_name }}
             </option>
           </select>
           <button
             @click="generateShiftReport"
             :disabled="!selectedShiftForReport || loading"
-            class="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            class="w-full py-3 bg-blue-500 text-white rounded-xl font-medium active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Tạo báo cáo ca
+            {{ loading ? '⏳ Đang tạo...' : '✓ Tạo báo cáo ca' }}
           </button>
         </div>
 
         <!-- Daily Report -->
-        <div class="border rounded-lg p-4">
-          <h3 class="font-medium mb-3">Báo cáo ngày</h3>
+        <div class="bg-white rounded-2xl p-4 shadow-sm">
+          <h3 class="font-bold text-gray-800 mb-3">📅 Báo cáo ngày</h3>
           <input
             v-model="selectedDate"
             type="date"
-            class="w-full border rounded px-3 py-2 mb-3"
+            class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base mb-3 focus:outline-none focus:border-green-500"
           />
           <button
             @click="generateDailyReport"
             :disabled="!selectedDate || loading"
-            class="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+            class="w-full py-3 bg-green-500 text-white rounded-xl font-medium active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Tạo báo cáo ngày
+            {{ loading ? '⏳ Đang tạo...' : '✓ Tạo báo cáo ngày' }}
           </button>
         </div>
 
         <!-- Shift Handover -->
-        <div class="border rounded-lg p-4">
-          <h3 class="font-medium mb-3">Bàn giao ca</h3>
+        <div class="bg-white rounded-2xl p-4 shadow-sm">
+          <h3 class="font-bold text-gray-800 mb-3">🔄 Bàn giao ca</h3>
           <input
             v-model="handoverForm.toCashierID"
             type="text"
             placeholder="ID thu ngân tiếp nhận"
-            class="w-full border rounded px-3 py-2 mb-2"
+            class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base mb-3 focus:outline-none focus:border-orange-500"
           />
           <textarea
             v-model="handoverForm.notes"
-            placeholder="Ghi chú bàn giao"
-            class="w-full border rounded px-3 py-2 mb-3 h-20 resize-none"
+            placeholder="Ghi chú bàn giao (tùy chọn)"
+            rows="2"
+            class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base mb-3 focus:outline-none focus:border-orange-500 resize-none"
           ></textarea>
           <button
             @click="performHandover"
             :disabled="!handoverForm.toCashierID || loading"
-            class="w-full px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50"
+            class="w-full py-3 bg-orange-500 text-white rounded-xl font-medium active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Bàn giao ca
+            {{ loading ? '⏳ Đang xử lý...' : '✓ Xác nhận bàn giao' }}
           </button>
         </div>
       </div>
-    </div>
 
-    <!-- Current Report Display -->
-    <div v-if="currentReport" class="bg-white rounded-lg shadow p-6">
-      <div class="flex justify-between items-center mb-4">
-        <h2 class="text-lg font-semibold">{{ currentReport.title }}</h2>
-        <button
-          @click="printReport"
-          class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
-        >
-          <i class="fas fa-print mr-2"></i>In báo cáo
-        </button>
-      </div>
-
-      <!-- Report Content -->
-      <div id="report-content" class="space-y-6">
-        <!-- Header -->
-        <div class="text-center border-b pb-4">
-          <h1 class="text-xl font-bold">QUÁN CAFÉ</h1>
-          <h2 class="text-lg">{{ currentReport.title }}</h2>
-          <p class="text-sm text-gray-600">Ngày tạo: {{ formatDateTime(currentReport.generated_at) }}</p>
+      <!-- Current Report Display -->
+      <div v-if="currentReport" class="bg-white rounded-2xl p-4 shadow-sm mb-4">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-bold text-gray-800">{{ currentReport.title }}</h2>
+          <button
+            @click="printReport"
+            class="p-2 bg-gray-100 text-gray-700 rounded-lg active:scale-95 transition-transform"
+          >
+            🖨️
+          </button>
         </div>
 
-        <!-- Summary -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div class="text-center p-4 bg-blue-50 rounded">
-            <div class="text-2xl font-bold text-blue-600">{{ currentReport.total_orders }}</div>
-            <div class="text-sm text-gray-600">Tổng đơn hàng</div>
+        <!-- Report Content -->
+        <div id="report-content" class="space-y-4">
+          <!-- Header -->
+          <div class="text-center border-b-2 border-gray-200 pb-4">
+            <h1 class="text-xl font-bold text-gray-800">QUÁN CAFÉ</h1>
+            <h2 class="text-base font-medium text-gray-700">{{ currentReport.title }}</h2>
+            <p class="text-xs text-gray-500 mt-1">{{ formatDateTime(currentReport.generated_at) }}</p>
           </div>
-          <div class="text-center p-4 bg-green-50 rounded">
-            <div class="text-2xl font-bold text-green-600">{{ formatCurrency(currentReport.total_revenue) }}</div>
-            <div class="text-sm text-gray-600">Tổng doanh thu</div>
-          </div>
-          <div class="text-center p-4 bg-yellow-50 rounded">
-            <div class="text-2xl font-bold text-yellow-600">{{ formatCurrency(currentReport.cash_revenue) }}</div>
-            <div class="text-sm text-gray-600">Tiền mặt</div>
-          </div>
-          <div class="text-center p-4 bg-purple-50 rounded">
-            <div class="text-2xl font-bold text-purple-600">{{ formatCurrency(currentReport.transfer_revenue + currentReport.qr_revenue) }}</div>
-            <div class="text-sm text-gray-600">Chuyển khoản</div>
-          </div>
-        </div>
 
-        <!-- Revenue Breakdown -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div class="bg-gray-50 p-4 rounded">
-            <h3 class="font-medium mb-2">Tiền mặt</h3>
-            <div class="text-lg font-bold">{{ formatCurrency(currentReport.cash_revenue) }}</div>
-            <div class="text-sm text-gray-600">{{ getPercentage(currentReport.cash_revenue, currentReport.total_revenue) }}%</div>
-          </div>
-          <div class="bg-gray-50 p-4 rounded">
-            <h3 class="font-medium mb-2">Chuyển khoản</h3>
-            <div class="text-lg font-bold">{{ formatCurrency(currentReport.transfer_revenue) }}</div>
-            <div class="text-sm text-gray-600">{{ getPercentage(currentReport.transfer_revenue, currentReport.total_revenue) }}%</div>
-          </div>
-          <div class="bg-gray-50 p-4 rounded">
-            <h3 class="font-medium mb-2">QR Code</h3>
-            <div class="text-lg font-bold">{{ formatCurrency(currentReport.qr_revenue) }}</div>
-            <div class="text-sm text-gray-600">{{ getPercentage(currentReport.qr_revenue, currentReport.total_revenue) }}%</div>
-          </div>
-        </div>
-
-        <!-- Reconciliation -->
-        <div v-if="currentReport.reconciliation" class="bg-gray-50 p-4 rounded">
-          <h3 class="font-medium mb-3">Đối soát tiền mặt</h3>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <div class="text-sm text-gray-600">Tiền mặt dự kiến</div>
-              <div class="font-medium">{{ formatCurrency(currentReport.reconciliation.expected_cash) }}</div>
+          <!-- Summary Stats -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-blue-50 rounded-xl p-3 text-center">
+              <div class="text-2xl font-bold text-blue-600">{{ currentReport.total_orders }}</div>
+              <div class="text-xs text-gray-600">Tổng đơn</div>
             </div>
-            <div>
-              <div class="text-sm text-gray-600">Tiền mặt thực tế</div>
-              <div class="font-medium">{{ formatCurrency(currentReport.reconciliation.actual_cash) }}</div>
+            <div class="bg-green-50 rounded-xl p-3 text-center">
+              <div class="text-lg font-bold text-green-600">{{ formatPrice(currentReport.total_revenue) }}</div>
+              <div class="text-xs text-gray-600">Doanh thu</div>
             </div>
-            <div>
-              <div class="text-sm text-gray-600">Chênh lệch</div>
-              <div :class="getDifferenceClass(currentReport.reconciliation.difference)">
-                {{ formatCurrency(currentReport.reconciliation.difference) }}
-                <span class="text-xs ml-1">({{ currentReport.reconciliation.status }})</span>
+            <div class="bg-yellow-50 rounded-xl p-3 text-center">
+              <div class="text-lg font-bold text-yellow-600">{{ formatPrice(currentReport.cash_revenue) }}</div>
+              <div class="text-xs text-gray-600">💵 Tiền mặt</div>
+            </div>
+            <div class="bg-purple-50 rounded-xl p-3 text-center">
+              <div class="text-lg font-bold text-purple-600">{{ formatPrice(currentReport.transfer_revenue + currentReport.qr_revenue) }}</div>
+              <div class="text-xs text-gray-600">💳 Chuyển khoản</div>
+            </div>
+          </div>
+
+          <!-- Revenue Breakdown -->
+          <div class="space-y-2">
+            <h3 class="font-bold text-gray-800 text-sm">Chi tiết thanh toán</h3>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center bg-gray-50 rounded-lg p-3">
+                <span class="text-sm text-gray-700">💵 Tiền mặt</span>
+                <div class="text-right">
+                  <div class="font-bold text-gray-800">{{ formatPrice(currentReport.cash_revenue) }}</div>
+                  <div class="text-xs text-gray-500">{{ getPercentage(currentReport.cash_revenue, currentReport.total_revenue) }}%</div>
+                </div>
+              </div>
+              <div class="flex justify-between items-center bg-gray-50 rounded-lg p-3">
+                <span class="text-sm text-gray-700">💳 Chuyển khoản</span>
+                <div class="text-right">
+                  <div class="font-bold text-gray-800">{{ formatPrice(currentReport.transfer_revenue) }}</div>
+                  <div class="text-xs text-gray-500">{{ getPercentage(currentReport.transfer_revenue, currentReport.total_revenue) }}%</div>
+                </div>
+              </div>
+              <div class="flex justify-between items-center bg-gray-50 rounded-lg p-3">
+                <span class="text-sm text-gray-700">📱 QR Code</span>
+                <div class="text-right">
+                  <div class="font-bold text-gray-800">{{ formatPrice(currentReport.qr_revenue) }}</div>
+                  <div class="text-xs text-gray-500">{{ getPercentage(currentReport.qr_revenue, currentReport.total_revenue) }}%</div>
+                </div>
               </div>
             </div>
           </div>
-          <div v-if="currentReport.reconciliation.notes" class="mt-2 text-sm text-gray-600">
-            Ghi chú: {{ currentReport.reconciliation.notes }}
-          </div>
-        </div>
 
-        <!-- Audit Trail -->
-        <div v-if="currentReport.audits && currentReport.audits.length > 0" class="space-y-3">
-          <h3 class="font-medium">Nhật ký kiểm toán</h3>
-          <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Thời gian</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Hành động</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Order ID</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Lý do</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Số tiền</th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                <tr v-for="audit in currentReport.audits" :key="audit.id">
-                  <td class="px-4 py-2 text-sm">{{ formatDateTime(audit.audited_at) }}</td>
-                  <td class="px-4 py-2 text-sm">
-                    <span :class="getAuditActionClass(audit.action)">
-                      {{ getAuditActionText(audit.action) }}
-                    </span>
-                  </td>
-                  <td class="px-4 py-2 text-sm font-mono">{{ audit.order_id }}</td>
-                  <td class="px-4 py-2 text-sm">{{ audit.reason }}</td>
-                  <td class="px-4 py-2 text-sm font-medium">{{ formatCurrency(audit.amount) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Report History -->
-    <div class="bg-white rounded-lg shadow p-6">
-      <h2 class="text-lg font-semibold mb-4">Lịch sử báo cáo</h2>
-      <div v-if="reports.length > 0" class="space-y-3">
-        <div
-          v-for="report in reports"
-          :key="report.generated_at"
-          class="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer"
-          @click="viewReport(report)"
-        >
-          <div class="flex justify-between items-center">
-            <div>
-              <div class="font-medium">{{ getReportTitle(report) }}</div>
-              <div class="text-sm text-gray-600">{{ formatDateTime(report.generated_at) }}</div>
+          <!-- Reconciliation -->
+          <div v-if="currentReport.reconciliation" class="bg-green-50 rounded-xl p-4">
+            <h3 class="font-bold text-gray-800 text-sm mb-3">💰 Đối soát tiền mặt</h3>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">Dự kiến:</span>
+                <span class="font-medium text-gray-800">{{ formatPrice(currentReport.reconciliation.expected_cash) }}</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">Thực tế:</span>
+                <span class="font-medium text-gray-800">{{ formatPrice(currentReport.reconciliation.actual_cash) }}</span>
+              </div>
+              <div class="flex justify-between items-center pt-2 border-t border-green-200">
+                <span class="text-sm font-medium text-gray-700">Chênh lệch:</span>
+                <span :class="getDifferenceClass(currentReport.reconciliation.difference)" class="font-bold">
+                  {{ formatPrice(currentReport.reconciliation.difference) }}
+                </span>
+              </div>
             </div>
-            <div class="text-right">
-              <div class="font-medium">{{ formatCurrency(report.total_revenue) }}</div>
-              <div class="text-sm text-gray-600">{{ report.total_orders }} đơn</div>
+            <div v-if="currentReport.reconciliation.notes" class="mt-3 text-xs text-gray-600 bg-white rounded-lg p-2">
+              <span class="font-medium">Ghi chú:</span> {{ currentReport.reconciliation.notes }}
+            </div>
+          </div>
+
+          <!-- Audit Trail -->
+          <div v-if="currentReport.audits && currentReport.audits.length > 0" class="space-y-2">
+            <h3 class="font-bold text-gray-800 text-sm">📝 Nhật ký kiểm toán</h3>
+            <div class="space-y-2">
+              <div
+                v-for="audit in currentReport.audits"
+                :key="audit.id"
+                class="bg-gray-50 rounded-lg p-3"
+              >
+                <div class="flex justify-between items-start mb-2">
+                  <span :class="getAuditActionBadge(audit.action)">
+                    {{ getAuditActionText(audit.action) }}
+                  </span>
+                  <span class="font-bold text-gray-800">{{ formatPrice(audit.amount) }}</span>
+                </div>
+                <div class="text-xs text-gray-600">
+                  <div>Order: #{{ audit.order_id?.slice(-6) }}</div>
+                  <div v-if="audit.reason">Lý do: {{ audit.reason }}</div>
+                  <div class="text-gray-500 mt-1">{{ formatDateTime(audit.audited_at) }}</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
-      <div v-else class="text-center py-8 text-gray-500">
-        Chưa có báo cáo nào
+
+      <!-- Report History -->
+      <div class="mb-4">
+        <h2 class="text-lg font-bold text-gray-800 mb-3">📚 Lịch sử báo cáo</h2>
+        
+        <div v-if="reports.length === 0" class="text-center py-12 bg-white rounded-2xl">
+          <div class="text-5xl mb-3">📭</div>
+          <p class="text-gray-500">Chưa có báo cáo nào</p>
+          <p class="text-sm text-gray-400 mt-1">Tạo báo cáo mới ở trên</p>
+        </div>
+
+        <div v-else class="space-y-3">
+          <div
+            v-for="report in reports"
+            :key="report.generated_at"
+            @click="viewReport(report)"
+            class="bg-white rounded-xl p-4 shadow-sm active:scale-98 transition-transform"
+          >
+            <div class="flex justify-between items-start mb-2">
+              <div>
+                <h3 class="font-bold text-gray-800">{{ getReportTitle(report) }}</h3>
+                <p class="text-xs text-gray-500">{{ formatDateTime(report.generated_at) }}</p>
+              </div>
+              <span class="text-sm text-blue-500 font-medium">Xem →</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-gray-600">{{ report.total_orders }} đơn hàng</span>
+              <span class="font-bold text-green-600">{{ formatPrice(report.total_revenue) }}</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-    </div>
+
+    <!-- Bottom Navigation -->
+    <BottomNav />
   </div>
 </template>
 
-<script>
+<script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useCashierStore } from '../stores/cashier'
 import { useShiftStore } from '../stores/shift'
-import Navigation from '../components/Navigation.vue'
+import BottomNav from '../components/BottomNav.vue'
 
-export default {
-  name: 'CashierReports',
-  components: {
-    Navigation
-  },
-  setup() {
-    const cashierStore = useCashierStore()
-    const shiftStore = useShiftStore()
+const cashierStore = useCashierStore()
+const shiftStore = useShiftStore()
 
-    const selectedShiftForReport = ref('')
-    const selectedDate = ref(new Date().toISOString().split('T')[0])
-    const currentReport = ref(null)
-    const handoverForm = ref({
-      toCashierID: '',
-      notes: ''
-    })
+const selectedShiftForReport = ref('')
+const selectedDate = ref(new Date().toISOString().split('T')[0])
+const currentReport = ref(null)
+const handoverForm = ref({
+  toCashierID: '',
+  notes: ''
+})
 
-    const loading = computed(() => cashierStore.loading)
-    const error = computed(() => cashierStore.error)
-    const reports = computed(() => cashierStore.reports)
-    const availableShifts = computed(() => shiftStore.shifts)
+// Computed
+const loading = computed(() => cashierStore.loading)
+const error = computed(() => cashierStore.error)
+const reports = computed(() => cashierStore.reports)
+const availableShifts = computed(() => shiftStore.shifts)
 
-    onMounted(async () => {
-      await shiftStore.fetchAllShifts()
-    })
-
-    const generateShiftReport = async () => {
-      try {
-        const report = await cashierStore.generateShiftReport(selectedShiftForReport.value)
-        currentReport.value = {
-          ...report,
-          title: `Báo cáo ca ${report.shift?.type || 'N/A'}`
-        }
-      } catch (error) {
-        console.error('Generate shift report failed:', error)
-      }
+// Methods
+const generateShiftReport = async () => {
+  try {
+    const report = await cashierStore.generateShiftReport(selectedShiftForReport.value)
+    currentReport.value = {
+      ...report,
+      title: `Báo cáo ca ${report.shift?.type || 'N/A'}`
     }
-
-    const generateDailyReport = async () => {
-      try {
-        const report = await cashierStore.getDailyReport(selectedDate.value)
-        currentReport.value = {
-          ...report,
-          title: `Báo cáo ngày ${selectedDate.value}`
-        }
-      } catch (error) {
-        console.error('Generate daily report failed:', error)
-      }
-    }
-
-    const performHandover = async () => {
-      if (!confirm('Bạn có chắc muốn bàn giao ca?')) return
-
-      try {
-        await cashierStore.handoverShift({
-          from_cashier_id: 'current_user', // Should get from auth store
-          to_cashier_id: handoverForm.value.toCashierID,
-          notes: handoverForm.value.notes
-        })
-        handoverForm.value = { toCashierID: '', notes: '' }
-        alert('Bàn giao ca thành công!')
-      } catch (error) {
-        console.error('Handover failed:', error)
-      }
-    }
-
-    const viewReport = (report) => {
-      currentReport.value = {
-        ...report,
-        title: getReportTitle(report)
-      }
-    }
-
-    const printReport = () => {
-      const printContent = document.getElementById('report-content')
-      const printWindow = window.open('', '_blank')
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Báo cáo</title>
-            <style>
-              body { font-family: Arial, sans-serif; margin: 20px; }
-              .text-center { text-align: center; }
-              .grid { display: grid; gap: 1rem; }
-              .grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
-              .grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
-              .grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
-              .p-4 { padding: 1rem; }
-              .bg-gray-50 { background-color: #f9fafb; }
-              .rounded { border-radius: 0.375rem; }
-              .font-bold { font-weight: bold; }
-              .font-medium { font-weight: 500; }
-              .text-sm { font-size: 0.875rem; }
-              .text-lg { font-size: 1.125rem; }
-              .text-xl { font-size: 1.25rem; }
-              .text-2xl { font-size: 1.5rem; }
-              .border-b { border-bottom: 1px solid #e5e7eb; }
-              .pb-4 { padding-bottom: 1rem; }
-              .mb-2 { margin-bottom: 0.5rem; }
-              .mb-3 { margin-bottom: 0.75rem; }
-              .mb-4 { margin-bottom: 1rem; }
-              .space-y-3 > * + * { margin-top: 0.75rem; }
-              .space-y-6 > * + * { margin-top: 1.5rem; }
-              table { width: 100%; border-collapse: collapse; }
-              th, td { padding: 0.5rem; border: 1px solid #e5e7eb; text-align: left; }
-              th { background-color: #f9fafb; font-weight: 500; }
-            </style>
-          </head>
-          <body>
-            ${printContent.innerHTML}
-          </body>
-        </html>
-      `)
-      printWindow.document.close()
-      printWindow.print()
-    }
-
-    const clearError = () => {
-      cashierStore.clearError()
-    }
-
-    // Utility functions
-    const formatCurrency = (amount) => {
-      return new Intl.NumberFormat('vi-VN', {
-        style: 'currency',
-        currency: 'VND'
-      }).format(amount)
-    }
-
-    const formatDate = (date) => {
-      if (!date) return 'N/A'
-      const d = new Date(date)
-      if (isNaN(d.getTime())) return 'Invalid Date'
-      return d.toLocaleDateString('vi-VN')
-    }
-
-    const formatDateTime = (date) => {
-      if (!date) return 'N/A'
-      const d = new Date(date)
-      if (isNaN(d.getTime())) return 'Invalid Date'
-      return d.toLocaleString('vi-VN')
-    }
-
-    const getPercentage = (value, total) => {
-      if (total === 0) return 0
-      return Math.round((value / total) * 100)
-    }
-
-    const getDifferenceClass = (difference) => {
-      if (difference > 0) return 'font-medium text-green-600'
-      if (difference < 0) return 'font-medium text-red-600'
-      return 'font-medium text-gray-600'
-    }
-
-    const getAuditActionClass = (action) => {
-      const classes = {
-        'CANCEL': 'px-2 py-1 text-xs rounded bg-red-100 text-red-800',
-        'REFUND': 'px-2 py-1 text-xs rounded bg-orange-100 text-orange-800',
-        'OVERRIDE': 'px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-800',
-        'LOCK': 'px-2 py-1 text-xs rounded bg-gray-100 text-gray-800'
-      }
-      return classes[action] || 'px-2 py-1 text-xs rounded bg-gray-100 text-gray-800'
-    }
-
-    const getAuditActionText = (action) => {
-      const texts = {
-        'CANCEL': 'Hủy',
-        'REFUND': 'Hoàn tiền',
-        'OVERRIDE': 'Điều chỉnh',
-        'LOCK': 'Khóa'
-      }
-      return texts[action] || action
-    }
-
-    const getReportTitle = (report) => {
-      if (report.shift) {
-        return `Báo cáo ca ${report.shift.type}`
-      }
-      return 'Báo cáo tổng hợp'
-    }
-
-    return {
-      selectedShiftForReport,
-      selectedDate,
-      currentReport,
-      handoverForm,
-      loading,
-      error,
-      reports,
-      availableShifts,
-      generateShiftReport,
-      generateDailyReport,
-      performHandover,
-      viewReport,
-      printReport,
-      clearError,
-      formatCurrency,
-      formatDate,
-      formatDateTime,
-      getPercentage,
-      getDifferenceClass,
-      getAuditActionClass,
-      getAuditActionText,
-      getReportTitle
-    }
+  } catch (error) {
+    console.error('Generate shift report failed:', error)
   }
 }
+
+const generateDailyReport = async () => {
+  try {
+    const report = await cashierStore.getDailyReport(selectedDate.value)
+    currentReport.value = {
+      ...report,
+      title: `Báo cáo ngày ${formatDate(selectedDate.value)}`
+    }
+  } catch (error) {
+    console.error('Generate daily report failed:', error)
+  }
+}
+
+const performHandover = async () => {
+  if (!confirm('Bạn có chắc muốn bàn giao ca? Không thể hoàn tác!')) return
+
+  try {
+    await cashierStore.handoverShift({
+      from_cashier_id: 'current_user',
+      to_cashier_id: handoverForm.value.toCashierID,
+      notes: handoverForm.value.notes
+    })
+    handoverForm.value = { toCashierID: '', notes: '' }
+    alert('✓ Bàn giao ca thành công!')
+  } catch (error) {
+    console.error('Handover failed:', error)
+  }
+}
+
+const viewReport = (report) => {
+  currentReport.value = {
+    ...report,
+    title: getReportTitle(report)
+  }
+  // Scroll to top
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+const printReport = () => {
+  const printContent = document.getElementById('report-content')
+  const printWindow = window.open('', '_blank')
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>${currentReport.value.title}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .text-center { text-align: center; }
+          .space-y-4 > * + * { margin-top: 1rem; }
+          .grid { display: grid; gap: 0.75rem; }
+          .grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+          .p-3 { padding: 0.75rem; }
+          .bg-gray-50 { background-color: #f9fafb; }
+          .rounded-xl { border-radius: 0.75rem; }
+          .font-bold { font-weight: bold; }
+          .font-medium { font-weight: 500; }
+          .text-xs { font-size: 0.75rem; }
+          .text-sm { font-size: 0.875rem; }
+          .text-base { font-size: 1rem; }
+          .text-lg { font-size: 1.125rem; }
+          .text-xl { font-size: 1.25rem; }
+          .text-2xl { font-size: 1.5rem; }
+          .border-b-2 { border-bottom: 2px solid #e5e7eb; }
+          .pb-4 { padding-bottom: 1rem; }
+          .mb-2 { margin-bottom: 0.5rem; }
+          .mb-3 { margin-bottom: 0.75rem; }
+          .mt-1 { margin-top: 0.25rem; }
+          .mt-3 { margin-top: 0.75rem; }
+        </style>
+      </head>
+      <body>
+        ${printContent.innerHTML}
+      </body>
+    </html>
+  `)
+  printWindow.document.close()
+  printWindow.print()
+}
+
+const clearError = () => {
+  cashierStore.clearError()
+}
+
+// Utility functions
+const formatPrice = (amount) => {
+  if (!amount && amount !== 0) return '0₫'
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
+    maximumFractionDigits: 0
+  }).format(amount)
+}
+
+const formatDate = (date) => {
+  if (!date) return 'N/A'
+  return new Date(date).toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  })
+}
+
+const formatDateTime = (date) => {
+  if (!date) return 'N/A'
+  return new Date(date).toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+const getShiftTypeText = (type) => {
+  const types = {
+    MORNING: '☀️ Ca sáng',
+    AFTERNOON: '🌤️ Ca chiều',
+    EVENING: '🌙 Ca tối'
+  }
+  return types[type] || type
+}
+
+const getPercentage = (value, total) => {
+  if (!total || total === 0) return 0
+  return Math.round((value / total) * 100)
+}
+
+const getDifferenceClass = (difference) => {
+  if (difference > 0) return 'text-green-600'
+  if (difference < 0) return 'text-red-600'
+  return 'text-gray-600'
+}
+
+const getAuditActionBadge = (action) => {
+  const badges = {
+    CANCEL: 'px-2 py-1 text-xs rounded-full bg-red-100 text-red-700 font-medium',
+    REFUND: 'px-2 py-1 text-xs rounded-full bg-orange-100 text-orange-700 font-medium',
+    OVERRIDE: 'px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700 font-medium',
+    LOCK: 'px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700 font-medium'
+  }
+  return badges[action] || 'px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700 font-medium'
+}
+
+const getAuditActionText = (action) => {
+  const texts = {
+    CANCEL: '❌ Hủy',
+    REFUND: '↩️ Hoàn tiền',
+    OVERRIDE: '✏️ Điều chỉnh',
+    LOCK: '🔒 Khóa'
+  }
+  return texts[action] || action
+}
+
+const getReportTitle = (report) => {
+  if (report.shift) {
+    return `Báo cáo ca ${report.shift.type}`
+  }
+  return 'Báo cáo tổng hợp'
+}
+
+// Lifecycle
+onMounted(async () => {
+  await shiftStore.fetchAllShifts()
+})
 </script>
+
+<style scoped>
+.active\:scale-95:active {
+  transform: scale(0.95);
+}
+
+.active\:scale-98:active {
+  transform: scale(0.98);
+}
+</style>

@@ -133,8 +133,109 @@
 
       <!-- Waiter/Manager/Cashier Dashboard -->
       <div v-else>
-        <!-- Quick Stats -->
-        <div class="grid grid-cols-2 gap-3 mb-4">
+        <!-- Cashier Dashboard -->
+        <div v-if="isCashier">
+          <!-- Current Shift Info -->
+          <div v-if="hasOpenShift" class="mb-4 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-2xl p-4 shadow-lg">
+            <div class="flex items-center justify-between mb-2">
+              <div>
+                <h3 class="font-bold text-lg">Ca làm việc</h3>
+                <p class="text-sm opacity-90">{{ getShiftTypeText(currentShift.type) }}</p>
+              </div>
+              <div class="text-right">
+                <p class="text-xs opacity-75">Thời gian</p>
+                <p class="font-bold">{{ shiftDuration }}</p>
+              </div>
+            </div>
+            <div class="text-xs opacity-90">
+              Bắt đầu: {{ formatTime(currentShift.started_at) }}
+            </div>
+          </div>
+
+          <!-- Cashier Stats -->
+          <div class="grid grid-cols-2 gap-3 mb-4">
+            <div class="bg-white rounded-2xl p-4 shadow-sm">
+              <div class="text-3xl mb-2">📋</div>
+              <div class="text-2xl font-bold text-gray-800">{{ todayOrders }}</div>
+              <div class="text-xs text-gray-500">Orders hôm nay</div>
+            </div>
+            <div class="bg-white rounded-2xl p-4 shadow-sm">
+              <div class="text-3xl mb-2">💰</div>
+              <div class="text-lg font-bold text-green-600">{{ formatPrice(todayRevenue) }}</div>
+              <div class="text-xs text-gray-500">Doanh thu hôm nay</div>
+            </div>
+            <div class="bg-white rounded-2xl p-4 shadow-sm">
+              <div class="text-3xl mb-2">💵</div>
+              <div class="text-lg font-bold text-blue-600">{{ formatPrice(shiftRevenue) }}</div>
+              <div class="text-xs text-gray-500">Doanh thu ca này</div>
+            </div>
+            <div class="bg-white rounded-2xl p-4 shadow-sm">
+              <div class="text-3xl mb-2">⏰</div>
+              <div class="text-2xl font-bold text-purple-600">{{ openShiftsCount }}</div>
+              <div class="text-xs text-gray-500">Ca đang mở</div>
+            </div>
+          </div>
+
+          <!-- Quick Actions for Cashier -->
+          <div class="mb-4">
+            <h2 class="text-lg font-bold text-gray-800 mb-3">⚡ Thao tác nhanh</h2>
+            <div class="grid grid-cols-2 gap-3">
+              <button @click="$router.push('/cashier')" 
+                class="bg-gradient-to-br from-yellow-500 to-orange-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+                <div class="text-4xl mb-2">💵</div>
+                <div class="font-bold">Thu ngân</div>
+              </button>
+              <button @click="$router.push('/shifts')" 
+                class="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+                <div class="text-4xl mb-2">⏰</div>
+                <div class="font-bold">Ca làm</div>
+              </button>
+              <button @click="$router.push('/orders')" 
+                class="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+                <div class="text-4xl mb-2">📋</div>
+                <div class="font-bold">Orders</div>
+              </button>
+              <button v-if="user?.role === 'manager'" @click="$router.push('/users')" 
+                class="bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+                <div class="text-4xl mb-2">👥</div>
+                <div class="font-bold">Nhân viên</div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Open Shifts Preview -->
+          <div v-if="openShifts.length > 0" class="mb-4">
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="text-lg font-bold text-gray-800">🔓 Ca đang mở</h2>
+              <button @click="$router.push('/shifts')" class="text-sm text-blue-500 font-medium">
+                Xem tất cả →
+              </button>
+            </div>
+            <div class="space-y-3">
+              <div v-for="shift in openShifts.slice(0, 3)" :key="shift.id"
+                @click="$router.push('/shifts')"
+                class="bg-white rounded-xl p-4 shadow-sm active:scale-98 transition-transform border-l-4 border-yellow-500">
+                <div class="flex justify-between items-start mb-2">
+                  <div>
+                    <h3 class="font-bold">{{ shift.user_name }}</h3>
+                    <p class="text-sm text-gray-600">{{ getRoleTypeText(shift.role_type) }}</p>
+                  </div>
+                  <span class="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
+                    Đang mở
+                  </span>
+                </div>
+                <div class="text-sm text-gray-500">
+                  Bắt đầu: {{ formatTime(shift.started_at) }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Waiter/Manager Dashboard -->
+        <div v-else>
+          <!-- Quick Stats -->
+          <div class="grid grid-cols-2 gap-3 mb-4">
           <div class="bg-white rounded-2xl p-4 shadow-sm">
             <div class="text-3xl mb-2">📋</div>
             <div class="text-2xl font-bold text-gray-800">{{ todayOrders }}</div>
@@ -236,6 +337,7 @@
           </div>
         </div>
       </div>
+    </div>
     </div>
 
     <!-- Bottom Navigation -->
@@ -378,6 +480,40 @@ const pendingOrders = computed(() => {
   return orders.value.filter(o => o.status === 'CREATED').length
 })
 
+// Cashier-specific stats
+const shiftRevenue = computed(() => {
+  if (!currentShift.value) return 0
+  
+  const shiftStart = new Date(currentShift.value.started_at)
+  const shiftEnd = currentShift.value.ended_at ? new Date(currentShift.value.ended_at) : new Date()
+  
+  return orders.value
+    .filter(o => {
+      if (o.status === 'CANCELLED') return false
+      const orderTime = new Date(o.created_at)
+      return orderTime >= shiftStart && orderTime <= shiftEnd
+    })
+    .reduce((sum, o) => sum + o.total, 0)
+})
+
+const openShiftsCount = computed(() => {
+  return shiftStore.openShifts.length
+})
+
+const openShifts = computed(() => {
+  return shiftStore.openShifts
+    .sort((a, b) => new Date(b.started_at) - new Date(a.started_at))
+})
+
+const getRoleTypeText = (roleType) => {
+  const roles = {
+    waiter: '🍽️ Phục vụ',
+    barista: '🍹 Pha chế',
+    cashier: '💵 Thu ngân'
+  }
+  return roles[roleType] || roleType
+}
+
 const shiftDuration = computed(() => {
   if (!currentShift.value?.started_at) return ''
   const start = new Date(currentShift.value.started_at)
@@ -464,6 +600,13 @@ onMounted(async () => {
       shiftStore.fetchCurrentShift(),
       baristaStore.fetchQueuedOrders(),
       baristaStore.fetchMyOrders()
+    ])
+  } else if (isCashier.value) {
+    // Cashier needs all shifts and orders
+    await Promise.all([
+      shiftStore.fetchCurrentShift(),
+      shiftStore.fetchAllShifts(),
+      orderStore.fetchOrders()
     ])
   } else {
     // Other roles use order store
