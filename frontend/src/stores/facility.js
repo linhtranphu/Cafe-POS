@@ -343,10 +343,7 @@ export const useFacilityStore = defineStore('facility', {
         console.warn('Maintenance due endpoint not available:', error.message)
         return []
       }
-    }
-  }
-})
-,
+    },
 
     // Facility Type management
     async fetchFacilityTypes() {

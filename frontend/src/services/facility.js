@@ -234,7 +234,6 @@ export const facilityService = {
     const response = await api.get(`/waiter/facilities/search?${params}`)
     return response.data
   },
-}
 
   // Facility Type management
   async getFacilityTypes() {
@@ -266,5 +265,5 @@ export const facilityService = {
   async deleteFacilityArea(id) {
     const response = await api.delete(`/manager/facility-areas/${id}`)
     return response.data
-  },
+  }
 }
