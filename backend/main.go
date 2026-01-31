@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"os/exec"
 	"time"
 	"cafe-pos/backend/application/services"
@@ -24,7 +25,11 @@ func main() {
 	time.Sleep(2 * time.Second)
 
 	// MongoDB connection
-	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI("mongodb://localhost:27017"))
+	mongoURI := os.Getenv("MONGODB_URI")
+	if mongoURI == "" {
+		mongoURI = "mongodb://localhost:27017"
+	}
+	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(mongoURI))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -46,7 +51,12 @@ func main() {
 	smManager := domain.NewStateMachineManager()
 
 	// Services
-	jwtService := services.NewJWTService("your-secret-key")
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "your-secret-key"
+		log.Println("⚠️  JWT_SECRET not set, using default (not recommended for production)")
+	}
+	jwtService := services.NewJWTService(jwtSecret)
 	authService := services.NewAuthService(userRepo, jwtService)
 	userManagementService := services.NewUserManagementService(userRepo, authService)
 	orderService := services.NewOrderService(orderRepo, shiftRepo, smManager)
@@ -330,10 +340,15 @@ func main() {
 	}
 
 	// Create default admin user
-	// createDefaultUsers(authService, userRepo)
+	createDefaultUsers(authService, userRepo)
 
-	log.Println("Server starting on :3000")
-	r.Run(":3000")
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3000"
+	}
+
+	log.Printf("Server starting on :%s", port)
+	r.Run(":" + port)
 }
 
 func createDefaultUsers(authService *services.AuthService, userRepo *mongodb.UserRepository) {
@@ -344,31 +359,17 @@ func createDefaultUsers(authService *services.AuthService, userRepo *mongodb.Use
 		return
 	}
 
-	// Create default users
-	users := []struct {
-		username string
-		password string
-		role     user.Role
-		name     string
-	}{
-		{"admin", "admin123", user.RoleManager, "Administrator"},
-		{"waiter1", "waiter123", user.RoleWaiter, "Waiter 1"},
-		{"barista1", "barista123", user.RoleBarista, "Barista 1"},
-		{"cashier1", "cashier123", user.RoleCashier, "Cashier 1"},
+	// Create only admin user
+	hashedPassword, _ := authService.HashPassword("admin123")
+	newUser := &user.User{
+		Username:  "admin",
+		Password:  hashedPassword,
+		Role:      user.RoleManager,
+		Name:      "Administrator",
+		Active:    true,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
-
-	for _, u := range users {
-		hashedPassword, _ := authService.HashPassword(u.password)
-		newUser := &user.User{
-			Username:  u.username,
-			Password:  hashedPassword,
-			Role:      u.role,
-			Name:      u.name,
-			Active:    true,
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
-		}
-		userRepo.Create(ctx, newUser)
-		log.Printf("Created user: %s (role: %s)", u.username, u.role)
-	}
+	userRepo.Create(ctx, newUser)
+	log.Printf("Created user: admin (role: %s)", user.RoleManager)
 }

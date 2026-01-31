@@ -32,16 +32,16 @@ services:
       - MONGODB_URI=${MONGODB_URI}
       - MONGODB_DATABASE=${MONGODB_DATABASE:-cafe_pos}
       - JWT_SECRET=${JWT_SECRET}
-      - PORT=8080
+      - PORT=3000
     ports:
-      - "8080:8080"
+      - "3000:3000"
     depends_on:
       mongodb:
         condition: service_healthy
     networks:
       - cafe-pos-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/state-machines"]
       interval: 30s
       timeout: 10s
       retries: 3
