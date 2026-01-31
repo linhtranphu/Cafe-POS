@@ -16,9 +16,9 @@ import (
 )
 
 func main() {
-	// Kill existing processes on port 8080
-	log.Println("🔄 Stopping existing processes on port 8080...")
-	exec.Command("bash", "-c", "lsof -ti:8080 | xargs -r kill -9").Run()
+	// Kill existing processes on port 3000
+	log.Println("🔄 Stopping existing processes on port 3000...")
+	exec.Command("bash", "-c", "lsof -ti:3000 | xargs -r kill -9").Run()
 	exec.Command("pkill", "-f", "cafe-pos-server").Run()
 	exec.Command("pkill", "-f", "go run main.go").Run()
 	time.Sleep(2 * time.Second)
@@ -332,8 +332,8 @@ func main() {
 	// Create default admin user
 	// createDefaultUsers(authService, userRepo)
 
-	log.Println("Server starting on :8080")
-	r.Run(":8080")
+	log.Println("Server starting on :3000")
+	r.Run(":3000")
 }
 
 func createDefaultUsers(authService *services.AuthService, userRepo *mongodb.UserRepository) {
