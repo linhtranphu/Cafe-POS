@@ -102,14 +102,14 @@ nano .env  # Edit with secure passwords
 - **Variable**: `MONGO_INITDB_ROOT_PASSWORD`
 - **Generation**: `openssl rand -base64 32`
 - **Min Length**: 16 characters
-- **Current**: `v0ys4k/cduilPyonooIa23XgBWtNv+f6qEmYyNEIzfM=` ✅
+- **Current**: Empty (user must set) ⚠️
 
 ### JWT Secret
 - **Location**: `.env` file
 - **Variable**: `JWT_SECRET`
 - **Generation**: `openssl rand -base64 64`
 - **Min Length**: 32 characters
-- **Current**: `udjAGqFuZdct/gqQdbjEcJ25isyzlhpdQ99vlE4knse71HpaLIxqpJfX4nS37JJVq6vCaE5K4yD22FpgxIpSiA==` ✅
+- **Current**: Empty (user must set) ⚠️
 
 ### Admin Account
 - **Username**: `admin`

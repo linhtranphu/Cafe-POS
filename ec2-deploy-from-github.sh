@@ -109,33 +109,35 @@ if [ ! -f ".env" ]; then
     echo ""
     echo -e "${BLUE}📝 Creating .env file...${NC}"
     
-    # Generate secure passwords
-    MONGO_PASS=$(openssl rand -base64 32)
-    JWT_SECRET=$(openssl rand -base64 64)
-    
-    # Create .env
+    # Create .env with empty passwords
     cat > .env << EOF
 # ============================================
 # MongoDB Configuration
 # ============================================
 MONGO_INITDB_ROOT_USERNAME=admin
-MONGO_INITDB_ROOT_PASSWORD=$MONGO_PASS
+MONGO_INITDB_ROOT_PASSWORD=
 MONGO_INITDB_DATABASE=cafe_pos
 
 # ============================================
 # Backend Configuration
 # ============================================
-MONGODB_URI=mongodb://admin:$MONGO_PASS@mongodb:27017
+MONGODB_URI=mongodb://admin:@mongodb:27017
 MONGODB_DATABASE=cafe_pos
-JWT_SECRET=$JWT_SECRET
+JWT_SECRET=
 PORT=3000
 EOF
     
-    echo -e "${GREEN}✅ .env file created with secure passwords${NC}"
+    echo -e "${GREEN}✅ .env file created${NC}"
     echo ""
-    echo -e "${BLUE}📊 Generated Credentials:${NC}"
-    echo "   MongoDB Password: $MONGO_PASS"
-    echo "   JWT Secret: $JWT_SECRET"
+    echo -e "${YELLOW}⚠️  IMPORTANT: Edit .env file with your passwords!${NC}"
+    echo ""
+    echo -e "${BLUE}📝 To set passwords:${NC}"
+    echo "   1. nano .env"
+    echo "   2. Generate MongoDB password: openssl rand -base64 32"
+    echo "   3. Generate JWT secret: openssl rand -base64 64"
+    echo "   4. Update MONGO_INITDB_ROOT_PASSWORD and MONGODB_URI"
+    echo "   5. Update JWT_SECRET"
+    echo "   6. Save and exit (Ctrl+X, Y, Enter)"
     echo ""
 else
     echo -e "${GREEN}✅ .env file already exists${NC}"

@@ -70,6 +70,15 @@ PORT=3000
 EOF
 ```
 
+**Or edit manually:**
+```bash
+nano .env
+# Set your own passwords:
+# MONGO_INITDB_ROOT_PASSWORD=your-secure-password
+# MONGODB_URI=mongodb://admin:your-secure-password@mongodb:27017
+# JWT_SECRET=your-secure-jwt-secret
+```
+
 ### Step 4: Install Docker
 ```bash
 curl -fsSL https://get.docker.com -o get-docker.sh
