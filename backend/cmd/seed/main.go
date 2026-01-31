@@ -51,6 +51,7 @@ func seedData() {
 }
 
 func seedUsers(ctx context.Context, authService *services.AuthService, userRepo *mongodb.UserRepository) {
+	// Only seed manager account for production
 	users := []struct {
 		username string
 		password string
@@ -58,11 +59,6 @@ func seedUsers(ctx context.Context, authService *services.AuthService, userRepo 
 		name     string
 	}{
 		{"admin", "admin123", user.RoleManager, "Quản lý"},
-		{"waiter1", "waiter123", user.RoleWaiter, "Nhân viên 1"},
-		{"waiter2", "waiter123", user.RoleWaiter, "Nhân viên 2"},
-		{"barista1", "barista123", user.RoleBarista, "Barista 1"},
-		{"barista2", "barista123", user.RoleBarista, "Barista 2"},
-		{"cashier1", "cashier123", user.RoleCashier, "Thu ngân 1"},
 	}
 
 	for _, u := range users {

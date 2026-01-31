@@ -44,33 +44,7 @@
         </div>
       </form>
 
-      <div class="mt-8 pt-5 border-t border-gray-200">
-        <h3 class="text-gray-600 text-sm mb-3">Tài khoản demo:</h3>
-        <div 
-          class="p-2 bg-gray-100 my-1 rounded-lg cursor-pointer text-xs transition-colors hover:bg-gray-200" 
-          @click="quickLogin('admin', 'admin123')"
-        >
-          <strong class="text-gray-700">Manager:</strong> admin / admin123
-        </div>
-        <div 
-          class="p-2 bg-gray-100 my-1 rounded-lg cursor-pointer text-xs transition-colors hover:bg-gray-200" 
-          @click="quickLogin('waiter1', 'waiter123')"
-        >
-          <strong class="text-gray-700">Waiter:</strong> waiter1 / waiter123
-        </div>
-        <div 
-          class="p-2 bg-blue-50 my-1 rounded-lg cursor-pointer text-xs transition-colors hover:bg-blue-100 border border-blue-200" 
-          @click="quickLogin('barista1', 'barista123')"
-        >
-          <strong class="text-blue-700">🍹 Barista:</strong> barista1 / barista123
-        </div>
-        <div 
-          class="p-2 bg-yellow-50 my-1 rounded-lg cursor-pointer text-xs transition-colors hover:bg-yellow-100 border border-yellow-200" 
-          @click="quickLogin('cashier1', 'cashier123')"
-        >
-          <strong class="text-yellow-700">💵 Cashier:</strong> cashier1 / cashier123
-        </div>
-      </div>
+      <!-- Demo accounts removed for production deployment -->
     </div>
   </div>
 </template>
@@ -106,11 +80,7 @@ const handleLogin = async () => {
   loading.value = false
 }
 
-const quickLogin = (user, pass) => {
-  username.value = user
-  password.value = pass
-  handleLogin()
-}
+// Quick login removed for production
 </script>
 
 <style scoped>

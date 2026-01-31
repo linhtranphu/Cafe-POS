@@ -6,8 +6,8 @@ services:
     container_name: cafe-pos-mongodb
     restart: always
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-admin123}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
       MONGO_INITDB_DATABASE: ${MONGODB_DATABASE:-cafe_pos}
     ports:
       - "27017:27017"
@@ -27,9 +27,9 @@ services:
     container_name: cafe-pos-backend
     restart: always
     environment:
-      - MONGODB_URI=${MONGODB_URI:-mongodb://admin:admin123@mongodb:27017}
+      - MONGODB_URI=${MONGODB_URI}
       - MONGODB_DATABASE=${MONGODB_DATABASE:-cafe_pos}
-      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      - JWT_SECRET=${JWT_SECRET}
       - PORT=8080
     ports:
       - "8080:8080"
