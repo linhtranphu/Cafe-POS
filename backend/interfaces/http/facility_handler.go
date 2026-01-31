@@ -93,6 +93,11 @@ func (h *FacilityHandler) DeleteFacility(c *gin.Context) {
 	username := c.GetString("username")
 
 	if err := h.service.DeleteFacility(c.Request.Context(), id, userID, username); err != nil {
+		// Check if it's a business rule validation error
+		if err.Error() == "không thể xóa tài sản đã có lịch sử bảo trì" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -329,4 +334,86 @@ func (h *FacilityHandler) GetStatusHistory(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, history)
+}
+
+// FacilityType handlers
+func (h *FacilityHandler) CreateFacilityType(c *gin.Context) {
+	var req struct {
+		Name string `json:"name" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ft, err := h.service.CreateFacilityType(c.Request.Context(), req.Name)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, ft)
+}
+
+func (h *FacilityHandler) GetFacilityTypes(c *gin.Context) {
+	types, err := h.service.GetFacilityTypes(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, types)
+}
+
+func (h *FacilityHandler) DeleteFacilityType(c *gin.Context) {
+	id, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID không hợp lệ"})
+		return
+	}
+
+	if err := h.service.DeleteFacilityType(c.Request.Context(), id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Không thể xóa loại thiết bị đang được sử dụng"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Xóa thành công"})
+}
+
+// FacilityArea handlers
+func (h *FacilityHandler) CreateFacilityArea(c *gin.Context) {
+	var req struct {
+		Name string `json:"name" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	fa, err := h.service.CreateFacilityArea(c.Request.Context(), req.Name)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, fa)
+}
+
+func (h *FacilityHandler) GetFacilityAreas(c *gin.Context) {
+	areas, err := h.service.GetFacilityAreas(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, areas)
+}
+
+func (h *FacilityHandler) DeleteFacilityArea(c *gin.Context) {
+	id, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID không hợp lệ"})
+		return
+	}
+
+	if err := h.service.DeleteFacilityArea(c.Request.Context(), id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Không thể xóa khu vực đang được sử dụng"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Xóa thành công"})
 }

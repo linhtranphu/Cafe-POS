@@ -35,17 +35,20 @@
         </div>
       </div>
 
-      <!-- Shift Selector -->
+      <!-- Cashier Shift Manager -->
+      <CashierShiftManager />
+
+      <!-- Shift Selector - Only Cashier Shifts -->
       <div class="bg-white rounded-2xl p-4 shadow-sm mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-2">📅 Chọn ca làm việc</label>
+        <label class="block text-sm font-medium text-gray-700 mb-2">📅 Chọn ca thu ngân để xem</label>
         <select 
           v-model="selectedShift" 
           @change="loadPayments" 
           class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-yellow-500"
         >
-          <option value="">-- Chọn ca --</option>
-          <option v-for="shift in availableShifts" :key="shift.id" :value="shift.id">
-            {{ getShiftTypeText(shift.type) }} - {{ formatDate(shift.started_at) }} - {{ shift.user_name }}
+          <option value="">-- Chọn ca thu ngân --</option>
+          <option v-for="shift in cashierShifts" :key="shift.id" :value="shift.id">
+            {{ formatDate(shift.start_time) }} - {{ shift.cashier_name }} - {{ getStatusText(shift.status) }}
           </option>
         </select>
       </div>
@@ -265,13 +268,14 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useCashierStore } from '../stores/cashier'
-import { useShiftStore } from '../stores/shift'
+import { useCashierShiftStore } from '../stores/cashierShift'
 import BottomNav from '../components/BottomNav.vue'
+import CashierShiftManager from '../components/CashierShiftManager.vue'
 import OverridePaymentModal from '../components/OverridePaymentModal.vue'
 import DiscrepancyModal from '../components/DiscrepancyModal.vue'
 
 const cashierStore = useCashierStore()
-const shiftStore = useShiftStore()
+const cashierShiftStore = useCashierShiftStore()
 
 const selectedShift = ref('')
 const showOverride = ref(false)
@@ -285,13 +289,13 @@ const reconciliationForm = ref({
 
 // Computed
 const shiftStatus = computed(() => cashierStore.shiftStatus)
+const cashierShifts = computed(() => cashierShiftStore.cashierShifts)
 const payments = computed(() => cashierStore.payments)
 const pendingDiscrepancies = computed(() => cashierStore.pendingDiscrepancies)
 const reconciliation = computed(() => cashierStore.reconciliation)
 const hasReconciliation = computed(() => cashierStore.hasReconciliation)
 const loading = computed(() => cashierStore.loading)
 const error = computed(() => cashierStore.error)
-const availableShifts = computed(() => shiftStore.shifts)
 
 // Methods
 const refreshData = async () => {
@@ -419,6 +423,24 @@ const formatDateTime = (date) => {
   })
 }
 
+const getStatusText = (status) => {
+  // Handle both shift status and order status
+  const statusMap = {
+    // Shift statuses
+    'OPEN': '🟢 Đang mở',
+    'CLOSURE_INITIATED': '🟡 Đang đóng',
+    'CLOSED': '🔴 Đã đóng',
+    // Order statuses
+    'PAID': '✓ Đã thu',
+    'QUEUED': '⏳ Chờ pha',
+    'IN_PROGRESS': '🍹 Đang pha',
+    'READY': '✅ Sẵn sàng',
+    'SERVED': '🎯 Hoàn tất',
+    'LOCKED': '🔒 Đã khóa'
+  }
+  return statusMap[status] || status
+}
+
 const getShiftTypeText = (type) => {
   const types = {
     MORNING: '☀️ Ca sáng',
@@ -458,18 +480,6 @@ const getStatusBadge = (status) => {
   return badges[status] || 'px-3 py-1 text-xs rounded-full bg-gray-100 text-gray-700 font-medium inline-block'
 }
 
-const getStatusText = (status) => {
-  const texts = {
-    PAID: '✓ Đã thu',
-    QUEUED: '⏳ Chờ pha',
-    IN_PROGRESS: '🍹 Đang pha',
-    READY: '✅ Sẵn sàng',
-    SERVED: '🎯 Hoàn tất',
-    LOCKED: '🔒 Đã khóa'
-  }
-  return texts[status] || status
-}
-
 const getDifferenceClass = (difference) => {
   if (difference > 0) return 'text-green-600'
   if (difference < 0) return 'text-red-600'
@@ -478,7 +488,8 @@ const getDifferenceClass = (difference) => {
 
 // Lifecycle
 onMounted(async () => {
-  await shiftStore.fetchAllShifts()
+  // Fetch cashier shifts instead of all shifts
+  await cashierShiftStore.fetchMyCashierShifts()
   await cashierStore.getPendingDiscrepancies()
 })
 </script>

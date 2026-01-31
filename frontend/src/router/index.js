@@ -3,14 +3,16 @@ import { useAuthStore } from '../stores/auth'
 import LoginView from '../views/LoginView.vue'
 import DashboardView from '../views/DashboardView.vue'
 import MenuView from '../views/MenuView.vue'
-import IngredientView from '../views/IngredientView.vue'
-import FacilityView from '../views/FacilityView.vue'
-import ExpenseView from '../views/ExpenseView.vue'
+import IngredientManagementView from '../views/IngredientManagementView.vue'
+import FacilityManagementView from '../views/FacilityManagementView.vue'
+import ExpenseManagementView from '../views/ExpenseManagementView.vue'
 import OrderView from '../views/OrderView.vue'
 import BaristaView from '../views/BaristaView.vue'
 import ShiftView from '../views/ShiftView.vue'
+import ManagerShiftView from '../views/ManagerShiftView.vue'
 import CashierDashboard from '../views/CashierDashboard.vue'
 import CashierReports from '../views/CashierReports.vue'
+import CashierShiftClosure from '../views/CashierShiftClosure.vue'
 import UserManagementView from '../views/UserManagementView.vue'
 import ProfileView from '../views/ProfileView.vue'
 
@@ -40,19 +42,19 @@ const routes = [
   {
     path: '/ingredients',
     name: 'Ingredients',
-    component: IngredientView,
+    component: IngredientManagementView,
     meta: { requiresAuth: true, requiresManager: true }
   },
   {
     path: '/facilities',
     name: 'Facilities',
-    component: FacilityView,
+    component: FacilityManagementView,
     meta: { requiresAuth: true, requiresManager: true }
   },
   {
     path: '/expenses',
     name: 'Expenses',
-    component: ExpenseView,
+    component: ExpenseManagementView,
     meta: { requiresAuth: true, requiresManager: true }
   },
   {
@@ -72,6 +74,12 @@ const routes = [
     name: 'Shifts',
     component: ShiftView,
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/manager/shifts',
+    name: 'ManagerShifts',
+    component: ManagerShiftView,
+    meta: { requiresAuth: true, requiresManager: true }
   },
   {
     path: '/users',
@@ -95,6 +103,12 @@ const routes = [
     path: '/cashier/reports',
     name: 'CashierReports',
     component: CashierReports,
+    meta: { requiresAuth: true, requiresCashier: true }
+  },
+  {
+    path: '/cashier/shift-closure/:id',
+    name: 'CashierShiftClosure',
+    component: CashierShiftClosure,
     meta: { requiresAuth: true, requiresCashier: true }
   }
 ]

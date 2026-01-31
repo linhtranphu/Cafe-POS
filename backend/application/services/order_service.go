@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"time"
+	"cafe-pos/backend/domain"
 	"cafe-pos/backend/domain/order"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -21,14 +22,20 @@ type OrderRepository interface {
 }
 
 type OrderService struct {
-	orderRepo OrderRepository
-	shiftRepo ShiftRepository
+	orderRepo           OrderRepository
+	shiftRepo           ShiftRepository
+	stateMachineManager *domain.StateMachineManager
 }
 
-func NewOrderService(orderRepo OrderRepository, shiftRepo ShiftRepository) *OrderService {
+func NewOrderService(
+	orderRepo OrderRepository,
+	shiftRepo ShiftRepository,
+	stateMachineManager *domain.StateMachineManager,
+) *OrderService {
 	return &OrderService{
-		orderRepo: orderRepo,
-		shiftRepo: shiftRepo,
+		orderRepo:           orderRepo,
+		shiftRepo:           shiftRepo,
+		stateMachineManager: stateMachineManager,
 	}
 }
 
@@ -71,8 +78,9 @@ func (s *OrderService) CollectPayment(ctx context.Context, id primitive.ObjectID
 		return nil, err
 	}
 
-	if !o.CanTransitionTo(order.StatusPaid) {
-		return nil, errors.New("cannot collect payment in current state")
+	// Validate state transition using state machine
+	if err := s.stateMachineManager.ValidateOrderTransition(o, order.EventPayOrder); err != nil {
+		return nil, fmt.Errorf("payment validation failed: %w", err)
 	}
 
 	collectorID, _ := primitive.ObjectIDFromHex(req.CollectorID)
@@ -105,13 +113,9 @@ func (s *OrderService) EditOrder(ctx context.Context, id primitive.ObjectID, req
 		return nil, err
 	}
 
-	// BR-07: Once order enters IN_PROGRESS, no modification or refund is allowed
-	if !o.CanModify() {
-		return nil, errors.New("order cannot be modified after being accepted by barista")
-	}
-
-	if !o.IsEditable() {
-		return nil, errors.New("order is not editable in current state")
+	// Validate using state machine
+	if !s.stateMachineManager.CanModifyOrder(o) {
+		return nil, fmt.Errorf("cannot modify order in state %s", o.Status)
 	}
 
 	// Store old total for refund calculation
@@ -164,9 +168,9 @@ func (s *OrderService) RefundPartial(ctx context.Context, id primitive.ObjectID,
 		return nil, err
 	}
 
-	// BR-08: Refunds only allowed before QUEUED
-	if !o.CanRefund() {
-		return nil, errors.New("can only refund paid orders before they are sent to barista")
+	// Validate state transition using state machine
+	if err := s.stateMachineManager.ValidateOrderTransition(o, order.EventRefundOrder); err != nil {
+		return nil, fmt.Errorf("refund validation failed: %w", err)
 	}
 
 	if req.Amount > o.AmountPaid {
@@ -194,12 +198,9 @@ func (s *OrderService) SendToBar(ctx context.Context, id primitive.ObjectID) (*o
 		return nil, err
 	}
 
-	if o.Status != order.StatusPaid || !o.IsFullyPaid() {
-		return nil, errors.New("order must be fully paid before sending to bar")
-	}
-
-	if !o.CanTransitionTo(order.StatusQueued) {
-		return nil, errors.New("cannot send order to bar in current state")
+	// Validate state transition using state machine
+	if err := s.stateMachineManager.ValidateOrderTransition(o, order.EventSendToBar); err != nil {
+		return nil, fmt.Errorf("send to bar validation failed: %w", err)
 	}
 
 	now := time.Now()
@@ -220,8 +221,9 @@ func (s *OrderService) AcceptOrder(ctx context.Context, id primitive.ObjectID, b
 		return nil, err
 	}
 
-	if !o.CanTransitionTo(order.StatusInProgress) {
-		return nil, errors.New("cannot accept order in current state")
+	// Validate state transition using state machine
+	if err := s.stateMachineManager.ValidateOrderTransition(o, order.EventStartPreparing); err != nil {
+		return nil, fmt.Errorf("accept order validation failed: %w", err)
 	}
 
 	// BR-13: Check if barista has an open shift
@@ -250,8 +252,9 @@ func (s *OrderService) FinishPreparing(ctx context.Context, id primitive.ObjectI
 		return nil, err
 	}
 
-	if !o.CanTransitionTo(order.StatusReady) {
-		return nil, errors.New("cannot mark order as ready in current state")
+	// Validate state transition using state machine
+	if err := s.stateMachineManager.ValidateOrderTransition(o, order.EventMarkReady); err != nil {
+		return nil, fmt.Errorf("finish preparing validation failed: %w", err)
 	}
 
 	now := time.Now()
@@ -271,8 +274,9 @@ func (s *OrderService) ServeOrder(ctx context.Context, id primitive.ObjectID) (*
 		return nil, err
 	}
 
-	if !o.CanTransitionTo(order.StatusServed) {
-		return nil, errors.New("cannot serve order in current state")
+	// Validate state transition using state machine
+	if err := s.stateMachineManager.ValidateOrderTransition(o, order.EventServeOrder); err != nil {
+		return nil, fmt.Errorf("serve order validation failed: %w", err)
 	}
 
 	now := time.Now()
@@ -291,13 +295,9 @@ func (s *OrderService) CancelOrder(ctx context.Context, id primitive.ObjectID, r
 		return nil, err
 	}
 
-	// BR-07: Cannot cancel once barista has accepted
-	if o.Status == order.StatusInProgress || o.Status == order.StatusReady {
-		return nil, errors.New("cannot cancel order after barista has started preparing")
-	}
-
-	if !o.CanTransitionTo(order.StatusCancelled) {
-		return nil, errors.New("cannot cancel order in current state")
+	// Validate state transition using state machine
+	if err := s.stateMachineManager.ValidateOrderTransition(o, order.EventCancelOrder); err != nil {
+		return nil, fmt.Errorf("cancel order validation failed: %w", err)
 	}
 
 	o.Status = order.StatusCancelled
@@ -358,8 +358,9 @@ func (s *OrderService) LockOrder(ctx context.Context, id primitive.ObjectID) (*o
 		return nil, err
 	}
 
-	if !o.CanTransitionTo(order.StatusLocked) {
-		return nil, errors.New("cannot lock order in current state")
+	// Validate state transition using state machine
+	if err := s.stateMachineManager.ValidateOrderTransition(o, order.EventLockOrder); err != nil {
+		return nil, fmt.Errorf("lock order validation failed: %w", err)
 	}
 
 	now := time.Now()

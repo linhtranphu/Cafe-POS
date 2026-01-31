@@ -18,32 +18,79 @@
 
     <!-- Content -->
     <div class="px-4 py-4 pb-24">
-      <!-- Shift Status -->
-      <div v-if="hasOpenShift" class="bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl p-4 text-white shadow-lg mb-4">
-        <div class="flex items-center justify-between mb-2">
-          <div class="flex items-center gap-2">
-            <span class="text-2xl">✅</span>
-            <span class="font-bold">Ca đang mở</span>
-          </div>
-          <span class="text-sm opacity-90">{{ shiftDuration }}</span>
+      <!-- Manager Dashboard (No Shift Concept) -->
+      <div v-if="user?.role === 'manager'">
+        <!-- Welcome Card -->
+        <div class="bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl p-6 text-white shadow-lg mb-4">
+          <h2 class="text-2xl font-bold mb-2">🎯 Quản lý hệ thống</h2>
+          <p class="text-sm opacity-90">Truy cập nhanh các chức năng quản lý</p>
         </div>
-        <p class="text-sm opacity-90">Bắt đầu: {{ formatTime(currentShift?.started_at) }}</p>
-      </div>
-      <div v-else class="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-4 text-white shadow-lg mb-4">
-        <div class="flex items-center justify-between mb-2">
-          <div class="flex items-center gap-2">
-            <span class="text-2xl">⚠️</span>
-            <span class="font-bold">Chưa mở ca</span>
+
+        <!-- Quick Stats for Manager -->
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div class="bg-white rounded-2xl p-4 shadow-sm">
+            <div class="text-3xl mb-2">📋</div>
+            <div class="text-2xl font-bold text-gray-800">{{ todayOrders }}</div>
+            <div class="text-xs text-gray-500">Orders hôm nay</div>
+          </div>
+          <div class="bg-white rounded-2xl p-4 shadow-sm">
+            <div class="text-3xl mb-2">💰</div>
+            <div class="text-lg font-bold text-green-600">{{ formatPrice(todayRevenue) }}</div>
+            <div class="text-xs text-gray-500">Doanh thu hôm nay</div>
           </div>
         </div>
-        <button @click="$router.push('/shifts')" 
-          class="mt-2 bg-white text-orange-600 px-4 py-2 rounded-lg font-medium text-sm">
-          Mở ca ngay
-        </button>
+
+        <!-- Management Quick Actions -->
+        <div class="mb-4">
+          <h2 class="text-lg font-bold text-gray-800 mb-3">⚡ Thao tác nhanh</h2>
+          <div class="grid grid-cols-2 gap-3">
+            <button @click="$router.push('/facilities')" 
+              class="bg-gradient-to-br from-cyan-500 to-blue-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+              <div class="text-4xl mb-2">🏢</div>
+              <div class="font-bold">Cơ sở vật chất</div>
+            </button>
+            <button @click="$router.push('/ingredients')" 
+              class="bg-gradient-to-br from-green-500 to-emerald-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+              <div class="text-4xl mb-2">🥬</div>
+              <div class="font-bold">Nguyên liệu</div>
+            </button>
+            <button @click="$router.push('/expenses')" 
+              class="bg-gradient-to-br from-pink-500 to-purple-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+              <div class="text-4xl mb-2">💸</div>
+              <div class="font-bold">Chi phí</div>
+            </button>
+          </div>
+        </div>
       </div>
 
-      <!-- Barista Dashboard -->
-      <div v-if="isBarista">
+      <!-- Non-Manager Dashboard (With Shift Concept) -->
+      <div v-else>
+        <!-- Shift Status -->
+        <div v-if="hasOpenShift" class="bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl p-4 text-white shadow-lg mb-4">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <span class="text-2xl">✅</span>
+              <span class="font-bold">Ca đang mở</span>
+            </div>
+            <span class="text-sm opacity-90">{{ shiftDuration }}</span>
+          </div>
+          <p class="text-sm opacity-90">Bắt đầu: {{ formatTime(currentShift?.started_at) }}</p>
+        </div>
+        <div v-else class="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-4 text-white shadow-lg mb-4">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <span class="text-2xl">⚠️</span>
+              <span class="font-bold">Chưa mở ca</span>
+            </div>
+          </div>
+          <button @click="$router.push('/shifts')" 
+            class="mt-2 bg-white text-orange-600 px-4 py-2 rounded-lg font-medium text-sm">
+            Mở ca ngay
+          </button>
+        </div>
+
+        <!-- Barista Dashboard -->
+        <div v-if="isBarista">
         <!-- Current Shift Info -->
         <div v-if="hasOpenShift" class="mb-4 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-2xl p-4 shadow-lg">
           <div class="flex items-center justify-between mb-2">
@@ -131,8 +178,8 @@
         </div>
       </div>
 
-      <!-- Waiter/Manager/Cashier Dashboard -->
-      <div v-else>
+        <!-- Waiter/Manager/Cashier Dashboard -->
+        <div v-else>
         <!-- Cashier Dashboard -->
         <div v-if="isCashier">
           <!-- Current Shift Info -->
@@ -343,6 +390,7 @@
     <!-- Bottom Navigation -->
     <BottomNav />
   </div>
+</div>
 </template>
 
 <script setup>
@@ -378,7 +426,7 @@ const orders = computed(() => {
   }
   return orderStore.orders
 })
-const isCashier = computed(() => authStore.user?.role === 'cashier' || authStore.user?.role === 'manager')
+const isCashier = computed(() => authStore.user?.role === 'cashier')
 
 const recentOrders = computed(() => {
   return [...orders.value].sort((a, b) => 
@@ -476,7 +524,21 @@ const todayRevenue = computed(() => {
     .reduce((sum, o) => sum + o.total, 0)
 })
 
+const completedOrders = computed(() => {
+  const today = new Date().toDateString()
+  return orders.value.filter(o => 
+    new Date(o.created_at).toDateString() === today && o.status === 'SERVED'
+  ).length
+})
+
 const pendingOrders = computed(() => {
+  // For manager: show all orders that are not completed or cancelled
+  if (user.value?.role === 'manager') {
+    return orders.value.filter(o => 
+      o.status !== 'SERVED' && o.status !== 'CANCELLED'
+    ).length
+  }
+  // For others: show only created orders
   return orders.value.filter(o => o.status === 'CREATED').length
 })
 
@@ -594,6 +656,12 @@ onMounted(async () => {
   updateTime()
   timeInterval = setInterval(updateTime, 1000)
   
+  // Manager doesn't need shift data
+  if (user.value?.role === 'manager') {
+    await orderStore.fetchOrders()
+    return
+  }
+  
   if (isBarista.value) {
     // Barista uses barista store
     await Promise.all([
@@ -623,6 +691,7 @@ onUnmounted(() => {
   }
 })
 </script>
+
 
 <style scoped>
 .active\:scale-95:active {

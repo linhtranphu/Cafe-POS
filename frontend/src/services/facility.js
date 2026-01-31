@@ -177,7 +177,7 @@ export const facilityService = {
   },
 
   async getIssueReports() {
-    const response = await api.get('/manager/issue-reports')
+    const response = await api.get('/manager/issues')
     return response.data
   },
 
@@ -188,19 +188,19 @@ export const facilityService = {
 
   // FR-FM-05: Issue reporting
   async createIssueReport(reportData) {
-    const response = await api.post('/staff/issue-reports', reportData)
+    const response = await api.post('/manager/issues', reportData)
     return response.data
   },
 
   async updateIssueReportStatus(reportId, status) {
-    const response = await api.patch(`/manager/issue-reports/${reportId}/status`, {
+    const response = await api.patch(`/manager/issues/${reportId}/status`, {
       status
     })
     return response.data
   },
 
   async addReportComment(reportId, comment) {
-    const response = await api.post(`/manager/issue-reports/${reportId}/comments`, {
+    const response = await api.post(`/manager/issues/${reportId}/comments`, {
       comment
     })
     return response.data
@@ -232,6 +232,39 @@ export const facilityService = {
     if (filters.offset) params.append('offset', filters.offset)
     
     const response = await api.get(`/waiter/facilities/search?${params}`)
+    return response.data
+  },
+}
+
+  // Facility Type management
+  async getFacilityTypes() {
+    const response = await api.get('/manager/facility-types')
+    return response.data
+  },
+
+  async createFacilityType(type) {
+    const response = await api.post('/manager/facility-types', type)
+    return response.data
+  },
+
+  async deleteFacilityType(id) {
+    const response = await api.delete(`/manager/facility-types/${id}`)
+    return response.data
+  },
+
+  // Facility Area management
+  async getFacilityAreas() {
+    const response = await api.get('/manager/facility-areas')
+    return response.data
+  },
+
+  async createFacilityArea(area) {
+    const response = await api.post('/manager/facility-areas', area)
+    return response.data
+  },
+
+  async deleteFacilityArea(id) {
+    const response = await api.delete(`/manager/facility-areas/${id}`)
     return response.data
   },
 }

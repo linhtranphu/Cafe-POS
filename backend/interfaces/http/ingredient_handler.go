@@ -154,3 +154,47 @@ func (h *IngredientHandler) GetStockHistory(c *gin.Context) {
 
 	c.JSON(http.StatusOK, histories)
 }
+
+// Category handlers
+func (h *IngredientHandler) CreateCategory(c *gin.Context) {
+	var req ingredient.CreateCategoryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	cat, err := h.ingredientService.CreateCategory(c.Request.Context(), &req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, cat)
+}
+
+func (h *IngredientHandler) GetCategories(c *gin.Context) {
+	categories, err := h.ingredientService.GetCategories(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, categories)
+}
+
+func (h *IngredientHandler) DeleteCategory(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	err = h.ingredientService.DeleteCategory(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot delete category that is in use"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "category deleted"})
+}

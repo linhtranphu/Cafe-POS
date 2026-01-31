@@ -38,5 +38,20 @@ export const ingredientService = {
   async adjustStock(id, adjustment) {
     const response = await api.post(`/manager/ingredients/${id}/adjust`, adjustment)
     return response.data
+  },
+
+  // Category methods
+  async getCategories() {
+    const response = await api.get('/manager/ingredient-categories')
+    return response.data
+  },
+
+  async createCategory(category) {
+    const response = await api.post('/manager/ingredient-categories', category)
+    return response.data
+  },
+
+  async deleteCategory(id) {
+    await api.delete(`/manager/ingredient-categories/${id}`)
   }
 }

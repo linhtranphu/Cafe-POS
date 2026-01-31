@@ -13,6 +13,9 @@ type IngredientRepository interface {
 	Update(ctx context.Context, id primitive.ObjectID, item *ingredient.Ingredient) error
 	Delete(ctx context.Context, id primitive.ObjectID) error
 	FindLowStock(ctx context.Context) ([]*ingredient.Ingredient, error)
+	CreateCategory(ctx context.Context, cat *ingredient.IngredientCategory) error
+	GetCategories(ctx context.Context) ([]ingredient.IngredientCategory, error)
+	DeleteCategory(ctx context.Context, id primitive.ObjectID) error
 }
 
 type StockHistoryRepository interface {
@@ -21,15 +24,22 @@ type StockHistoryRepository interface {
 }
 
 type IngredientService struct {
-	ingredientRepo IngredientRepository
+	ingredientRepo   IngredientRepository
 	stockHistoryRepo StockHistoryRepository
+	autoExpenseService *AutoExpenseService
 }
 
 func NewIngredientService(ingredientRepo IngredientRepository, stockHistoryRepo StockHistoryRepository) *IngredientService {
 	return &IngredientService{
-		ingredientRepo: ingredientRepo,
+		ingredientRepo:   ingredientRepo,
 		stockHistoryRepo: stockHistoryRepo,
 	}
+}
+
+// SetAutoExpenseService sets the AutoExpenseService for automatic expense tracking
+// This is called after service initialization to avoid circular dependencies
+func (s *IngredientService) SetAutoExpenseService(autoExpenseService *AutoExpenseService) {
+	s.autoExpenseService = autoExpenseService
 }
 
 func (s *IngredientService) CreateIngredient(ctx context.Context, req *ingredient.CreateIngredientRequest) (*ingredient.Ingredient, error) {
@@ -46,6 +56,14 @@ func (s *IngredientService) CreateIngredient(ctx context.Context, req *ingredien
 	err := s.ingredientRepo.Create(ctx, item)
 	if err != nil {
 		return nil, err
+	}
+
+	// Track expense for initial purchase if AutoExpenseService is configured
+	if s.autoExpenseService != nil && req.Quantity > 0 {
+		if err := s.autoExpenseService.TrackIngredientPurchase(ctx, item, req.Quantity); err != nil {
+			// Log error but don't fail the operation
+			// The ingredient was created successfully, expense tracking is secondary
+		}
 	}
 
 	return item, nil
@@ -131,6 +149,15 @@ func (s *IngredientService) AdjustStock(ctx context.Context, id primitive.Object
 	}
 	s.stockHistoryRepo.Create(ctx, history)
 
+	// Track expense for stock IN (positive quantity adjustment)
+	// Only track if AutoExpenseService is configured and quantity is positive
+	if s.autoExpenseService != nil && req.Quantity > 0 {
+		if err := s.autoExpenseService.TrackIngredientPurchase(ctx, item, req.Quantity); err != nil {
+			// Log error but don't fail the operation
+			// The stock adjustment was successful, expense tracking is secondary
+		}
+	}
+
 	return item, nil
 }
 
@@ -140,4 +167,26 @@ func (s *IngredientService) GetLowStockIngredients(ctx context.Context) ([]*ingr
 
 func (s *IngredientService) GetStockHistory(ctx context.Context, id primitive.ObjectID) ([]*ingredient.StockHistory, error) {
 	return s.stockHistoryRepo.FindByIngredientID(ctx, id)
+}
+
+// Category methods
+func (s *IngredientService) CreateCategory(ctx context.Context, req *ingredient.CreateCategoryRequest) (*ingredient.IngredientCategory, error) {
+	cat := &ingredient.IngredientCategory{
+		Name: req.Name,
+	}
+	
+	err := s.ingredientRepo.CreateCategory(ctx, cat)
+	if err != nil {
+		return nil, err
+	}
+	
+	return cat, nil
+}
+
+func (s *IngredientService) GetCategories(ctx context.Context) ([]ingredient.IngredientCategory, error) {
+	return s.ingredientRepo.GetCategories(ctx)
+}
+
+func (s *IngredientService) DeleteCategory(ctx context.Context, id primitive.ObjectID) error {
+	return s.ingredientRepo.DeleteCategory(ctx, id)
 }

@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"time"
 	"cafe-pos/backend/application/services"
+	"cafe-pos/backend/domain"
 	"cafe-pos/backend/domain/user"
 	"cafe-pos/backend/infrastructure/mongodb"
 	"cafe-pos/backend/interfaces/http"
@@ -36,17 +37,22 @@ func main() {
 	orderRepo := mongodb.NewOrderRepository(db)
 	shiftRepo := mongodb.NewShiftRepository(db)
 	// Cashier repositories
+	cashierShiftRepo := mongodb.NewCashierShiftRepository(db)
 	cashReconciliationRepo := mongodb.NewCashReconciliationRepository(db)
 	paymentDiscrepancyRepo := mongodb.NewPaymentDiscrepancyRepository(db)
 	paymentAuditRepo := mongodb.NewPaymentAuditRepository(db)
+
+	// State Machine Manager
+	smManager := domain.NewStateMachineManager()
 
 	// Services
 	jwtService := services.NewJWTService("your-secret-key")
 	authService := services.NewAuthService(userRepo, jwtService)
 	userManagementService := services.NewUserManagementService(userRepo, authService)
-	orderService := services.NewOrderService(orderRepo, shiftRepo)
-	shiftService := services.NewShiftService(shiftRepo, orderRepo)
+	orderService := services.NewOrderService(orderRepo, shiftRepo, smManager)
+	shiftService := services.NewShiftService(shiftRepo, orderRepo, smManager)
 	// Cashier services
+	cashierShiftService := services.NewCashierShiftService(cashierShiftRepo, shiftRepo, smManager)
 	cashReconciliationService := services.NewCashReconciliationService(cashReconciliationRepo, shiftRepo, orderRepo)
 	paymentOversightService := services.NewPaymentOversightService(orderRepo, paymentDiscrepancyRepo, paymentAuditRepo)
 	cashierReportService := services.NewCashierReportService(orderRepo, cashReconciliationRepo, shiftRepo, paymentAuditRepo)
@@ -54,10 +60,14 @@ func main() {
 	// Handlers
 	authHandler := http.NewAuthHandler(authService)
 	userManagementHandler := http.NewUserManagementHandler(userManagementService)
-	orderHandler := http.NewOrderHandler(orderService)
-	shiftHandler := http.NewShiftHandler(shiftService)
-	// Cashier handler
+	orderHandler := http.NewOrderHandler(orderService, smManager)
+	shiftHandler := http.NewShiftHandler(shiftService, smManager)
+	// Cashier handlers
+	cashierShiftHandler := http.NewCashierShiftHandler(cashierShiftService)
+	cashierShiftClosureHandler := http.NewCashierShiftClosureHandler(cashierShiftService, smManager)
 	cashierHandler := http.NewCashierHandler(cashReconciliationService, paymentOversightService, cashierReportService)
+	// State machine handler
+	stateMachineHandler := http.NewStateMachineHandler(smManager)
 	menuRepo := mongodb.NewMenuRepository(db)
 	menuService := services.NewMenuService(menuRepo)
 	menuHandler := http.NewMenuHandler(menuService)
@@ -71,6 +81,11 @@ func main() {
 	expenseRepo := mongodb.NewExpenseRepository(db)
 	expenseService := services.NewExpenseService(expenseRepo)
 	expenseHandler := http.NewExpenseHandler(expenseService)
+
+	// Auto Expense Service - wire up with other services
+	autoExpenseService := services.NewAutoExpenseService(expenseService)
+	ingredientService.SetAutoExpenseService(autoExpenseService)
+	facilityService.SetAutoExpenseService(autoExpenseService)
 
 	// Router
 	r := gin.Default()
@@ -92,6 +107,12 @@ func main() {
 	{
 		api.POST("/login", authHandler.Login)
 		
+		// State machine information endpoints (public for documentation)
+		api.GET("/state-machines", stateMachineHandler.GetAllStateMachines)
+		api.GET("/state-machines/cashier-shift", stateMachineHandler.GetCashierShiftStates)
+		api.GET("/state-machines/waiter-shift", stateMachineHandler.GetWaiterShiftStates)
+		api.GET("/state-machines/order", stateMachineHandler.GetOrderStates)
+		
 		// Protected routes
 		protected := api.Group("/")
 		protected.Use(http.AuthMiddleware(jwtService))
@@ -100,7 +121,8 @@ func main() {
 			protected.GET("/profile", userManagementHandler.GetCurrentUser)
 			protected.POST("/change-password", userManagementHandler.ChangePassword)
 			
-			// Shift management - available for all roles (waiter, barista, cashier)
+			// Shift management - available for waiter and barista only
+			// Note: Cashier shifts use separate endpoints under /cashier-shifts
 			shifts := protected.Group("/shifts")
 			{
 				shifts.POST("/start", shiftHandler.StartShift)
@@ -109,6 +131,31 @@ func main() {
 				shifts.GET("/current", shiftHandler.GetCurrentShift)
 				shifts.GET("/my", shiftHandler.GetMyShifts)
 				shifts.GET("/:id", shiftHandler.GetShift)
+			}
+			
+			// Cashier shift management - separate from waiter/barista shifts
+			cashierShifts := protected.Group("/cashier-shifts")
+			cashierShifts.Use(http.RequireRole(user.RoleCashier, user.RoleManager))
+			{
+				cashierShifts.POST("", cashierShiftHandler.StartCashierShift)
+				cashierShifts.GET("/current", cashierShiftHandler.GetCurrentCashierShift)
+				cashierShifts.GET("/my-shifts", cashierShiftHandler.GetMyCashierShifts)
+				cashierShifts.GET("/:id", cashierShiftHandler.GetCashierShift)
+				
+				// Shift closure workflow
+				cashierShifts.GET("/check-waiter-shifts", cashierShiftClosureHandler.CheckWaiterShifts)
+				cashierShifts.POST("/:id/initiate-closure", cashierShiftClosureHandler.InitiateClosure)
+				cashierShifts.POST("/:id/record-actual-cash", cashierShiftClosureHandler.RecordActualCash)
+				cashierShifts.POST("/:id/document-variance", cashierShiftClosureHandler.DocumentVariance)
+				cashierShifts.POST("/:id/confirm-responsibility", cashierShiftClosureHandler.ConfirmResponsibility)
+				cashierShifts.POST("/:id/close", cashierShiftClosureHandler.CloseShift)
+			}
+			
+			// Cashier shift management - manager only
+			cashierShiftsManager := protected.Group("/cashier-shifts")
+			cashierShiftsManager.Use(http.RequireRole(user.RoleManager))
+			{
+				cashierShiftsManager.GET("", cashierShiftHandler.GetAllCashierShifts)
 			}
 			
 			// Waiter routes
@@ -209,6 +256,11 @@ func main() {
 				manager.DELETE("/ingredients/:id", ingredientHandler.DeleteIngredient)
 				manager.POST("/ingredients/:id/adjust", ingredientHandler.AdjustStock)
 				
+				// Ingredient category routes
+				manager.POST("/ingredient-categories", ingredientHandler.CreateCategory)
+				manager.GET("/ingredient-categories", ingredientHandler.GetCategories)
+				manager.DELETE("/ingredient-categories/:id", ingredientHandler.DeleteCategory)
+				
 				// Facility management routes
 				manager.GET("/facilities", facilityHandler.GetAllFacilities)
 				manager.GET("/facilities/search", facilityHandler.SearchFacilities)
@@ -227,6 +279,14 @@ func main() {
 				manager.GET("/maintenance/due", facilityHandler.GetMaintenanceDue)
 				manager.GET("/issues", facilityHandler.GetIssueReports)
 				manager.POST("/issues", facilityHandler.CreateIssueReport)
+				
+				// Facility type and area routes
+				manager.POST("/facility-types", facilityHandler.CreateFacilityType)
+				manager.GET("/facility-types", facilityHandler.GetFacilityTypes)
+				manager.DELETE("/facility-types/:id", facilityHandler.DeleteFacilityType)
+				manager.POST("/facility-areas", facilityHandler.CreateFacilityArea)
+				manager.GET("/facility-areas", facilityHandler.GetFacilityAreas)
+				manager.DELETE("/facility-areas/:id", facilityHandler.DeleteFacilityArea)
 				
 				// Expense management routes
 				manager.POST("/expenses", expenseHandler.CreateExpense)

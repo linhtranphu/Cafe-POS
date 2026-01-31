@@ -3,17 +3,25 @@ package http
 import (
 	"net/http"
 	"cafe-pos/backend/application/services"
+	"cafe-pos/backend/domain"
 	"cafe-pos/backend/domain/order"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type OrderHandler struct {
-	orderService *services.OrderService
+	orderService        *services.OrderService
+	stateMachineManager *domain.StateMachineManager
 }
 
-func NewOrderHandler(orderService *services.OrderService) *OrderHandler {
-	return &OrderHandler{orderService: orderService}
+func NewOrderHandler(
+	orderService *services.OrderService,
+	stateMachineManager *domain.StateMachineManager,
+) *OrderHandler {
+	return &OrderHandler{
+		orderService:        orderService,
+		stateMachineManager: stateMachineManager,
+	}
 }
 
 func (h *OrderHandler) CreateOrder(c *gin.Context) {
@@ -54,9 +62,20 @@ func (h *OrderHandler) CollectPayment(c *gin.Context) {
 	req.CollectorID = userID.(string)
 	req.CollectorName = username.(string)
 
+	// Service layer handles validation
 	o, err := h.orderService.CollectPayment(c.Request.Context(), id, &req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		// Get order for error context
+		ord, _ := h.orderService.GetOrder(c.Request.Context(), id)
+		if ord != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":       err.Error(),
+				"next_action": h.stateMachineManager.GetOrderNextAction(ord),
+				"can_cancel":  h.stateMachineManager.CanCancelOrder(ord),
+			})
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		}
 		return
 	}
 
@@ -74,6 +93,23 @@ func (h *OrderHandler) EditOrder(c *gin.Context) {
 	var req order.EditOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get the order first to validate state
+	o, err := h.orderService.GetOrder(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
+		return
+	}
+
+	// Check if order can be modified using state machine
+	if !h.stateMachineManager.CanModifyOrder(o) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":       "cannot modify order in current state",
+			"status":      o.Status,
+			"next_action": h.stateMachineManager.GetOrderNextAction(o),
+		})
 		return
 	}
 
@@ -100,7 +136,26 @@ func (h *OrderHandler) RefundPartial(c *gin.Context) {
 		return
 	}
 
-	o, err := h.orderService.RefundPartial(c.Request.Context(), id, &req)
+	// Get the order first to validate state
+	o, err := h.orderService.GetOrder(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
+		return
+	}
+
+	// Validate state transition using state machine
+	err = h.stateMachineManager.ValidateOrderTransition(o, order.EventRefundOrder)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":       err.Error(),
+			"status":      o.Status,
+			"can_refund":  h.stateMachineManager.CanRefundOrder(o),
+			"next_action": h.stateMachineManager.GetOrderNextAction(o),
+		})
+		return
+	}
+
+	o, err = h.orderService.RefundPartial(c.Request.Context(), id, &req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -117,9 +172,20 @@ func (h *OrderHandler) SendToBar(c *gin.Context) {
 		return
 	}
 
+	// Service layer handles validation
 	o, err := h.orderService.SendToBar(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		// Get order for error context
+		ord, _ := h.orderService.GetOrder(c.Request.Context(), id)
+		if ord != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":       err.Error(),
+				"status":      ord.Status,
+				"next_action": h.stateMachineManager.GetOrderNextAction(ord),
+			})
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		}
 		return
 	}
 
@@ -138,7 +204,25 @@ func (h *OrderHandler) AcceptOrder(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	username, _ := c.Get("username")
 
-	o, err := h.orderService.AcceptOrder(c.Request.Context(), id, userID.(string), username.(string))
+	// Get the order first to validate state
+	o, err := h.orderService.GetOrder(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
+		return
+	}
+
+	// Validate state transition using state machine
+	err = h.stateMachineManager.ValidateOrderTransition(o, order.EventStartPreparing)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":       err.Error(),
+			"status":      o.Status,
+			"next_action": h.stateMachineManager.GetOrderNextAction(o),
+		})
+		return
+	}
+
+	o, err = h.orderService.AcceptOrder(c.Request.Context(), id, userID.(string), username.(string))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -156,7 +240,26 @@ func (h *OrderHandler) FinishPreparing(c *gin.Context) {
 		return
 	}
 
-	o, err := h.orderService.FinishPreparing(c.Request.Context(), id)
+	// Get the order first to validate state
+	o, err := h.orderService.GetOrder(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
+		return
+	}
+
+	// Validate state transition using state machine
+	err = h.stateMachineManager.ValidateOrderTransition(o, order.EventMarkReady)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":       err.Error(),
+			"status":      o.Status,
+			"progress":    h.stateMachineManager.GetOrderProgress(o),
+			"next_action": h.stateMachineManager.GetOrderNextAction(o),
+		})
+		return
+	}
+
+	o, err = h.orderService.FinishPreparing(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -173,7 +276,25 @@ func (h *OrderHandler) ServeOrder(c *gin.Context) {
 		return
 	}
 
-	o, err := h.orderService.ServeOrder(c.Request.Context(), id)
+	// Get the order first to validate state
+	o, err := h.orderService.GetOrder(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
+		return
+	}
+
+	// Validate state transition using state machine
+	err = h.stateMachineManager.ValidateOrderTransition(o, order.EventServeOrder)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":       err.Error(),
+			"status":      o.Status,
+			"next_action": h.stateMachineManager.GetOrderNextAction(o),
+		})
+		return
+	}
+
+	o, err = h.orderService.ServeOrder(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -196,7 +317,26 @@ func (h *OrderHandler) CancelOrder(c *gin.Context) {
 		return
 	}
 
-	o, err := h.orderService.CancelOrder(c.Request.Context(), id, &req)
+	// Get the order first to validate state
+	o, err := h.orderService.GetOrder(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
+		return
+	}
+
+	// Validate state transition using state machine
+	err = h.stateMachineManager.ValidateOrderTransition(o, order.EventCancelOrder)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":       err.Error(),
+			"status":      o.Status,
+			"can_cancel":  h.stateMachineManager.CanCancelOrder(o),
+			"next_action": h.stateMachineManager.GetOrderNextAction(o),
+		})
+		return
+	}
+
+	o, err = h.orderService.CancelOrder(c.Request.Context(), id, &req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -213,7 +353,26 @@ func (h *OrderHandler) LockOrder(c *gin.Context) {
 		return
 	}
 
-	o, err := h.orderService.LockOrder(c.Request.Context(), id)
+	// Get the order first to validate state
+	o, err := h.orderService.GetOrder(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
+		return
+	}
+
+	// Validate state transition using state machine
+	err = h.stateMachineManager.ValidateOrderTransition(o, order.EventLockOrder)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":       err.Error(),
+			"status":      o.Status,
+			"can_lock":    h.stateMachineManager.CanLockOrder(o),
+			"next_action": h.stateMachineManager.GetOrderNextAction(o),
+		})
+		return
+	}
+
+	o, err = h.orderService.LockOrder(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

@@ -28,14 +28,18 @@ const authStore = useAuthStore()
 const navItems = computed(() => {
   const role = authStore.user?.role
   
-  const baseItems = [
-    { path: '/dashboard', icon: '🏠', label: 'Trang chủ' },
-    { path: '/orders', icon: '📋', label: 'Orders' },
-    { path: '/shifts', icon: '⏰', label: 'Ca làm' },
-    { path: '/profile', icon: '👤', label: 'Cá nhân' }
-  ]
+  // Manager navigation (5 items)
+  if (role === 'manager') {
+    return [
+      { path: '/dashboard', icon: '🏠', label: 'Dashboard' },
+      { path: '/manager/shifts', icon: '⏰', label: 'Quản lý ca' },
+      { path: '/cashier/reports', icon: '📊', label: 'Báo cáo' },
+      { path: '/users', icon: '👥', label: 'Nhân viên' },
+      { path: '/profile', icon: '👤', label: 'Cá nhân' }
+    ]
+  }
 
-  // Barista has different navigation
+  // Barista navigation
   if (role === 'barista') {
     return [
       { path: '/dashboard', icon: '🏠', label: 'Trang chủ' },
@@ -45,12 +49,24 @@ const navItems = computed(() => {
     ]
   }
 
-  // Cashier/Manager có thêm menu
-  if (role === 'cashier' || role === 'manager') {
-    baseItems.splice(1, 0, { path: '/cashier', icon: '💰', label: 'Thu ngân' })
+  // Cashier navigation
+  if (role === 'cashier') {
+    return [
+      { path: '/dashboard', icon: '🏠', label: 'Trang chủ' },
+      { path: '/cashier', icon: '💰', label: 'Thu ngân' },
+      { path: '/orders', icon: '📋', label: 'Orders' },
+      { path: '/shifts', icon: '⏰', label: 'Ca làm' },
+      { path: '/profile', icon: '👤', label: 'Cá nhân' }
+    ]
   }
 
-  return baseItems
+  // Default navigation (waiter, etc.)
+  return [
+    { path: '/dashboard', icon: '🏠', label: 'Trang chủ' },
+    { path: '/orders', icon: '📋', label: 'Orders' },
+    { path: '/shifts', icon: '⏰', label: 'Ca làm' },
+    { path: '/profile', icon: '👤', label: 'Cá nhân' }
+  ]
 })
 
 const isActive = (path) => {

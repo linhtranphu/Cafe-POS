@@ -4,6 +4,8 @@ import { facilityService } from '../services/facility'
 export const useFacilityStore = defineStore('facility', {
   state: () => ({
     items: [],
+    types: [],
+    areas: [],
     loading: false,
     error: null
   }),
@@ -340,6 +342,79 @@ export const useFacilityStore = defineStore('facility', {
       } catch (error) {
         console.warn('Maintenance due endpoint not available:', error.message)
         return []
+      }
+    }
+  }
+})
+,
+
+    // Facility Type management
+    async fetchFacilityTypes() {
+      this.error = null
+      try {
+        this.types = await facilityService.getFacilityTypes() || []
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi tải loại thiết bị'
+        this.types = []
+      }
+    },
+
+    async createFacilityType(type) {
+      this.error = null
+      try {
+        const newType = await facilityService.createFacilityType(type)
+        this.types.push(newType)
+        return true
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi tạo loại thiết bị'
+        return false
+      }
+    },
+
+    async deleteFacilityType(id) {
+      this.error = null
+      try {
+        await facilityService.deleteFacilityType(id)
+        this.types = this.types.filter(t => t.id !== id)
+        return true
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi xóa loại thiết bị'
+        return false
+      }
+    },
+
+    // Facility Area management
+    async fetchFacilityAreas() {
+      this.error = null
+      try {
+        this.areas = await facilityService.getFacilityAreas() || []
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi tải khu vực'
+        this.areas = []
+      }
+    },
+
+    async createFacilityArea(area) {
+      this.error = null
+      try {
+        const newArea = await facilityService.createFacilityArea(area)
+        this.areas.push(newArea)
+        return true
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi tạo khu vực'
+        return false
+      }
+    },
+
+    async deleteFacilityArea(id) {
+      this.error = null
+      try {
+        await facilityService.deleteFacilityArea(id)
+        this.areas = this.areas.filter(a => a.id !== id)
+        return true
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi xóa khu vực'
+        return false
       }
     }
   }

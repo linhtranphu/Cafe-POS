@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Ingredient LocalStorage</title>
+</head>
+<body>
+    <h1>Clear Ingredient Categories from LocalStorage</h1>
+    <button onclick="clearStorage()">Clear LocalStorage</button>
+    <div id="result"></div>
+
+    <script>
+        function clearStorage() {
+            // Remove ingredient categories from localStorage
+            localStorage.removeItem('ingredientCategories');
+            
+            document.getElementById('result').innerHTML = '<p style="color: green;">✅ Ingredient categories cleared from localStorage!</p>';
+            
+            console.log('Cleared ingredientCategories from localStorage');
+        }
+        
+        // Show current value
+        window.onload = function() {
+            const current = localStorage.getItem('ingredientCategories');
+            if (current) {
+                document.getElementById('result').innerHTML = '<p>Current value: ' + current + '</p>';
+            } else {
+                document.getElementById('result').innerHTML = '<p>No ingredient categories in localStorage</p>';
+            }
+        }
+    </script>
+</body>
+</html>

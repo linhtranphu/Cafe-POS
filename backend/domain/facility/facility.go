@@ -126,3 +126,40 @@ const (
 	AreaOffice     = "Văn phòng"
 	AreaOther      = "Khác"
 )
+
+// FacilityType represents a facility type/category
+type FacilityType struct {
+	ID        primitive.ObjectID `json:"id" bson:"_id,omitempty"`
+	Name      string             `json:"name" bson:"name"`
+	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
+}
+
+// FacilityArea represents a facility area/location
+type FacilityArea struct {
+	ID        primitive.ObjectID `json:"id" bson:"_id,omitempty"`
+	Name      string             `json:"name" bson:"name"`
+	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
+}
+
+// GetDefaultFacilityTypes returns list of default facility types
+func GetDefaultFacilityTypes() []string {
+	return []string{
+		TypeFurniture,
+		TypeMachine,
+		TypeUtensil,
+		TypeElectric,
+		TypeOther,
+	}
+}
+
+// GetDefaultFacilityAreas returns list of default facility areas
+func GetDefaultFacilityAreas() []string {
+	return []string{
+		AreaDiningRoom,
+		AreaKitchen,
+		AreaCounter,
+		AreaStorage,
+		AreaOffice,
+		AreaOther,
+	}
+}

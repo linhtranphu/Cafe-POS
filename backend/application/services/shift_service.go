@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"time"
+	"cafe-pos/backend/domain"
 	"cafe-pos/backend/domain/order"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -23,24 +24,42 @@ type ShiftRepository interface {
 }
 
 type ShiftService struct {
-	shiftRepo ShiftRepository
-	orderRepo OrderRepository
+	shiftRepo           ShiftRepository
+	orderRepo           OrderRepository
+	stateMachineManager *domain.StateMachineManager
 }
 
-func NewShiftService(shiftRepo ShiftRepository, orderRepo OrderRepository) *ShiftService {
+func NewShiftService(
+	shiftRepo ShiftRepository,
+	orderRepo OrderRepository,
+	stateMachineManager *domain.StateMachineManager,
+) *ShiftService {
 	return &ShiftService{
-		shiftRepo: shiftRepo,
-		orderRepo: orderRepo,
+		shiftRepo:           shiftRepo,
+		orderRepo:           orderRepo,
+		stateMachineManager: stateMachineManager,
 	}
 }
 
 func (s *ShiftService) StartShift(ctx context.Context, req *order.StartShiftRequest, userID, userName string, roleType order.RoleType) (*order.Shift, error) {
+	// Reject cashier role - cashier shifts are handled separately
+	if roleType == "cashier" {
+		return nil, errors.New("cashier shifts must be created using the cashier shift service")
+	}
+	
+	// Validate role type is waiter or barista
+	if !roleType.IsValid() {
+		return nil, errors.New("invalid role type: must be waiter or barista")
+	}
+	
 	userOID, _ := primitive.ObjectIDFromHex(userID)
 	
 	// Check if user already has an open shift for this role
 	existingShift, _ := s.shiftRepo.FindOpenShiftByUser(ctx, userOID, roleType)
-	if existingShift != nil {
-		return nil, errors.New("user already has an open shift for this role")
+	
+	// Validate using state machine
+	if err := s.stateMachineManager.ValidateWaiterShiftStart(existingShift); err != nil {
+		return nil, err
 	}
 
 	shift := &order.Shift{
@@ -51,15 +70,6 @@ func (s *ShiftService) StartShift(ctx context.Context, req *order.StartShiftRequ
 		UserName:   userName,
 		StartCash:  req.StartCash,
 		StartedAt:  time.Now(),
-	}
-	
-	// Set legacy fields for backward compatibility
-	if roleType == order.RoleWaiter {
-		shift.WaiterID = userOID
-		shift.WaiterName = userName
-	} else if roleType == order.RoleCashier {
-		shift.CashierID = userOID
-		shift.CashierName = userName
 	}
 
 	if err := s.shiftRepo.Create(ctx, shift); err != nil {
@@ -74,8 +84,9 @@ func (s *ShiftService) EndShift(ctx context.Context, shiftID primitive.ObjectID,
 		return nil, err
 	}
 
-	if shift.Status != order.ShiftOpen {
-		return nil, errors.New("shift is not open")
+	// Validate state transition using state machine
+	if err := s.stateMachineManager.ValidateWaiterShiftTransition(shift, order.EventEndShift); err != nil {
+		return nil, err
 	}
 
 	orders, err := s.orderRepo.FindByShiftID(ctx, shiftID)
@@ -132,7 +143,19 @@ func (s *ShiftService) GetShift(ctx context.Context, id primitive.ObjectID) (*or
 }
 
 func (s *ShiftService) CloseShiftAndLockOrders(ctx context.Context, shiftID primitive.ObjectID, req *order.EndShiftRequest) (*order.Shift, error) {
-	shift, err := s.EndShift(ctx, shiftID, req)
+	// Get shift first to validate
+	shift, err := s.shiftRepo.FindByID(ctx, shiftID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Validate state transition using state machine
+	if err := s.stateMachineManager.ValidateWaiterShiftTransition(shift, order.EventEndShift); err != nil {
+		return nil, err
+	}
+
+	// End the shift
+	shift, err = s.EndShift(ctx, shiftID, req)
 	if err != nil {
 		return nil, err
 	}

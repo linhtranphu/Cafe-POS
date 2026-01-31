@@ -5,6 +5,7 @@ export const useIngredientStore = defineStore('ingredient', {
   state: () => ({
     items: [],
     lowStockItems: [],
+    categories: [],
     loading: false,
     error: null
   }),
@@ -101,6 +102,41 @@ export const useIngredientStore = defineStore('ingredient', {
         return true
       } catch (error) {
         this.error = error.response?.data?.error || 'Lỗi điều chỉnh tồn kho'
+        return false
+      }
+    },
+
+    // Category actions
+    async fetchCategories() {
+      this.error = null
+      try {
+        this.categories = await ingredientService.getCategories() || []
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi tải danh mục'
+        this.categories = []
+      }
+    },
+
+    async createCategory(category) {
+      this.error = null
+      try {
+        const newCategory = await ingredientService.createCategory(category)
+        this.categories.push(newCategory)
+        return true
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi tạo danh mục'
+        return false
+      }
+    },
+
+    async deleteCategory(id) {
+      this.error = null
+      try {
+        await ingredientService.deleteCategory(id)
+        this.categories = this.categories.filter(c => c.id !== id)
+        return true
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi xóa danh mục'
         return false
       }
     }

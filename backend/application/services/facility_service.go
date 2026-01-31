@@ -13,11 +13,18 @@ import (
 )
 
 type FacilityService struct {
-	repo *mongodb.FacilityRepository
+	repo               *mongodb.FacilityRepository
+	autoExpenseService *AutoExpenseService
 }
 
 func NewFacilityService(repo *mongodb.FacilityRepository) *FacilityService {
 	return &FacilityService{repo: repo}
+}
+
+// SetAutoExpenseService sets the AutoExpenseService for automatic expense tracking
+// This is called after service initialization to avoid circular dependencies
+func (s *FacilityService) SetAutoExpenseService(autoExpenseService *AutoExpenseService) {
+	s.autoExpenseService = autoExpenseService
 }
 
 func (s *FacilityService) GetAllFacilities(ctx context.Context) ([]facility.Facility, error) {
@@ -60,7 +67,19 @@ func (s *FacilityService) CreateFacility(ctx context.Context, f *facility.Facili
 		Username:    username,
 	}
 	
-	return s.repo.CreateHistory(ctx, history)
+	if err := s.repo.CreateHistory(ctx, history); err != nil {
+		return err
+	}
+
+	// Track expense for facility purchase if AutoExpenseService is configured
+	if s.autoExpenseService != nil {
+		if err := s.autoExpenseService.TrackFacilityPurchase(ctx, f); err != nil {
+			// Log error but don't fail the operation
+			// The facility was created successfully, expense tracking is secondary
+		}
+	}
+
+	return nil
 }
 
 func (s *FacilityService) UpdateFacility(ctx context.Context, id primitive.ObjectID, f *facility.Facility, userID primitive.ObjectID, username string) error {
@@ -164,7 +183,24 @@ func (s *FacilityService) CreateMaintenanceRecord(ctx context.Context, record *f
 		Username:   record.Username,
 	}
 	
-	return s.repo.CreateHistory(ctx, history)
+	if err := s.repo.CreateHistory(ctx, history); err != nil {
+		return err
+	}
+
+	// Track expense for maintenance if AutoExpenseService is configured
+	if s.autoExpenseService != nil {
+		// Get facility name for expense description
+		fac, err := s.repo.GetByID(ctx, record.FacilityID)
+		if err == nil {
+			facilityName := fac.Name
+			if err := s.autoExpenseService.TrackMaintenance(ctx, record.FacilityID, facilityName, record.Cost, record.Date, record.Description); err != nil {
+				// Log error but don't fail the operation
+				// The maintenance record was created successfully, expense tracking is secondary
+			}
+		}
+	}
+
+	return nil
 }
 
 func (s *FacilityService) GetMaintenanceHistory(ctx context.Context, facilityID primitive.ObjectID) ([]facility.MaintenanceRecord, error) {
@@ -227,4 +263,44 @@ func (s *FacilityService) SearchFacilities(ctx context.Context, filter facility.
 	}
 	
 	return facilities, total, nil
+}
+
+// FacilityType management
+func (s *FacilityService) CreateFacilityType(ctx context.Context, name string) (*facility.FacilityType, error) {
+	ft := &facility.FacilityType{
+		Name: name,
+	}
+	err := s.repo.CreateFacilityType(ctx, ft)
+	if err != nil {
+		return nil, err
+	}
+	return ft, nil
+}
+
+func (s *FacilityService) GetFacilityTypes(ctx context.Context) ([]facility.FacilityType, error) {
+	return s.repo.GetFacilityTypes(ctx)
+}
+
+func (s *FacilityService) DeleteFacilityType(ctx context.Context, id primitive.ObjectID) error {
+	return s.repo.DeleteFacilityType(ctx, id)
+}
+
+// FacilityArea management
+func (s *FacilityService) CreateFacilityArea(ctx context.Context, name string) (*facility.FacilityArea, error) {
+	fa := &facility.FacilityArea{
+		Name: name,
+	}
+	err := s.repo.CreateFacilityArea(ctx, fa)
+	if err != nil {
+		return nil, err
+	}
+	return fa, nil
+}
+
+func (s *FacilityService) GetFacilityAreas(ctx context.Context) ([]facility.FacilityArea, error) {
+	return s.repo.GetFacilityAreas(ctx)
+}
+
+func (s *FacilityService) DeleteFacilityArea(ctx context.Context, id primitive.ObjectID) error {
+	return s.repo.DeleteFacilityArea(ctx, id)
 }

@@ -79,3 +79,55 @@ func (r *IngredientRepository) FindLowStock(ctx context.Context) ([]*ingredient.
 	}
 	return items, nil
 }
+
+// Category methods
+func (r *IngredientRepository) CreateCategory(ctx context.Context, cat *ingredient.IngredientCategory) error {
+	categoryCollection := r.collection.Database().Collection("ingredient_categories")
+	cat.CreatedAt = time.Now()
+	cat.UpdatedAt = time.Now()
+	result, err := categoryCollection.InsertOne(ctx, cat)
+	if err != nil {
+		return err
+	}
+	cat.ID = result.InsertedID.(primitive.ObjectID)
+	return nil
+}
+
+func (r *IngredientRepository) GetCategories(ctx context.Context) ([]ingredient.IngredientCategory, error) {
+	categoryCollection := r.collection.Database().Collection("ingredient_categories")
+	opts := options.Find().SetSort(bson.D{{"name", 1}})
+	cursor, err := categoryCollection.Find(ctx, bson.M{}, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var categories []ingredient.IngredientCategory
+	if err = cursor.All(ctx, &categories); err != nil {
+		return nil, err
+	}
+	return categories, nil
+}
+
+func (r *IngredientRepository) DeleteCategory(ctx context.Context, id primitive.ObjectID) error {
+	categoryCollection := r.collection.Database().Collection("ingredient_categories")
+	
+	// Check if any ingredients use this category
+	var cat ingredient.IngredientCategory
+	err := categoryCollection.FindOne(ctx, bson.M{"_id": id}).Decode(&cat)
+	if err != nil {
+		return err
+	}
+	
+	count, err := r.collection.CountDocuments(ctx, bson.M{"category": cat.Name})
+	if err != nil {
+		return err
+	}
+	
+	if count > 0 {
+		return mongo.ErrNoDocuments // Return error if category is in use
+	}
+	
+	_, err = categoryCollection.DeleteOne(ctx, bson.M{"_id": id})
+	return err
+}

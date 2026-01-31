@@ -15,6 +15,7 @@ const (
 	StatusReady      OrderStatus = "READY"       // Pha xong, chờ giao
 	StatusServed     OrderStatus = "SERVED"      // Đã giao cho khách
 	StatusCancelled  OrderStatus = "CANCELLED"   // Đã hủy
+	StatusRefunded   OrderStatus = "REFUNDED"    // Đã hoàn tiền
 	StatusLocked     OrderStatus = "LOCKED"      // Đã chốt ca
 )
 

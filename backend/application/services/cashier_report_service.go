@@ -117,7 +117,7 @@ func (s *CashierReportService) HandoverShift(data *HandoverData) error {
 
 	var fromCashierShifts []*order.Shift
 	for _, shift := range openShifts {
-		if shift.WaiterID.Hex() == data.FromCashierID {
+		if shift.UserID.Hex() == data.FromCashierID {
 			fromCashierShifts = append(fromCashierShifts, shift)
 		}
 	}
@@ -133,7 +133,7 @@ func (s *CashierReportService) HandoverShift(data *HandoverData) error {
 	}
 
 	for _, shift := range fromCashierShifts {
-		shift.WaiterID = toCashierObjID
+		shift.UserID = toCashierObjID
 		shift.UpdatedAt = time.Now()
 		
 		err = s.shiftRepo.Update(context.Background(), shift.ID, shift)

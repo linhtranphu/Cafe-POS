@@ -368,3 +368,63 @@ func (r *FacilityRepository) GetStatusHistory(ctx context.Context, facilityID pr
 	}
 	return history, nil
 }
+
+// FacilityType and FacilityArea management
+
+func (r *FacilityRepository) CreateFacilityType(ctx context.Context, ft *facility.FacilityType) error {
+	ft.CreatedAt = time.Now()
+	result, err := r.db.Collection("facility_types").InsertOne(ctx, ft)
+	if err != nil {
+		return err
+	}
+	ft.ID = result.InsertedID.(primitive.ObjectID)
+	return nil
+}
+
+func (r *FacilityRepository) GetFacilityTypes(ctx context.Context) ([]facility.FacilityType, error) {
+	cursor, err := r.db.Collection("facility_types").Find(ctx, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var types []facility.FacilityType
+	if err = cursor.All(ctx, &types); err != nil {
+		return nil, err
+	}
+	return types, nil
+}
+
+func (r *FacilityRepository) DeleteFacilityType(ctx context.Context, id primitive.ObjectID) error {
+	_, err := r.db.Collection("facility_types").DeleteOne(ctx, bson.M{"_id": id})
+	return err
+}
+
+func (r *FacilityRepository) CreateFacilityArea(ctx context.Context, fa *facility.FacilityArea) error {
+	fa.CreatedAt = time.Now()
+	result, err := r.db.Collection("facility_areas").InsertOne(ctx, fa)
+	if err != nil {
+		return err
+	}
+	fa.ID = result.InsertedID.(primitive.ObjectID)
+	return nil
+}
+
+func (r *FacilityRepository) GetFacilityAreas(ctx context.Context) ([]facility.FacilityArea, error) {
+	cursor, err := r.db.Collection("facility_areas").Find(ctx, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var areas []facility.FacilityArea
+	if err = cursor.All(ctx, &areas); err != nil {
+		return nil, err
+	}
+	return areas, nil
+}
+
+func (r *FacilityRepository) DeleteFacilityArea(ctx context.Context, id primitive.ObjectID) error {
+	_, err := r.db.Collection("facility_areas").DeleteOne(ctx, bson.M{"_id": id})
+	return err
+}

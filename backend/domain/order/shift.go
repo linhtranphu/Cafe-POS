@@ -24,17 +24,15 @@ type RoleType string
 
 const (
 	RoleWaiter  RoleType = "waiter"
-	RoleCashier RoleType = "cashier"
 	RoleBarista RoleType = "barista"
 )
 
 // ParseRoleType converts a string to RoleType
+// Note: Cashier shifts are now handled separately in the cashier domain
 func ParseRoleType(role string) RoleType {
 	switch role {
 	case "waiter":
 		return RoleWaiter
-	case "cashier":
-		return RoleCashier
 	case "barista":
 		return RoleBarista
 	default:
@@ -45,7 +43,7 @@ func ParseRoleType(role string) RoleType {
 // IsValid checks if the RoleType is valid
 func (r RoleType) IsValid() bool {
 	switch r {
-	case RoleWaiter, RoleCashier, RoleBarista:
+	case RoleWaiter, RoleBarista:
 		return true
 	default:
 		return false
@@ -57,6 +55,8 @@ func (r RoleType) String() string {
 	return string(r)
 }
 
+// Shift represents a work period for a waiter or barista.
+// Note: Cashier shifts are handled separately in the cashier domain with CashierShift.
 type Shift struct {
 	ID            primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	Type          ShiftType          `bson:"type" json:"type"`
@@ -64,12 +64,6 @@ type Shift struct {
 	RoleType      RoleType           `bson:"role_type" json:"role_type"`
 	UserID        primitive.ObjectID `bson:"user_id" json:"user_id"`
 	UserName      string             `bson:"user_name" json:"user_name"`
-	
-	// Legacy fields - kept for backward compatibility
-	WaiterID      primitive.ObjectID `bson:"waiter_id,omitempty" json:"waiter_id,omitempty"`
-	WaiterName    string             `bson:"waiter_name,omitempty" json:"waiter_name,omitempty"`
-	CashierID     primitive.ObjectID `bson:"cashier_id,omitempty" json:"cashier_id,omitempty"`
-	CashierName   string             `bson:"cashier_name,omitempty" json:"cashier_name,omitempty"`
 	
 	StartCash     float64            `bson:"start_cash" json:"start_cash"`
 	EndCash       float64            `bson:"end_cash" json:"end_cash"`
