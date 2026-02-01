@@ -317,7 +317,7 @@
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-3">Ngày mua</label>
                 <input v-model="formData.purchase_date" type="date" 
-                  class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                  class="w-full px-3 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none" />
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-3">Giá trị (VND)</label>
@@ -517,13 +517,19 @@ const deleteCategory = async (categoryName) => {
 // Utility functions imported from formatters.js
 
 const openCreateModal = () => {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  const todayDate = `${year}-${month}-${day}`
+  
   formData.value = {
     name: '',
     type: '',
     area: '',
     quantity: 1,
     status: FACILITY_STATUS.IN_USE,
-    purchase_date: '',
+    purchase_date: todayDate,
     cost: 0,
     supplier: '',
     notes: ''

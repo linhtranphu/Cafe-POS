@@ -119,7 +119,7 @@
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Ngày *</label>
               <input v-model="formData.date" type="date" 
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                class="w-full px-3 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 appearance-none" />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Thanh toán *</label>

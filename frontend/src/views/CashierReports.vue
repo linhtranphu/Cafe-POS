@@ -57,7 +57,7 @@
           <input
             v-model="selectedDate"
             type="date"
-            class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base mb-3 focus:outline-none focus:border-green-500"
+            class="w-full border-2 border-gray-300 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none focus:border-green-500 appearance-none"
           />
           <button
             @click="generateDailyReport"

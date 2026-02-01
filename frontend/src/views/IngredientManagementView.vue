@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-50 flex flex-col">
+  <div class="h-screen w-screen overflow-hidden flex flex-col bg-gray-50">
     <!-- Mobile Header - Fixed -->
     <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
       <div class="px-4 py-3">
@@ -184,28 +184,44 @@
       </div>
     </transition>
 
-    <!-- Create/Edit Modal -->
-      <div v-if="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-          <h2 class="text-2xl font-bold mb-4">{{ isEditing ? 'Cập Nhật Nguyên Liệu' : 'Thêm Nguyên Liệu Mới' }}</h2>
-          
-          <div class="space-y-4">
+    <!-- Create/Edit Modal - Slide from Right -->
+    <transition name="slide-right">
+      <div v-if="showModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
+        <div class="bg-gray-50 w-full h-screen flex flex-col">
+          <!-- Mobile Header - Fixed -->
+          <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
+            <div class="px-4 py-3">
+              <div class="flex items-center justify-between">
+                <button @click="closeModal" class="text-2xl text-gray-600">←</button>
+                <h1 class="text-xl font-bold text-gray-800">{{ isEditing ? '✏️ Cập nhật nguyên liệu' : '➕ Thêm nguyên liệu mới' }}</h1>
+                <div class="w-8"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Scrollable Content -->
+          <div class="flex-1 overflow-y-auto px-4 py-6 space-y-5">
+            <!-- Tên nguyên liệu -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Tên Nguyên Liệu *</label>
-              <input v-model="formData.name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+              <label class="block text-sm font-medium text-gray-700 mb-3">Tên nguyên liệu *</label>
+              <input v-model="formData.name" type="text" 
+                class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
+            <!-- Danh mục & Đơn vị - Responsive Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Danh Mục *</label>
-                <select v-model="formData.category" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                <label class="block text-sm font-medium text-gray-700 mb-3">Danh mục *</label>
+                <select v-model="formData.category" 
+                  class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                   <option value="">Chọn danh mục</option>
                   <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
                 </select>
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Đơn Vị *</label>
-                <select v-model="formData.unit" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                <label class="block text-sm font-medium text-gray-700 mb-3">Đơn vị *</label>
+                <select v-model="formData.unit" 
+                  class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                   <option value="">Chọn đơn vị</option>
                   <option v-for="unit in INGREDIENT_UNIT_OPTIONS" :key="unit.value" :value="unit.value">
                     {{ unit.label }}
@@ -214,57 +230,72 @@
               </div>
             </div>
 
-            <div class="grid grid-cols-3 gap-4">
+            <!-- Số lượng & Tối thiểu & Giá/Đơn vị -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Số Lượng *</label>
-                <input v-model.number="formData.quantity" type="number" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+                <label class="block text-sm font-medium text-gray-700 mb-3">Số lượng *</label>
+                <input v-model.number="formData.quantity" type="number" step="0.01" 
+                  class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Số Lượng Tối Thiểu *</label>
-                <input v-model.number="formData.min_stock" type="number" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+                <label class="block text-sm font-medium text-gray-700 mb-3">Tối thiểu *</label>
+                <input v-model.number="formData.min_stock" type="number" step="0.01" 
+                  class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Giá/Đơn Vị *</label>
-                <input v-model.number="formData.cost_per_unit" type="number" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+                <label class="block text-sm font-medium text-gray-700 mb-3">Giá/Đơn vị *</label>
+                <input v-model.number="formData.cost_per_unit" type="number" step="0.01" 
+                  class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
               </div>
             </div>
 
+            <!-- Nhà cung cấp -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Nhà Cung Cấp</label>
-              <input v-model="formData.supplier" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+              <label class="block text-sm font-medium text-gray-700 mb-3">Nhà cung cấp</label>
+              <input v-model="formData.supplier" type="text" 
+                class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
 
+            <!-- Ghi chú -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Ghi Chú</label>
-              <textarea v-model="formData.notes" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg"></textarea>
+              <label class="block text-sm font-medium text-gray-700 mb-3">Ghi chú</label>
+              <textarea v-model="formData.notes" rows="3" 
+                class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"></textarea>
             </div>
 
             <!-- Auto-Expense Indicator -->
             <div v-if="!isEditing && formData.quantity > 0 && formData.cost_per_unit > 0" 
-              class="bg-green-50 border border-green-200 rounded-lg p-3">
-              <div class="flex items-start gap-2">
-                <span class="text-green-600 text-lg">✅</span>
-                <div class="flex-1">
+              class="bg-green-50 border border-green-200 rounded-lg p-4 mt-6">
+              <div class="flex items-start gap-3">
+                <span class="text-green-600 text-2xl flex-shrink-0">✅</span>
+                <div class="flex-1 min-w-0">
                   <p class="text-sm font-medium text-green-800">Tự động ghi nhận chi phí</p>
-                  <p class="text-xs text-green-600 mt-1">
-                    Hệ thống sẽ tự động tạo chi phí: {{ formatCurrency(formData.quantity * formData.cost_per_unit) }}
+                  <p class="text-xs text-green-600 mt-2 break-words">
+                    Hệ thống sẽ tự động tạo chi phí: <span class="font-semibold">{{ formatCurrency(formData.quantity * formData.cost_per_unit) }}</span>
                   </p>
-                  <p class="text-xs text-green-600">Danh mục: Nguyên liệu</p>
+                  <p class="text-xs text-green-600 mt-1">Danh mục: Nguyên liệu</p>
                 </div>
               </div>
             </div>
+
+            <!-- Spacer for bottom buttons -->
+            <div class="h-24"></div>
           </div>
 
-          <div class="flex justify-end gap-3 mt-6">
-            <button @click="closeModal" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+          <!-- Fixed Footer -->
+          <div class="flex-shrink-0 bg-white px-4 py-4 border-t flex gap-3 pb-safe">
+            <button @click="closeModal" 
+              class="flex-1 bg-gray-200 text-gray-700 py-4 rounded-xl font-medium text-base active:bg-gray-300 transition-colors">
               Hủy
             </button>
-            <button @click="saveIngredient" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-              {{ isEditing ? 'Cập Nhật' : 'Thêm Mới' }}
+            <button @click="saveIngredient" 
+              class="flex-1 bg-blue-500 text-white py-4 rounded-xl font-medium text-base active:bg-blue-600 transition-colors">
+              {{ isEditing ? 'Cập nhật' : 'Thêm mới' }}
             </button>
           </div>
         </div>
       </div>
+    </transition>
 
       <!-- Adjust Stock Modal -->
       <div v-if="showAdjustModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -667,5 +698,22 @@ export default {
 
 .slide-up-leave-to {
   transform: translateY(100%);
+}
+
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.slide-right-enter-from {
+  transform: translateX(100%);
+}
+
+.slide-right-leave-to {
+  transform: translateX(100%);
+}
+
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
 }
 </style>
