@@ -1,10 +1,11 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import LoginView from '../views/LoginView.vue'
 import DashboardView from '../views/DashboardView.vue'
 import MenuView from '../views/MenuView.vue'
 import IngredientManagementView from '../views/IngredientManagementView.vue'
 import FacilityManagementView from '../views/FacilityManagementView.vue'
+import FacilityAddEditView from '../views/FacilityAddEditView.vue'
 import ExpenseManagementView from '../views/ExpenseManagementView.vue'
 import OrderView from '../views/OrderView.vue'
 import BaristaView from '../views/BaristaView.vue'
@@ -49,6 +50,18 @@ const routes = [
     path: '/facilities',
     name: 'Facilities',
     component: FacilityManagementView,
+    meta: { requiresAuth: true, requiresManager: true }
+  },
+  {
+    path: '/facilities/create',
+    name: 'FacilityCreate',
+    component: FacilityAddEditView,
+    meta: { requiresAuth: true, requiresManager: true }
+  },
+  {
+    path: '/facilities/edit/:id',
+    name: 'FacilityEdit',
+    component: FacilityAddEditView,
     meta: { requiresAuth: true, requiresManager: true }
   },
   {
@@ -114,7 +127,7 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHashHistory(),
   routes
 })
 

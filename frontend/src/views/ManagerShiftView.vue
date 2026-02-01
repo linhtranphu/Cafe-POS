@@ -382,46 +382,58 @@ const selectedShift = ref(null)
 const selectedShiftType = ref(null) // 'waiter' or 'cashier'
 
 // Computed
-const allShifts = computed(() => [...shiftStore.shifts, ...cashierShiftStore.shifts])
-
 const waiterShifts = computed(() => shiftStore.shifts || [])
 const cashierShifts = computed(() => cashierShiftStore.shifts || [])
 
-const openWaiterShifts = computed(() => 
-  waiterShifts.value.filter(s => s.status === 'OPEN' && s.role_type === 'waiter')
-)
+const allShifts = computed(() => {
+  const waiter = waiterShifts.value || []
+  const cashier = cashierShifts.value || []
+  return [...waiter, ...cashier]
+})
 
-const openBaristaShifts = computed(() => 
-  waiterShifts.value.filter(s => s.status === 'OPEN' && s.role_type === 'barista')
-)
+const openWaiterShifts = computed(() => {
+  const shifts = waiterShifts.value || []
+  return shifts.filter(s => s && s.status === 'OPEN' && s.role_type === 'waiter')
+})
 
-const openCashierShifts = computed(() => 
-  cashierShifts.value.filter(s => s.status === 'OPEN')
-)
+const openBaristaShifts = computed(() => {
+  const shifts = waiterShifts.value || []
+  return shifts.filter(s => s && s.status === 'OPEN' && s.role_type === 'barista')
+})
+
+const openCashierShifts = computed(() => {
+  const shifts = cashierShifts.value || []
+  return shifts.filter(s => s && s.status === 'OPEN')
+})
 
 const todayShifts = computed(() => {
   const today = new Date().toDateString()
-  return allShifts.value.filter(s => {
+  const shifts = allShifts.value || []
+  return shifts.filter(s => {
+    if (!s) return false
     const shiftDate = s.started_at || s.opened_at
-    return new Date(shiftDate).toDateString() === today
+    return shiftDate && new Date(shiftDate).toDateString() === today
   })
 })
 
 const filteredWaiterShifts = computed(() => {
-  const waiterOnly = waiterShifts.value.filter(s => s.role_type === 'waiter')
+  const shifts = waiterShifts.value || []
+  const waiterOnly = shifts.filter(s => s && s.role_type === 'waiter')
   if (filterStatus.value === 'all') return waiterOnly
-  return waiterOnly.filter(s => s.status === filterStatus.value)
+  return waiterOnly.filter(s => s && s.status === filterStatus.value)
 })
 
 const filteredBaristaShifts = computed(() => {
-  const baristaOnly = waiterShifts.value.filter(s => s.role_type === 'barista')
+  const shifts = waiterShifts.value || []
+  const baristaOnly = shifts.filter(s => s && s.role_type === 'barista')
   if (filterStatus.value === 'all') return baristaOnly
-  return baristaOnly.filter(s => s.status === filterStatus.value)
+  return baristaOnly.filter(s => s && s.status === filterStatus.value)
 })
 
 const filteredCashierShifts = computed(() => {
-  if (filterStatus.value === 'all') return cashierShifts.value
-  return cashierShifts.value.filter(s => s.status === filterStatus.value)
+  const shifts = cashierShifts.value || []
+  if (filterStatus.value === 'all') return shifts
+  return shifts.filter(s => s && s.status === filterStatus.value)
 })
 
 // Methods

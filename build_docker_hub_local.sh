@@ -46,6 +46,21 @@ fi
 
 echo ""
 
+# Clean up Docker resources
+echo "=========================================="
+echo "🧹 Cleaning up Docker resources..."
+echo "=========================================="
+echo ""
+
+echo "Removing unused containers..."
+docker container prune -f > /dev/null 2>&1
+
+echo "Removing unused images..."
+docker image prune -f > /dev/null 2>&1
+
+echo "✅ Docker cleanup complete"
+echo ""
+
 # Build Backend Image
 echo "=========================================="
 echo "🔨 Building Backend Image..."
@@ -85,6 +100,14 @@ else
 fi
 
 echo ""
+
+# Restart Docker daemon
+echo "=========================================="
+echo "🔄 Restarting Docker daemon..."
+echo "=========================================="
+echo ""
+
+
 
 # Start services with docker-compose
 echo "=========================================="
