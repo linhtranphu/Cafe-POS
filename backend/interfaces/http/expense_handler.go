@@ -48,6 +48,13 @@ func (h *ExpenseHandler) CreateExpense(c *gin.Context) {
 		return
 	}
 	
+	// Get username from context (set by auth middleware)
+	username, _ := c.Get("username")
+	createdBy := ""
+	if u, ok := username.(string); ok {
+		createdBy = u
+	}
+	
 	e := expense.Expense{
 		Date:          date,
 		CategoryID:    categoryID,
@@ -56,6 +63,9 @@ func (h *ExpenseHandler) CreateExpense(c *gin.Context) {
 		PaymentMethod: req.PaymentMethod,
 		Vendor:        req.Vendor,
 		Notes:         req.Notes,
+		CreatedBy:     createdBy,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}
 	
 	if err := h.service.CreateExpense(c.Request.Context(), &e); err != nil {

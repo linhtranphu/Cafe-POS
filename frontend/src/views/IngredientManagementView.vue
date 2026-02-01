@@ -1,7 +1,7 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-gray-50 flex flex-col">
     <!-- Mobile Header - Fixed -->
-    <div class="sticky top-0 z-40 bg-white shadow-sm">
+    <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
       <div class="px-4 py-3">
         <div class="flex items-center justify-between mb-3">
           <h1 class="text-xl font-bold text-gray-800">🥬 Nguyên liệu</h1>
@@ -18,7 +18,7 @@
     </div>
 
     <!-- Content -->
-    <div class="px-4 py-4 pb-24">
+    <div class="flex-1 overflow-y-auto px-4 py-4 pb-24">
       <!-- Stats Cards - Single Row -->
       <div class="bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl p-4 mb-4 text-white shadow-lg">
         <div class="text-xs opacity-90 mb-2">Tổng quan</div>

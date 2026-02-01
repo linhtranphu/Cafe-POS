@@ -76,7 +76,7 @@ func (s *AutoExpenseService) GetOrCreateCategory(ctx context.Context, categoryNa
 
 // TrackIngredientPurchase creates an expense record for ingredient purchase
 // This is called when creating a new ingredient or adjusting stock IN
-func (s *AutoExpenseService) TrackIngredientPurchase(ctx context.Context, ing *ingredient.Ingredient, quantity float64) error {
+func (s *AutoExpenseService) TrackIngredientPurchase(ctx context.Context, ing *ingredient.Ingredient, quantity float64, username string) error {
 	// Skip if no cost or quantity
 	if ing.CostPerUnit <= 0 || quantity <= 0 {
 		log.Printf("[AutoExpense] Skipping ingredient purchase tracking: zero cost or quantity (ingredient: %s)", ing.Name)
@@ -104,6 +104,9 @@ func (s *AutoExpenseService) TrackIngredientPurchase(ctx context.Context, ing *i
 		Notes:         fmt.Sprintf("Số lượng: %.2f %s", quantity, ing.Unit),
 		SourceType:    expense.SourceTypeIngredient,
 		SourceID:      ing.ID,
+		CreatedBy:     username, // Set to ingredient creator
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}
 
 	if err := s.expenseService.CreateExpense(ctx, exp); err != nil {
@@ -118,7 +121,7 @@ func (s *AutoExpenseService) TrackIngredientPurchase(ctx context.Context, ing *i
 
 // TrackFacilityPurchase creates an expense record for facility purchase
 // This is called when creating a new facility
-func (s *AutoExpenseService) TrackFacilityPurchase(ctx context.Context, fac *facility.Facility) error {
+func (s *AutoExpenseService) TrackFacilityPurchase(ctx context.Context, fac *facility.Facility, username string) error {
 	// Skip if no cost
 	if fac.Cost <= 0 {
 		log.Printf("[AutoExpense] Skipping facility purchase tracking: zero cost (facility: %s)", fac.Name)
@@ -143,6 +146,9 @@ func (s *AutoExpenseService) TrackFacilityPurchase(ctx context.Context, fac *fac
 		Notes:         fmt.Sprintf("Loại: %s, Khu vực: %s, Số lượng: %d", fac.Type, fac.Area, fac.Quantity),
 		SourceType:    expense.SourceTypeFacility,
 		SourceID:      fac.ID,
+		CreatedBy:     username, // Set to facility creator
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}
 
 	if err := s.expenseService.CreateExpense(ctx, exp); err != nil {
@@ -156,7 +162,7 @@ func (s *AutoExpenseService) TrackFacilityPurchase(ctx context.Context, fac *fac
 
 // TrackMaintenance creates an expense record for facility maintenance
 // This is called when creating a maintenance record
-func (s *AutoExpenseService) TrackMaintenance(ctx context.Context, facilityID primitive.ObjectID, facilityName string, cost float64, maintenanceDate time.Time, notes string) error {
+func (s *AutoExpenseService) TrackMaintenance(ctx context.Context, facilityID primitive.ObjectID, facilityName string, cost float64, maintenanceDate time.Time, notes string, username string) error {
 	// Skip if no cost
 	if cost <= 0 {
 		log.Printf("[AutoExpense] Skipping maintenance tracking: zero cost (facility: %s)", facilityName)
@@ -181,6 +187,9 @@ func (s *AutoExpenseService) TrackMaintenance(ctx context.Context, facilityID pr
 		Notes:         notes,
 		SourceType:    expense.SourceTypeMaintenance,
 		SourceID:      facilityID,
+		CreatedBy:     username, // Set to maintenance creator
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}
 
 	if err := s.expenseService.CreateExpense(ctx, exp); err != nil {

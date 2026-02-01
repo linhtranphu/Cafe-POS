@@ -73,7 +73,7 @@ func (s *FacilityService) CreateFacility(ctx context.Context, f *facility.Facili
 
 	// Track expense for facility purchase if AutoExpenseService is configured
 	if s.autoExpenseService != nil {
-		if err := s.autoExpenseService.TrackFacilityPurchase(ctx, f); err != nil {
+		if err := s.autoExpenseService.TrackFacilityPurchase(ctx, f, username); err != nil {
 			// Log error but don't fail the operation
 			// The facility was created successfully, expense tracking is secondary
 		}
@@ -193,7 +193,7 @@ func (s *FacilityService) CreateMaintenanceRecord(ctx context.Context, record *f
 		fac, err := s.repo.GetByID(ctx, record.FacilityID)
 		if err == nil {
 			facilityName := fac.Name
-			if err := s.autoExpenseService.TrackMaintenance(ctx, record.FacilityID, facilityName, record.Cost, record.Date, record.Description); err != nil {
+			if err := s.autoExpenseService.TrackMaintenance(ctx, record.FacilityID, facilityName, record.Cost, record.Date, record.Description, record.Username); err != nil {
 				// Log error but don't fail the operation
 				// The maintenance record was created successfully, expense tracking is secondary
 			}

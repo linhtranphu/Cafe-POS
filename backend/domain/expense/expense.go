@@ -43,6 +43,8 @@ type Expense struct {
 	SourceType string             `bson:"source_type,omitempty" json:"source_type,omitempty"`
 	SourceID   primitive.ObjectID `bson:"source_id,omitempty" json:"source_id,omitempty"`
 	
+	// Creator tracking
+	CreatedBy string    `bson:"created_by" json:"created_by"`
 	CreatedAt time.Time `bson:"created_at" json:"created_at"`
 	UpdatedAt time.Time `bson:"updated_at" json:"updated_at"`
 }

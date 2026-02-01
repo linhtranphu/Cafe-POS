@@ -1,7 +1,7 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="h-screen w-screen overflow-hidden flex flex-col bg-gray-50">
     <!-- Mobile Header - Fixed -->
-    <div class="sticky top-0 z-40 bg-white shadow-sm">
+    <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
       <div class="px-4 py-3">
         <div class="flex items-center justify-between mb-3">
           <h1 class="text-xl font-bold text-gray-800">🏢 Cơ sở vật chất</h1>
@@ -18,7 +18,7 @@
     </div>
 
     <!-- Content -->
-    <div class="px-4 py-4 pb-24">
+    <div class="flex-1 overflow-y-auto px-4 py-4 pb-24">
       <!-- Stats Cards - Single Row -->
       <div class="bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl p-4 mb-4 text-white shadow-lg">
         <div class="text-xs opacity-90 mb-2">Tổng quan</div>
@@ -131,98 +131,106 @@
     <!-- Create/Edit Modal - Mobile Optimized -->
     <transition name="slide-up">
       <div v-if="showModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
-        <div class="bg-white rounded-t-3xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="bg-white rounded-t-3xl w-full max-h-[95vh] overflow-y-auto">
           <div class="sticky top-0 bg-white px-4 py-4 border-b flex justify-between items-center">
             <h3 class="text-lg font-bold">{{ isEditing ? 'Cập nhật thiết bị' : 'Thêm thiết bị mới' }}</h3>
             <button @click="closeModal" class="text-2xl text-gray-400">×</button>
           </div>
           
-          <div class="px-4 py-4 space-y-4">
+          <div class="px-4 py-6 space-y-5 pb-8">
+            <!-- Tên thiết bị -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Tên thiết bị *</label>
+              <label class="block text-sm font-medium text-gray-700 mb-3">Tên thiết bị *</label>
               <input v-model="formData.name" type="text" 
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
+            <!-- Loại & Số lượng - Responsive Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Loại *</label>
+                <label class="block text-sm font-medium text-gray-700 mb-3">Loại *</label>
                 <select v-model="formData.type" 
-                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                  class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                   <option value="">Chọn loại</option>
                   <option v-for="cat in facilityCategories" :key="cat" :value="cat">{{ cat }}</option>
                 </select>
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Số lượng *</label>
+                <label class="block text-sm font-medium text-gray-700 mb-3">Số lượng *</label>
                 <input v-model.number="formData.quantity" type="number" 
-                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                  class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
               </div>
             </div>
 
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Khu vực *</label>
-              <input v-model="formData.area" type="text" placeholder="VD: Quầy bar, Bếp, Kho..."
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Trạng thái *</label>
-              <select v-model="formData.status" 
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                <option v-for="option in FACILITY_STATUS_OPTIONS" :key="option.value" :value="option.value">
-                  {{ option.label }}
-                </option>
-              </select>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
+            <!-- Khu vực & Trạng thái - Responsive Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Ngày mua</label>
+                <label class="block text-sm font-medium text-gray-700 mb-3">Khu vực *</label>
+                <input v-model="formData.area" type="text" placeholder="VD: Quầy bar"
+                  class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-3">Trạng thái *</label>
+                <select v-model="formData.status" 
+                  class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                  <option v-for="option in FACILITY_STATUS_OPTIONS" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Ngày mua & Giá trị - Responsive Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-3">Ngày mua</label>
                 <input v-model="formData.purchase_date" type="date" 
-                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                  class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Giá trị</label>
-                <input v-model.number="formData.cost" type="number" placeholder="VND"
-                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                <label class="block text-sm font-medium text-gray-700 mb-3">Giá trị (VND)</label>
+                <input v-model.number="formData.cost" type="number" placeholder="0"
+                  class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
               </div>
             </div>
 
+            <!-- Nhà cung cấp -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Nhà cung cấp</label>
+              <label class="block text-sm font-medium text-gray-700 mb-3">Nhà cung cấp</label>
               <input v-model="formData.supplier" type="text" 
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
 
+            <!-- Ghi chú -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+              <label class="block text-sm font-medium text-gray-700 mb-3">Ghi chú</label>
               <textarea v-model="formData.notes" rows="3" 
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"></textarea>
             </div>
 
             <!-- Auto-Expense Indicator -->
             <div v-if="!isEditing && formData.cost > 0" 
-              class="bg-green-50 border border-green-200 rounded-lg p-3">
-              <div class="flex items-start gap-2">
-                <span class="text-green-600 text-lg">✅</span>
-                <div class="flex-1">
+              class="bg-green-50 border border-green-200 rounded-lg p-4 mt-6">
+              <div class="flex items-start gap-3">
+                <span class="text-green-600 text-2xl flex-shrink-0">✅</span>
+                <div class="flex-1 min-w-0">
                   <p class="text-sm font-medium text-green-800">Tự động ghi nhận chi phí</p>
-                  <p class="text-xs text-green-600 mt-1">
-                    Hệ thống sẽ tự động tạo chi phí: {{ formatPrice(formData.cost) }}
+                  <p class="text-xs text-green-600 mt-2 break-words">
+                    Hệ thống sẽ tự động tạo chi phí: <span class="font-semibold">{{ formatPrice(formData.cost) }}</span>
                   </p>
-                  <p class="text-xs text-green-600">Danh mục: Cơ sở vật chất</p>
+                  <p class="text-xs text-green-600 mt-1">Danh mục: Cơ sở vật chất</p>
                 </div>
               </div>
             </div>
 
-            <div class="flex gap-3 pt-4">
+            <!-- Buttons -->
+            <div class="flex gap-3 pt-6 pb-2 border-t mt-6">
               <button @click="closeModal" 
-                class="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-medium active:bg-gray-300">
+                class="flex-1 bg-gray-200 text-gray-700 py-4 rounded-xl font-medium text-base active:bg-gray-300 transition-colors">
                 Hủy
               </button>
               <button @click="saveFacility" 
-                class="flex-1 bg-blue-500 text-white py-3 rounded-xl font-medium active:bg-blue-600">
+                class="flex-1 bg-blue-500 text-white py-4 rounded-xl font-medium text-base active:bg-blue-600 transition-colors">
                 {{ isEditing ? 'Cập nhật' : 'Thêm mới' }}
               </button>
             </div>
@@ -240,7 +248,7 @@
             <button @click="showMaintenanceSchedule = false" class="text-2xl text-gray-400">×</button>
           </div>
           
-          <div class="px-4 py-4">
+          <div class="px-4 py-4 pb-8">
             <div v-if="maintenanceSchedule.length === 0" class="text-center py-16">
               <div class="text-6xl mb-4">📭</div>
               <p class="text-gray-500">Không có lịch bảo trì nào</p>
@@ -249,13 +257,13 @@
             <div v-else class="space-y-3">
               <div v-for="item in maintenanceSchedule" :key="item.id" 
                 class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-                <div class="flex justify-between items-start mb-2">
-                  <div>
-                    <h4 class="font-bold text-gray-900">{{ item.facility_name }}</h4>
-                    <p class="text-sm text-gray-600">📍 {{ item.location }}</p>
+                <div class="flex justify-between items-start gap-3 mb-3">
+                  <div class="flex-1 min-w-0">
+                    <h4 class="font-bold text-gray-900 truncate">{{ item.facility_name }}</h4>
+                    <p class="text-sm text-gray-600 truncate">📍 {{ item.location }}</p>
                   </div>
                   <span :class="item.is_overdue ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'" 
-                    class="px-2 py-1 text-xs font-medium rounded-full">
+                    class="px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap flex-shrink-0">
                     {{ item.is_overdue ? 'Quá hạn' : 'Sắp tới' }}
                   </span>
                 </div>
@@ -276,7 +284,7 @@
             <button @click="showIssueReports = false" class="text-2xl text-gray-400">×</button>
           </div>
           
-          <div class="px-4 py-4">
+          <div class="px-4 py-4 pb-8">
             <div v-if="issueReports.length === 0" class="text-center py-16">
               <div class="text-6xl mb-4">✅</div>
               <p class="text-gray-500">Không có sự cố nào</p>
@@ -285,17 +293,17 @@
             <div v-else class="space-y-3">
               <div v-for="issue in issueReports" :key="issue.id" 
                 class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-                <div class="flex justify-between items-start mb-2">
-                  <div class="flex-1">
-                    <h4 class="font-bold text-gray-900">{{ issue.facility_name }}</h4>
-                    <p class="text-sm text-gray-700 mt-1">{{ issue.description }}</p>
+                <div class="flex justify-between items-start gap-3 mb-3">
+                  <div class="flex-1 min-w-0">
+                    <h4 class="font-bold text-gray-900 truncate">{{ issue.facility_name }}</h4>
+                    <p class="text-sm text-gray-700 mt-2 line-clamp-2">{{ issue.description }}</p>
                   </div>
                   <span :class="getIssueStatusClassLocal(issue.status)" 
-                    class="px-2 py-1 text-xs font-medium rounded-full whitespace-nowrap ml-2">
+                    class="px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap flex-shrink-0">
                     {{ getIssueStatusText(issue.status) }}
                   </span>
                 </div>
-                <p class="text-xs text-gray-500 mt-2">
+                <p class="text-xs text-gray-500 mt-3">
                   👤 {{ issue.reported_by }} • {{ formatDate(issue.reported_at) }}
                 </p>
               </div>
@@ -314,33 +322,33 @@
             <button @click="showCategoryModal = false" class="text-2xl text-gray-400">×</button>
           </div>
           
-          <div class="px-4 py-4">
+          <div class="px-4 py-4 pb-8">
             <!-- Add New Category -->
             <div class="bg-gray-50 rounded-xl p-4 mb-4">
               <h4 class="font-semibold text-gray-800 mb-3">Thêm danh mục mới</h4>
-              <div class="flex gap-2">
+              <div class="flex flex-col sm:flex-row gap-2">
                 <input v-model="newCategoryName" type="text" placeholder="Tên danh mục..." 
-                  class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" />
-                <button @click="addCategory" class="bg-purple-500 text-white px-6 py-3 rounded-lg font-medium active:bg-purple-600">
+                  class="flex-1 px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" />
+                <button @click="addCategory" class="bg-purple-500 text-white px-6 py-3 rounded-lg font-medium text-base active:bg-purple-600 whitespace-nowrap">
                   Thêm
                 </button>
               </div>
             </div>
 
             <!-- Category List -->
-            <div class="space-y-2">
+            <div class="space-y-3">
               <div v-for="cat in facilityCategories" :key="cat" 
                 class="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                  <div class="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-xl">
+                <div class="flex items-center gap-3 flex-1 min-w-0">
+                  <div class="w-12 h-12 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-2xl flex-shrink-0">
                     🏢
                   </div>
-                  <div>
-                    <div class="font-medium text-gray-800">{{ cat }}</div>
+                  <div class="min-w-0">
+                    <div class="font-medium text-gray-800 truncate">{{ cat }}</div>
                     <div class="text-xs text-gray-500">{{ getCategoryCount(cat) }} thiết bị</div>
                   </div>
                 </div>
-                <button @click="deleteCategory(cat)" class="text-red-500 hover:text-red-700 p-2">
+                <button @click="deleteCategory(cat)" class="text-red-500 hover:text-red-700 p-2 flex-shrink-0 ml-2">
                   🗑️
                 </button>
               </div>

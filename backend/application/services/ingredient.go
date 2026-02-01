@@ -42,7 +42,7 @@ func (s *IngredientService) SetAutoExpenseService(autoExpenseService *AutoExpens
 	s.autoExpenseService = autoExpenseService
 }
 
-func (s *IngredientService) CreateIngredient(ctx context.Context, req *ingredient.CreateIngredientRequest) (*ingredient.Ingredient, error) {
+func (s *IngredientService) CreateIngredient(ctx context.Context, req *ingredient.CreateIngredientRequest, username string) (*ingredient.Ingredient, error) {
 	item := &ingredient.Ingredient{
 		Name:        req.Name,
 		Category:    req.Category,
@@ -60,7 +60,7 @@ func (s *IngredientService) CreateIngredient(ctx context.Context, req *ingredien
 
 	// Track expense for initial purchase if AutoExpenseService is configured
 	if s.autoExpenseService != nil && req.Quantity > 0 {
-		if err := s.autoExpenseService.TrackIngredientPurchase(ctx, item, req.Quantity); err != nil {
+		if err := s.autoExpenseService.TrackIngredientPurchase(ctx, item, req.Quantity, username); err != nil {
 			// Log error but don't fail the operation
 			// The ingredient was created successfully, expense tracking is secondary
 		}
@@ -152,7 +152,7 @@ func (s *IngredientService) AdjustStock(ctx context.Context, id primitive.Object
 	// Track expense for stock IN (positive quantity adjustment)
 	// Only track if AutoExpenseService is configured and quantity is positive
 	if s.autoExpenseService != nil && req.Quantity > 0 {
-		if err := s.autoExpenseService.TrackIngredientPurchase(ctx, item, req.Quantity); err != nil {
+		if err := s.autoExpenseService.TrackIngredientPurchase(ctx, item, req.Quantity, req.Username); err != nil {
 			// Log error but don't fail the operation
 			// The stock adjustment was successful, expense tracking is secondary
 		}

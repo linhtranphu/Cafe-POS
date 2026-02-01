@@ -26,8 +26,13 @@ func NewExpenseRepository(db *mongo.Database) *ExpenseRepository {
 }
 
 func (r *ExpenseRepository) CreateExpense(ctx context.Context, e *expense.Expense) error {
-	e.CreatedAt = time.Now()
-	e.UpdatedAt = time.Now()
+	// Only set timestamps if not already set
+	if e.CreatedAt.IsZero() {
+		e.CreatedAt = time.Now()
+	}
+	if e.UpdatedAt.IsZero() {
+		e.UpdatedAt = time.Now()
+	}
 	result, err := r.expenses.InsertOne(ctx, e)
 	if err == nil {
 		e.ID = result.InsertedID.(primitive.ObjectID)

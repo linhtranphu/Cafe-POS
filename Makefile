@@ -43,6 +43,9 @@ exec-backend: ## Execute shell in backend container
 exec-mongodb: ## Execute MongoDB shell
 	docker-compose exec mongodb mongosh -u admin -p admin123
 
+seed-admin: ## Seed admin user only
+	cd backend && go run cmd/seed-admin/main.go
+
 build-backend: ## Build only backend image
 	docker-compose build backend
 

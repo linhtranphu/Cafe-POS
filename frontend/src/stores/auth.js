@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { login as authLogin } from '../services/auth'
+import api from '../services/api'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -29,8 +30,12 @@ export const useAuthStore = defineStore('auth', {
           this.token = response.token
           this.isAuthenticated = true
           
+          // Lưu vào localStorage
           localStorage.setItem('token', response.token)
           localStorage.setItem('user', JSON.stringify(response.user))
+          
+          // Set token cho API requests
+          api.defaults.headers.common['Authorization'] = `Bearer ${response.token}`
           
           return true
         } else {
@@ -60,15 +65,45 @@ export const useAuthStore = defineStore('auth', {
       this.isAuthenticated = false
       localStorage.removeItem('token')
       localStorage.removeItem('user')
+      delete api.defaults.headers.common['Authorization']
     },
 
+    // Khôi phục auth từ localStorage khi app load
     initAuth() {
       const token = localStorage.getItem('token')
       const user = localStorage.getItem('user')
+      
       if (token && user) {
-        this.token = token
-        this.user = JSON.parse(user)
-        this.isAuthenticated = true
+        try {
+          this.token = token
+          this.user = JSON.parse(user)
+          this.isAuthenticated = true
+          
+          // Set token cho API requests
+          api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+        } catch (error) {
+          console.error('Error restoring auth:', error)
+          this.logout()
+        }
+      }
+    },
+
+    // Validate token với backend (optional)
+    async validateToken() {
+      if (!this.token) return false
+      
+      try {
+        const response = await api.get('/profile')
+        if (response.data) {
+          this.user = response.data
+          localStorage.setItem('user', JSON.stringify(response.data))
+          return true
+        }
+        return false
+      } catch (error) {
+        console.error('Token validation failed:', error)
+        this.logout()
+        return false
       }
     }
   }

@@ -23,7 +23,14 @@ func (h *IngredientHandler) CreateIngredient(c *gin.Context) {
 		return
 	}
 
-	item, err := h.ingredientService.CreateIngredient(c.Request.Context(), &req)
+	// Get username from context
+	username, _ := c.Get("username")
+	createdBy := ""
+	if u, ok := username.(string); ok {
+		createdBy = u
+	}
+
+	item, err := h.ingredientService.CreateIngredient(c.Request.Context(), &req, createdBy)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"os"
-	"os/exec"
 	"time"
 	"cafe-pos/backend/application/services"
 	"cafe-pos/backend/domain"
@@ -17,23 +16,26 @@ import (
 )
 
 func main() {
-	// Kill existing processes on port 3000
-	log.Println("🔄 Stopping existing processes on port 3000...")
-	exec.Command("bash", "-c", "lsof -ti:3000 | xargs -r kill -9").Run()
-	exec.Command("pkill", "-f", "cafe-pos-server").Run()
-	exec.Command("pkill", "-f", "go run main.go").Run()
-	time.Sleep(2 * time.Second)
-
 	// MongoDB connection
 	mongoURI := os.Getenv("MONGODB_URI")
 	if mongoURI == "" {
 		mongoURI = "mongodb://localhost:27017"
 	}
+	log.Printf("Connecting to MongoDB: %s", mongoURI)
+	
 	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(mongoURI))
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("❌ MongoDB connection failed: %v", err)
 	}
 	defer client.Disconnect(context.TODO())
+
+	// Verify MongoDB connection
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := client.Ping(ctx, nil); err != nil {
+		log.Fatalf("❌ MongoDB ping failed: %v", err)
+	}
+	log.Println("✅ MongoDB connected successfully")
 
 	db := client.Database("cafe_pos")
 
