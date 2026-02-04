@@ -6,28 +6,39 @@ Tính năng Cash Handover cho phép waiter bàn giao tiền thu được từ kh
 
 ## 📋 Yêu Cầu Chức Năng
 
-### 1. Quy Trình Handover với Tương Tác
+### 1. Quy Trình Handover với Đối Soát Tiền
 - **Waiter** khởi tạo yêu cầu bàn giao (một phần hoặc toàn bộ)
-- **Cashier** nhận thông báo real-time và có thể tương tác
-- **Cashier** xác nhận/từ chối với ghi chú
-- **Waiter** nhận phản hồi và cập nhật trạng thái
-- Theo dõi lịch sử tất cả giao dịch handover
+- **Cashier** nhận thông báo và kiểm tra thông tin
+- **Đối soát vật lý**: Cashier đếm tiền thực tế và so sánh
+- **Xác nhận/Từ chối**: Cashier xác nhận với số tiền thực nhận hoặc từ chối với lý do
+- **Ghi nhận chênh lệch**: Nếu có sai khác giữa khai báo và thực tế
+- **Cập nhật hệ thống**: Tự động cập nhật số dư cho cả hai bên
+- **Audit trail**: Ghi lại toàn bộ quá trình để kiểm toán
 
-### 2. Tích Hợp UI
-- **Waiter**: Embed vào màn hình **ShiftView** với 2 nút riêng biệt
-- **Cashier**: Thêm section trong **CashierDashboard** để quản lý handover
-- **Real-time**: Notifications và updates cho cả hai bên
-- **History**: Lịch sử handover trong cả hai interface
+### 2. Đối Soát Chi Tiết
+- **Số tiền khai báo**: Waiter khai báo số tiền bàn giao
+- **Số tiền thực nhận**: Cashier đếm và xác nhận số tiền thực tế
+- **Phát hiện chênh lệch**: Hệ thống tự động tính toán sai khác
+- **Xử lý chênh lệch**: Ghi nhận lý do và trách nhiệm
+- **Báo cáo sai lệch**: Tạo báo cáo cho quản lý nếu cần
 
-### 3. Validation Rules
+### 3. Tích Hợp UI với Đối Soát
+- **Waiter**: Form khai báo số tiền với breakdown chi tiết
+- **Cashier**: Interface đối soát với calculator và form xác nhận
+- **Discrepancy Handling**: Modal xử lý chênh lệch với các tùy chọn
+- **Real-time**: Updates và notifications cho cả hai bên
+- **History**: Lịch sử đầy đủ với thông tin đối soát
+
+### 4. Validation Rules với Đối Soát
 - Waiter chỉ có thể handover tiền <= số tiền hiện có
-- Khi đóng ca: `remaining_cash` phải = 0 (thông qua handover)
-- Chỉ cashier đang trong ca mới có thể nhận tiền
+- Cashier phải xác nhận số tiền thực nhận (có thể khác khai báo)
+- Chênh lệch > threshold phải có lý do và approval
+- Tất cả giao dịch phải có audit trail đầy đủ
 - Không thể handover khi không có cashier shift mở
 
-## 🏗️ Thiết Kế Database
+## 🏗️ Thiết Kế Database với Đối Soát
 
-### Cash Handover Collection
+### Cash Handover Collection (Mở Rộng)
 ```javascript
 {
   _id: ObjectId,
@@ -37,26 +48,93 @@ Tính năng Cash Handover cho phép waiter bàn giao tiền thu được từ kh
   waiter_name: String,              // Tên waiter
   cashier_id: ObjectId,             // ID cashier
   cashier_name: String,             // Tên cashier
-  amount: Number,                   // Số tiền bàn giao
+  
+  // Thông tin bàn giao
+  declared_amount: Number,          // Số tiền waiter khai báo
+  actual_amount: Number,            // Số tiền cashier thực nhận
+  discrepancy: Number,              // Chênh lệch (actual - declared)
+  
   handover_type: String,            // "PARTIAL" | "FULL" | "END_SHIFT"
-  status: String,                   // "PENDING" | "CONFIRMED" | "REJECTED"
+  status: String,                   // "PENDING" | "CONFIRMED" | "REJECTED" | "DISCREPANCY"
+  
+  // Ghi chú và lý do
   waiter_note: String,              // Ghi chú từ waiter
   cashier_note: String,             // Ghi chú từ cashier
+  discrepancy_reason: String,       // Lý do chênh lệch
+  discrepancy_responsibility: String, // "WAITER" | "CASHIER" | "SYSTEM" | "UNKNOWN"
+  
+  // Thời gian
   handover_at: Date,                // Thời gian bàn giao
   confirmed_at: Date,               // Thời gian xác nhận
+  reconciled_at: Date,              // Thời gian đối soát
+  
+  // Metadata
+  end_cash: Number,                 // Tiền cuối ca (cho END_SHIFT)
+  requires_approval: Boolean,       // Cần approval từ manager
+  approved_by: ObjectId,            // ID người approve
+  approved_at: Date,                // Thời gian approve
+  
   created_at: Date,
   updated_at: Date
 }
 ```
 
-### Cập Nhật Shift Model
+### Cash Discrepancy Collection (Mới)
+```javascript
+{
+  _id: ObjectId,
+  handover_id: ObjectId,            // Liên kết với handover
+  waiter_shift_id: ObjectId,
+  cashier_shift_id: ObjectId,
+  
+  // Thông tin chênh lệch
+  declared_amount: Number,
+  actual_amount: Number,
+  discrepancy_amount: Number,       // Số tiền chênh lệch
+  discrepancy_type: String,         // "SHORTAGE" | "OVERAGE"
+  
+  // Phân tích nguyên nhân
+  reason_category: String,          // "COUNTING_ERROR" | "TRANSACTION_ERROR" | "THEFT" | "OTHER"
+  detailed_reason: String,          // Mô tả chi tiết
+  responsibility: String,           // "WAITER" | "CASHIER" | "SYSTEM" | "CUSTOMER" | "UNKNOWN"
+  
+  // Xử lý
+  resolution_status: String,        // "PENDING" | "RESOLVED" | "ESCALATED"
+  resolution_action: String,        // Hành động xử lý
+  resolved_by: ObjectId,            // ID người xử lý
+  resolved_at: Date,                // Thời gian xử lý
+  
+  // Approval (nếu cần)
+  requires_manager_approval: Boolean,
+  manager_approved: Boolean,
+  approved_by: ObjectId,
+  approved_at: Date,
+  manager_note: String,
+  
+  created_at: Date,
+  updated_at: Date
+}
+```
+
+### Cập Nhật Shift Models
 ```go
-// Thêm vào Shift struct
+// Thêm vào Shift struct (Waiter)
 type Shift struct {
     // ... existing fields
-    CurrentCash     float64 `bson:"current_cash" json:"current_cash"`         // Tiền hiện có
-    HandedOverCash  float64 `bson:"handed_over_cash" json:"handed_over_cash"` // Tổng tiền đã bàn giao
-    RemainingCash   float64 `bson:"remaining_cash" json:"remaining_cash"`     // Tiền còn lại
+    CurrentCash         float64 `bson:"current_cash" json:"current_cash"`           // Tiền hiện có
+    HandedOverCash      float64 `bson:"handed_over_cash" json:"handed_over_cash"`   // Tổng tiền đã bàn giao
+    RemainingCash       float64 `bson:"remaining_cash" json:"remaining_cash"`       // Tiền còn lại
+    TotalDiscrepancy    float64 `bson:"total_discrepancy" json:"total_discrepancy"` // Tổng chênh lệch
+    HandoverCount       int     `bson:"handover_count" json:"handover_count"`       // Số lần bàn giao
+}
+
+// Thêm vào CashierShift struct
+type CashierShift struct {
+    // ... existing fields
+    ReceivedCash        float64 `bson:"received_cash" json:"received_cash"`         // Tiền nhận từ waiter
+    TotalDiscrepancy    float64 `bson:"total_discrepancy" json:"total_discrepancy"` // Tổng chênh lệch
+    HandoverCount       int     `bson:"handover_count" json:"handover_count"`       // Số lần nhận bàn giao
+    DiscrepancyCount    int     `bson:"discrepancy_count" json:"discrepancy_count"` // Số lần có chênh lệch
 }
 ```
 
@@ -64,7 +142,7 @@ type Shift struct {
 
 ### 1. Domain Models
 
-#### Cash Handover Domain
+#### Cash Handover Domain (Mở Rộng)
 ```go
 // backend/domain/handover/cash_handover.go
 package handover
@@ -76,16 +154,31 @@ import (
 
 type HandoverStatus string
 type HandoverType string
+type DiscrepancyType string
+type ResponsibilityType string
 
 const (
-    StatusPending   HandoverStatus = "PENDING"
-    StatusConfirmed HandoverStatus = "CONFIRMED"
-    StatusRejected  HandoverStatus = "REJECTED"
+    StatusPending     HandoverStatus = "PENDING"
+    StatusConfirmed   HandoverStatus = "CONFIRMED"
+    StatusRejected    HandoverStatus = "REJECTED"
+    StatusDiscrepancy HandoverStatus = "DISCREPANCY"  // Có chênh lệch cần xử lý
     
     TypePartial   HandoverType = "PARTIAL"
     TypeFull      HandoverType = "FULL"
     TypeEndShift  HandoverType = "END_SHIFT"
+    
+    DiscrepancyShortage DiscrepancyType = "SHORTAGE"  // Thiếu tiền
+    DiscrepancyOverage  DiscrepancyType = "OVERAGE"   // Thừa tiền
+    
+    ResponsibilityWaiter   ResponsibilityType = "WAITER"
+    ResponsibilityCashier  ResponsibilityType = "CASHIER"
+    ResponsibilitySystem   ResponsibilityType = "SYSTEM"
+    ResponsibilityCustomer ResponsibilityType = "CUSTOMER"
+    ResponsibilityUnknown  ResponsibilityType = "UNKNOWN"
 )
+
+// Cash breakdown structure - REMOVED
+// Calculate total from breakdown - REMOVED
 
 type CashHandover struct {
     ID              primitive.ObjectID `bson:"_id,omitempty" json:"id"`
@@ -95,35 +188,407 @@ type CashHandover struct {
     WaiterName      string             `bson:"waiter_name" json:"waiter_name"`
     CashierID       primitive.ObjectID `bson:"cashier_id" json:"cashier_id"`
     CashierName     string             `bson:"cashier_name" json:"cashier_name"`
-    Amount          float64            `bson:"amount" json:"amount"`
+    
+    // Amounts
+    DeclaredAmount  float64            `bson:"declared_amount" json:"declared_amount"`   // Waiter khai báo
+    ActualAmount    float64            `bson:"actual_amount" json:"actual_amount"`       // Cashier thực nhận
+    Discrepancy     float64            `bson:"discrepancy" json:"discrepancy"`           // Chênh lệch
+    
     HandoverType    HandoverType       `bson:"handover_type" json:"handover_type"`
     Status          HandoverStatus     `bson:"status" json:"status"`
-    WaiterNote      string             `bson:"waiter_note,omitempty" json:"waiter_note,omitempty"`
-    CashierNote     string             `bson:"cashier_note,omitempty" json:"cashier_note,omitempty"`
-    EndCash         float64            `bson:"end_cash,omitempty" json:"end_cash,omitempty"`  // For END_SHIFT type
+    
+    // Notes and reasons
+    WaiterNote              string             `bson:"waiter_note,omitempty" json:"waiter_note,omitempty"`
+    CashierNote             string             `bson:"cashier_note,omitempty" json:"cashier_note,omitempty"`
+    DiscrepancyReason       string             `bson:"discrepancy_reason,omitempty" json:"discrepancy_reason,omitempty"`
+    DiscrepancyResponsibility ResponsibilityType `bson:"discrepancy_responsibility,omitempty" json:"discrepancy_responsibility,omitempty"`
+    
+    // Timestamps
     HandoverAt      time.Time          `bson:"handover_at" json:"handover_at"`
     ConfirmedAt     *time.Time         `bson:"confirmed_at,omitempty" json:"confirmed_at,omitempty"`
+    ReconciledAt    *time.Time         `bson:"reconciled_at,omitempty" json:"reconciled_at,omitempty"`
+    
+    // Metadata
+    EndCash         float64            `bson:"end_cash,omitempty" json:"end_cash,omitempty"`
+    RequiresApproval bool              `bson:"requires_approval" json:"requires_approval"`
+    ApprovedBy      primitive.ObjectID `bson:"approved_by,omitempty" json:"approved_by,omitempty"`
+    ApprovedAt      *time.Time         `bson:"approved_at,omitempty" json:"approved_at,omitempty"`
+    
     CreatedAt       time.Time          `bson:"created_at" json:"created_at"`
     UpdatedAt       time.Time          `bson:"updated_at" json:"updated_at"`
 }
 
+// Check if handover has discrepancy
+func (h *CashHandover) HasDiscrepancy() bool {
+    return h.Discrepancy != 0
+}
+
+// Get discrepancy type
+func (h *CashHandover) GetDiscrepancyType() DiscrepancyType {
+    if h.Discrepancy < 0 {
+        return DiscrepancyShortage
+    } else if h.Discrepancy > 0 {
+        return DiscrepancyOverage
+    }
+    return ""
+}
+
+// Check if requires manager approval (large discrepancy)
+func (h *CashHandover) RequiresManagerApproval(threshold float64) bool {
+    return h.HasDiscrepancy() && (h.Discrepancy > threshold || h.Discrepancy < -threshold)
+}
+
+// Request structures
 type CreateHandoverRequest struct {
-    Amount       float64      `json:"amount" binding:"required,gt=0"`
-    HandoverType HandoverType `json:"handover_type" binding:"required"`
-    WaiterNote   string       `json:"waiter_note"`
+    DeclaredAmount float64      `json:"declared_amount" binding:"required,gt=0"`
+    HandoverType   HandoverType `json:"handover_type" binding:"required"`
+    WaiterNote     string       `json:"waiter_note"`
 }
 
 type CreateHandoverAndEndShiftRequest struct {
-    WaiterNote string  `json:"waiter_note"`
-    EndCash    float64 `json:"end_cash" binding:"min=0"`
+    DeclaredAmount float64 `json:"declared_amount" binding:"required,gt=0"`
+    WaiterNote     string  `json:"waiter_note"`
+    EndCash        float64 `json:"end_cash" binding:"min=0"`
 }
 
 type ConfirmHandoverRequest struct {
-    Status      HandoverStatus `json:"status" binding:"required"`
-    CashierNote string         `json:"cashier_note"`
+    ActualAmount            float64            `json:"actual_amount" binding:"required,gte=0"`
+    Status                  HandoverStatus     `json:"status" binding:"required"`
+    CashierNote             string             `json:"cashier_note"`
+    DiscrepancyReason       string             `json:"discrepancy_reason"`
+    DiscrepancyResponsibility ResponsibilityType `json:"discrepancy_responsibility"`
+}
+
+// Cash Discrepancy model
+type CashDiscrepancy struct {
+    ID                      primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+    HandoverID              primitive.ObjectID `bson:"handover_id" json:"handover_id"`
+    WaiterShiftID           primitive.ObjectID `bson:"waiter_shift_id" json:"waiter_shift_id"`
+    CashierShiftID          primitive.ObjectID `bson:"cashier_shift_id" json:"cashier_shift_id"`
+    
+    // Discrepancy details
+    DeclaredAmount          float64            `bson:"declared_amount" json:"declared_amount"`
+    ActualAmount            float64            `bson:"actual_amount" json:"actual_amount"`
+    DiscrepancyAmount       float64            `bson:"discrepancy_amount" json:"discrepancy_amount"`
+    DiscrepancyType         DiscrepancyType    `bson:"discrepancy_type" json:"discrepancy_type"`
+    
+    // Analysis
+    ReasonCategory          string             `bson:"reason_category" json:"reason_category"`
+    DetailedReason          string             `bson:"detailed_reason" json:"detailed_reason"`
+    Responsibility          ResponsibilityType `bson:"responsibility" json:"responsibility"`
+    
+    // Resolution
+    ResolutionStatus        string             `bson:"resolution_status" json:"resolution_status"`
+    ResolutionAction        string             `bson:"resolution_action" json:"resolution_action"`
+    ResolvedBy              primitive.ObjectID `bson:"resolved_by,omitempty" json:"resolved_by,omitempty"`
+    ResolvedAt              *time.Time         `bson:"resolved_at,omitempty" json:"resolved_at,omitempty"`
+    
+    // Manager approval
+    RequiresManagerApproval bool               `bson:"requires_manager_approval" json:"requires_manager_approval"`
+    ManagerApproved         bool               `bson:"manager_approved" json:"manager_approved"`
+    ApprovedBy              primitive.ObjectID `bson:"approved_by,omitempty" json:"approved_by,omitempty"`
+    ApprovedAt              *time.Time         `bson:"approved_at,omitempty" json:"approved_at,omitempty"`
+    ManagerNote             string             `bson:"manager_note,omitempty" json:"manager_note,omitempty"`
+    
+    CreatedAt               time.Time          `bson:"created_at" json:"created_at"`
+    UpdatedAt               time.Time          `bson:"updated_at" json:"updated_at"`
 }
 ```
 
+### 3. Service Layer với Đối Soát
+```go
+// backend/application/services/cash_handover_service.go
+type CashHandoverService struct {
+    handoverRepo        CashHandoverRepository
+    discrepancyRepo     CashDiscrepancyRepository
+    shiftRepo           ShiftRepository
+    cashierShiftRepo    CashierShiftRepository
+    stateMachineManager *domain.StateMachineManager
+    discrepancyThreshold float64  // Ngưỡng chênh lệch cần approval
+}
+
+func (s *CashHandoverService) CreateHandover(ctx context.Context, waiterShiftID primitive.ObjectID, req *handover.CreateHandoverRequest, waiterID, waiterName string) (*handover.CashHandover, error) {
+    // 1. Validate waiter shift exists and is open
+    waiterShift, err := s.shiftRepo.FindByID(ctx, waiterShiftID)
+    if err != nil || waiterShift.Status != order.ShiftOpen {
+        return nil, errors.New("waiter shift not found or not open")
+    }
+    
+    // 2. Check if waiter owns the shift
+    waiterOID, _ := primitive.ObjectIDFromHex(waiterID)
+    if waiterShift.UserID != waiterOID {
+        return nil, errors.New("unauthorized: not your shift")
+    }
+    
+    // 3. Validate declared amount
+    if req.DeclaredAmount > waiterShift.RemainingCash {
+        return nil, errors.New("declared amount exceeds remaining cash")
+    }
+    
+    // 4. Validate cash breakdown if provided
+    if req.CashBreakdown != nil {
+        breakdownTotal := req.CashBreakdown.Total()
+        if breakdownTotal != req.DeclaredAmount {
+            return nil, errors.New("cash breakdown total does not match declared amount")
+        }
+    }
+    
+    // 5. Find active cashier shift
+    cashierShift, err := s.cashierShiftRepo.FindOpenShift(ctx)
+    if err != nil {
+        return nil, errors.New("no active cashier shift found")
+    }
+    
+    // 6. Create handover record
+    handover := &handover.CashHandover{
+        WaiterShiftID:   waiterShiftID,
+        CashierShiftID:  cashierShift.ID,
+        WaiterID:        waiterOID,
+        WaiterName:      waiterName,
+        CashierID:       cashierShift.CashierID,
+        CashierName:     cashierShift.CashierName,
+        DeclaredAmount:  req.DeclaredAmount,
+        ActualAmount:    0, // Will be set by cashier
+        Discrepancy:     0, // Will be calculated
+        HandoverType:    req.HandoverType,
+        Status:          handover.StatusPending,
+        WaiterNote:      req.WaiterNote,
+        HandoverAt:      time.Now(),
+        CreatedAt:       time.Now(),
+        UpdatedAt:       time.Now(),
+    }
+    
+    if err := s.handoverRepo.Create(ctx, handover); err != nil {
+        return nil, err
+    }
+    
+    return handover, nil
+}
+
+func (s *CashHandoverService) ConfirmHandoverWithReconciliation(ctx context.Context, handoverID primitive.ObjectID, req *handover.ConfirmHandoverRequest, cashierID string) error {
+    // 1. Get handover record
+    handover, err := s.handoverRepo.FindByID(ctx, handoverID)
+    if err != nil {
+        return err
+    }
+    
+    // 2. Validate cashier authorization
+    cashierOID, _ := primitive.ObjectIDFromHex(cashierID)
+    if handover.CashierID != cashierOID {
+        return errors.New("unauthorized: not assigned to you")
+    }
+    
+    // 3. Calculate discrepancy
+    discrepancy := req.ActualAmount - handover.DeclaredAmount
+    
+    // 4. Update handover with reconciliation data
+    now := time.Now()
+    handover.ActualAmount = req.ActualAmount
+    handover.Discrepancy = discrepancy
+    handover.Status = req.Status
+    handover.CashierNote = req.CashierNote
+    handover.ConfirmedAt = &now
+    handover.ReconciledAt = &now
+    handover.UpdatedAt = now
+    
+    // 5. Handle discrepancy if exists
+    if handover.HasDiscrepancy() {
+        handover.DiscrepancyReason = req.DiscrepancyReason
+        handover.DiscrepancyResponsibility = req.DiscrepancyResponsibility
+        
+        // Check if requires manager approval
+        if handover.RequiresManagerApproval(s.discrepancyThreshold) {
+            handover.RequiresApproval = true
+            handover.Status = handover.StatusDiscrepancy
+        }
+        
+        // Create discrepancy record
+        if err := s.createDiscrepancyRecord(ctx, handover); err != nil {
+            return err
+        }
+    }
+    
+    // 6. Update handover record
+    if err := s.handoverRepo.Update(ctx, handoverID, handover); err != nil {
+        return err
+    }
+    
+    // 7. If confirmed (and not requiring approval), update cash amounts
+    if req.Status == handover.StatusConfirmed && !handover.RequiresApproval {
+        if err := s.updateCashAmounts(ctx, handover); err != nil {
+            return err
+        }
+    }
+    
+    return nil
+}
+
+func (s *CashHandoverService) createDiscrepancyRecord(ctx context.Context, handover *handover.CashHandover) error {
+    discrepancy := &handover.CashDiscrepancy{
+        HandoverID:              handover.ID,
+        WaiterShiftID:           handover.WaiterShiftID,
+        CashierShiftID:          handover.CashierShiftID,
+        DeclaredAmount:          handover.DeclaredAmount,
+        ActualAmount:            handover.ActualAmount,
+        DiscrepancyAmount:       handover.Discrepancy,
+        DiscrepancyType:         handover.GetDiscrepancyType(),
+        DetailedReason:          handover.DiscrepancyReason,
+        Responsibility:          handover.DiscrepancyResponsibility,
+        ResolutionStatus:        "PENDING",
+        RequiresManagerApproval: handover.RequiresApproval,
+        CreatedAt:               time.Now(),
+        UpdatedAt:               time.Now(),
+    }
+    
+    return s.discrepancyRepo.Create(ctx, discrepancy)
+}
+
+func (s *CashHandoverService) updateCashAmounts(ctx context.Context, handover *handover.CashHandover) error {
+    now := time.Now()
+    
+    // Update waiter shift - use actual amount received
+    waiterShift, _ := s.shiftRepo.FindByID(ctx, handover.WaiterShiftID)
+    waiterShift.HandedOverCash += handover.ActualAmount
+    waiterShift.RemainingCash -= handover.DeclaredAmount  // Reduce by declared amount
+    waiterShift.TotalDiscrepancy += handover.Discrepancy
+    waiterShift.HandoverCount++
+    waiterShift.UpdatedAt = now
+    
+    // Handle END_SHIFT type
+    if handover.HandoverType == handover.TypeEndShift {
+        // Calculate total revenue and orders
+        orders, _ := s.orderRepo.FindByShiftID(ctx, handover.WaiterShiftID)
+        totalRevenue := 0.0
+        for _, o := range orders {
+            if o.Status == order.StatusPaid || o.Status == order.StatusInProgress || o.Status == order.StatusServed {
+                totalRevenue += o.Total
+            }
+        }
+        
+        // End the shift
+        waiterShift.Status = order.ShiftClosed
+        waiterShift.EndCash = handover.EndCash
+        waiterShift.TotalRevenue = totalRevenue
+        waiterShift.TotalOrders = len(orders)
+        waiterShift.EndedAt = &now
+        
+        // Lock completed orders
+        for _, o := range orders {
+            if o.Status == order.StatusServed || o.Status == order.StatusCancelled {
+                o.Status = order.StatusLocked
+                o.LockedAt = &now
+                s.orderRepo.Update(ctx, o.ID, o)
+            }
+        }
+    }
+    
+    s.shiftRepo.Update(ctx, handover.WaiterShiftID, waiterShift)
+    
+    // Update cashier shift
+    cashierShift, _ := s.cashierShiftRepo.FindByID(ctx, handover.CashierShiftID)
+    cashierShift.ReceivedCash += handover.ActualAmount
+    cashierShift.TotalDiscrepancy += handover.Discrepancy
+    cashierShift.HandoverCount++
+    if handover.HasDiscrepancy() {
+        cashierShift.DiscrepancyCount++
+    }
+    cashierShift.UpdatedAt = now
+    
+    s.cashierShiftRepo.Update(ctx, handover.CashierShiftID, cashierShift)
+    
+    return nil
+}
+
+// Manager approval for large discrepancies
+func (s *CashHandoverService) ApproveDiscrepancy(ctx context.Context, handoverID primitive.ObjectID, managerID string, approved bool, note string) error {
+    handover, err := s.handoverRepo.FindByID(ctx, handoverID)
+    if err != nil {
+        return err
+    }
+    
+    if !handover.RequiresApproval {
+        return errors.New("handover does not require approval")
+    }
+    
+    now := time.Now()
+    managerOID, _ := primitive.ObjectIDFromHex(managerID)
+    
+    handover.ApprovedBy = managerOID
+    handover.ApprovedAt = &now
+    handover.UpdatedAt = now
+    
+    if approved {
+        handover.Status = handover.StatusConfirmed
+        // Update cash amounts after approval
+        if err := s.updateCashAmounts(ctx, handover); err != nil {
+            return err
+        }
+    } else {
+        handover.Status = handover.StatusRejected
+        handover.CashierNote += " | Manager rejected: " + note
+    }
+    
+    // Update discrepancy record
+    discrepancy, _ := s.discrepancyRepo.FindByHandoverID(ctx, handoverID)
+    if discrepancy != nil {
+        discrepancy.ManagerApproved = approved
+        discrepancy.ApprovedBy = managerOID
+        discrepancy.ApprovedAt = &now
+        discrepancy.ManagerNote = note
+        discrepancy.ResolutionStatus = "RESOLVED"
+        discrepancy.UpdatedAt = now
+        s.discrepancyRepo.Update(ctx, discrepancy.ID, discrepancy)
+    }
+    
+    return s.handoverRepo.Update(ctx, handoverID, handover)
+}
+
+// Get discrepancy statistics
+func (s *CashHandoverService) GetDiscrepancyStats(ctx context.Context, startDate, endDate time.Time) (*DiscrepancyStats, error) {
+    handovers, err := s.handoverRepo.FindByDateRange(ctx, startDate, endDate)
+    if err != nil {
+        return nil, err
+    }
+    
+    stats := &DiscrepancyStats{
+        TotalHandovers:    len(handovers),
+        TotalDiscrepancy:  0,
+        ShortageCount:     0,
+        OverageCount:      0,
+        ShortageAmount:    0,
+        OverageAmount:     0,
+        RequiredApproval:  0,
+    }
+    
+    for _, h := range handovers {
+        if h.HasDiscrepancy() {
+            stats.TotalDiscrepancy += h.Discrepancy
+            if h.Discrepancy < 0 {
+                stats.ShortageCount++
+                stats.ShortageAmount += -h.Discrepancy
+            } else {
+                stats.OverageCount++
+                stats.OverageAmount += h.Discrepancy
+            }
+            if h.RequiresApproval {
+                stats.RequiredApproval++
+            }
+        }
+    }
+    
+    return stats, nil
+}
+
+type DiscrepancyStats struct {
+    TotalHandovers   int     `json:"total_handovers"`
+    TotalDiscrepancy float64 `json:"total_discrepancy"`
+    ShortageCount    int     `json:"shortage_count"`
+    OverageCount     int     `json:"overage_count"`
+    ShortageAmount   float64 `json:"shortage_amount"`
+    OverageAmount    float64 `json:"overage_amount"`
+    RequiredApproval int     `json:"required_approval"`
+}
+```
 ### 2. Repository Layer
 ```go
 // backend/infrastructure/mongodb/cash_handover_repository.go
@@ -137,6 +602,22 @@ func (r *CashHandoverRepository) Update(ctx context.Context, id primitive.Object
 func (r *CashHandoverRepository) FindByWaiterShift(ctx context.Context, shiftID primitive.ObjectID) ([]*handover.CashHandover, error)
 func (r *CashHandoverRepository) FindByCashierShift(ctx context.Context, shiftID primitive.ObjectID) ([]*handover.CashHandover, error)
 func (r *CashHandoverRepository) FindPendingByCashier(ctx context.Context, cashierID primitive.ObjectID) ([]*handover.CashHandover, error)
+func (r *CashHandoverRepository) FindByDateRange(ctx context.Context, startDate, endDate time.Time) ([]*handover.CashHandover, error)
+func (r *CashHandoverRepository) FindWithDiscrepancies(ctx context.Context) ([]*handover.CashHandover, error)
+func (r *CashHandoverRepository) FindRequiringApproval(ctx context.Context) ([]*handover.CashHandover, error)
+
+// backend/infrastructure/mongodb/cash_discrepancy_repository.go
+type CashDiscrepancyRepository struct {
+    collection *mongo.Collection
+}
+
+func (r *CashDiscrepancyRepository) Create(ctx context.Context, discrepancy *handover.CashDiscrepancy) error
+func (r *CashDiscrepancyRepository) FindByID(ctx context.Context, id primitive.ObjectID) (*handover.CashDiscrepancy, error)
+func (r *CashDiscrepancyRepository) Update(ctx context.Context, id primitive.ObjectID, discrepancy *handover.CashDiscrepancy) error
+func (r *CashDiscrepancyRepository) FindByHandoverID(ctx context.Context, handoverID primitive.ObjectID) (*handover.CashDiscrepancy, error)
+func (r *CashDiscrepancyRepository) FindPendingResolution(ctx context.Context) ([]*handover.CashDiscrepancy, error)
+func (r *CashDiscrepancyRepository) FindRequiringApproval(ctx context.Context) ([]*handover.CashDiscrepancy, error)
+func (r *CashDiscrepancyRepository) FindByDateRange(ctx context.Context, startDate, endDate time.Time) ([]*handover.CashDiscrepancy, error)
 ```
 
 ### 3. Service Layer
@@ -1443,3 +1924,316 @@ Waiter                    System                    Cashier
 ---
 
 Tính năng này đảm bảo tính minh bạch và kiểm soát chặt chẽ trong việc quản lý tiền mặt giữa waiter và cashier, đồng thời tích hợp mượt mà vào quy trình làm việc hiện tại.
+
+---
+
+## 🎨 Frontend Implementation với Đối Soát Chi Tiết
+
+### 1. Waiter Interface - Enhanced ShiftView.vue
+
+#### Partial Handover Modal (Simplified)
+```vue
+<!-- Partial Handover Modal -->
+<transition name="slide-up">
+  <div v-if="showPartialHandoverForm" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
+    <div class="bg-white rounded-t-3xl w-full p-6">
+      <h3 class="text-xl font-bold mb-4">💰 Bàn giao một phần tiền</h3>
+      
+      <!-- Current Cash Info -->
+      <div class="bg-blue-50 p-4 rounded-xl mb-4">
+        <div class="flex justify-between items-center">
+          <span class="text-sm text-gray-600">Tiền hiện có</span>
+          <span class="font-bold text-2xl text-blue-600">{{ formatPrice(currentShift?.remaining_cash || 0) }}</span>
+        </div>
+      </div>
+      
+      <form @submit.prevent="createPartialHandover" class="space-y-4">
+        <!-- Amount Input -->
+        <div>
+          <label class="block text-sm font-medium mb-2">Số tiền bàn giao (VNĐ) *</label>
+          <input v-model.number="partialHandoverForm.declared_amount" 
+            type="number" 
+            :max="currentShift?.remaining_cash || 0"
+            min="1000" 
+            step="1000" 
+            required 
+            class="w-full p-3 border rounded-xl text-lg font-bold focus:ring-2 focus:ring-yellow-500">
+        </div>
+        
+        <!-- Note -->
+        <div>
+          <label class="block text-sm font-medium mb-2">Ghi chú (tùy chọn)</label>
+          <textarea v-model="partialHandoverForm.waiter_note" 
+            rows="3" 
+            class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-yellow-500"
+            placeholder="Ghi chú về việc bàn giao..."></textarea>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="flex gap-2">
+          <button type="button" @click="showPartialHandoverForm = false" 
+            class="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-xl font-medium">
+            Hủy
+          </button>
+          <button type="submit" 
+            class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-3 rounded-xl font-medium">
+            Bàn giao
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</transition>
+```
+
+### 2. Cashier Interface - Enhanced CashierHandoverView.vue
+
+#### Reconciliation Modal với Discrepancy Handling
+```vue
+<!-- Reconciliation Modal -->
+<transition name="slide-up">
+  <div v-if="showReconcileForm" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
+    <div class="bg-white rounded-t-3xl w-full p-6 max-h-[90vh] overflow-y-auto">
+      <h3 class="text-xl font-bold mb-4">🔍 Đối soát bàn giao</h3>
+      
+      <!-- Handover Summary -->
+      <div class="bg-gray-50 p-4 rounded-xl mb-4">
+        <div class="flex justify-between items-center mb-2">
+          <span class="text-sm text-gray-600">Waiter</span>
+          <span class="font-medium">{{ selectedHandover?.waiter_name }}</span>
+        </div>
+        <div class="flex justify-between items-center mb-2">
+          <span class="text-sm text-gray-600">Số tiền khai báo</span>
+          <span class="font-bold text-lg">{{ formatPrice(selectedHandover?.declared_amount || 0) }}</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-sm text-gray-600">Loại bàn giao</span>
+          <span class="text-sm">{{ getHandoverTypeText(selectedHandover?.handover_type) }}</span>
+        </div>
+      </div>
+      
+      <!-- Cash Breakdown Display (if provided) - REMOVED -->
+      
+      <form @submit.prevent="reconcileHandover" class="space-y-4">
+        <!-- Actual Amount Input -->
+        <div>
+          <label class="block text-sm font-medium mb-2">Số tiền thực nhận (VNĐ) *</label>
+          <input v-model.number="reconcileForm.actual_amount" 
+            type="number" 
+            min="0" 
+            step="1000" 
+            required 
+            @input="calculateDiscrepancy"
+            class="w-full p-3 border rounded-xl text-lg font-bold focus:ring-2 focus:ring-blue-500">
+        </div>
+        
+        <!-- Discrepancy Display -->
+        <div v-if="discrepancy !== 0" class="p-4 rounded-xl" :class="discrepancy > 0 ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-sm font-medium">Chênh lệch:</span>
+            <span class="font-bold text-lg" :class="discrepancy > 0 ? 'text-green-600' : 'text-red-600'">
+              {{ discrepancy > 0 ? '+' : '' }}{{ formatPrice(discrepancy) }}
+            </span>
+          </div>
+          <p class="text-xs" :class="discrepancy > 0 ? 'text-green-700' : 'text-red-700'">
+            {{ discrepancy > 0 ? '✅ Thừa tiền' : '⚠️ Thiếu tiền' }}
+          </p>
+        </div>
+        
+        <!-- Discrepancy Reason (if discrepancy exists) -->
+        <div v-if="discrepancy !== 0">
+          <label class="block text-sm font-medium mb-2">Lý do chênh lệch *</label>
+          <select v-model="reconcileForm.discrepancy_reason" required 
+            class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 mb-2">
+            <option value="">-- Chọn lý do --</option>
+            <option value="COUNTING_ERROR">Lỗi đếm tiền</option>
+            <option value="TRANSACTION_ERROR">Lỗi giao dịch</option>
+            <option value="CUSTOMER_ISSUE">Vấn đề khách hàng</option>
+            <option value="SYSTEM_ERROR">Lỗi hệ thống</option>
+            <option value="OTHER">Khác</option>
+          </select>
+          
+          <label class="block text-sm font-medium mb-2">Trách nhiệm</label>
+          <select v-model="reconcileForm.discrepancy_responsibility" required 
+            class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500">
+            <option value="">-- Chọn trách nhiệm --</option>
+            <option value="WAITER">Waiter</option>
+            <option value="CASHIER">Cashier</option>
+            <option value="CUSTOMER">Khách hàng</option>
+            <option value="SYSTEM">Hệ thống</option>
+            <option value="UNKNOWN">Không rõ</option>
+          </select>
+        </div>
+        
+        <!-- Large Discrepancy Warning -->
+        <div v-if="Math.abs(discrepancy) > discrepancyThreshold" class="bg-orange-50 border border-orange-200 p-4 rounded-xl">
+          <div class="flex items-center">
+            <svg class="h-5 w-5 text-orange-400 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+            </svg>
+            <div>
+              <p class="text-sm font-medium text-orange-800">Chênh lệch lớn</p>
+              <p class="text-xs text-orange-700">Cần sự phê duyệt từ quản lý</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Cashier Note -->
+        <div>
+          <label class="block text-sm font-medium mb-2">Ghi chú đối soát</label>
+          <textarea v-model="reconcileForm.cashier_note" 
+            rows="3" 
+            class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500"
+            placeholder="Ghi chú về quá trình đối soát..."></textarea>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="flex gap-2">
+          <button type="button" @click="showReconcileForm = false" 
+            class="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-xl font-medium">
+            Hủy
+          </button>
+          <button type="button" @click="rejectHandover"
+            class="flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-xl font-medium">
+            Từ chối
+          </button>
+          <button type="submit" 
+            class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-xl font-medium">
+            Xác nhận
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</transition>
+```
+
+---
+
+## 🔗 API Endpoints Mở Rộng với Đối Soát
+
+```
+# Waiter Endpoints
+POST   /api/shifts/:id/handover               # Tạo yêu cầu bàn giao với breakdown
+POST   /api/shifts/:id/handover-and-end       # Tạo yêu cầu bàn giao toàn bộ và đóng ca
+GET    /api/shifts/:id/pending-handover       # Lấy handover đang pending của ca
+GET    /api/shifts/:id/handovers              # Lịch sử bàn giao của ca
+DELETE /api/cash-handovers/:id                # Hủy yêu cầu bàn giao (chỉ khi PENDING)
+
+# Cashier Endpoints
+GET    /api/cash-handovers/pending            # Lấy danh sách chờ xác nhận
+GET    /api/cash-handovers/today              # Lấy bàn giao hôm nay
+POST   /api/cash-handovers/:id/reconcile      # Đối soát với actual amount
+POST   /api/cash-handovers/:id/quick-confirm  # Xác nhận nhanh không cần ghi chú
+GET    /api/cash-handovers/discrepancy-stats  # Thống kê chênh lệch
+
+# Manager Endpoints
+GET    /api/cash-handovers/pending-approval   # Chênh lệch cần phê duyệt
+POST   /api/cash-handovers/:id/approve        # Phê duyệt/từ chối chênh lệch
+GET    /api/discrepancies/stats               # Thống kê chênh lệch chi tiết
+GET    /api/discrepancies/history             # Lịch sử chênh lệch
+
+# Shared Endpoints
+GET    /api/cash-handovers/my-requests        # Yêu cầu bàn giao của tôi (waiter)
+GET    /api/cash-handovers/history            # Lịch sử bàn giao (cả hai role)
+```
+
+---
+
+## 🎯 Quy Trình Đối Soát Chi Tiết
+
+### 1. **Waiter Handover Process:**
+```
+1. Waiter khai báo số tiền bàn giao
+2. Tạo handover record với status PENDING
+3. Gửi notification cho cashier
+```
+
+### 2. **Cashier Reconciliation Process:**
+```
+1. Cashier nhận notification
+2. Cashier xem thông tin handover
+3. Cashier đếm tiền thực tế
+4. Cashier nhập actual amount
+5. Hệ thống tự động tính discrepancy
+6. Nếu có chênh lệch:
+   - Cashier chọn lý do và trách nhiệm
+   - Nếu chênh lệch > threshold → cần manager approval
+7. Cashier xác nhận hoặc từ chối
+```
+
+### 3. **Manager Approval Process (nếu cần):**
+```
+1. Manager nhận notification về chênh lệch lớn
+2. Manager xem chi tiết handover và discrepancy
+3. Manager phê duyệt hoặc từ chối với ghi chú
+4. Nếu phê duyệt → cập nhật cash amounts
+5. Nếu từ chối → handover status = REJECTED
+```
+
+### 4. **System Updates:**
+```
+1. Waiter shift: 
+   - handed_over_cash += actual_amount
+   - remaining_cash -= declared_amount
+   - total_discrepancy += discrepancy
+2. Cashier shift:
+   - received_cash += actual_amount
+   - total_discrepancy += discrepancy
+3. Audit trail: Ghi lại tất cả thay đổi
+```
+
+---
+
+## 📊 Báo Cáo Đối Soát & Chênh Lệch
+
+### 1. **Discrepancy Dashboard:**
+- Tổng số lần handover
+- Số lần có chênh lệch
+- Tổng số tiền chênh lệch
+- Phân tích theo nguyên nhân
+- Top waiter/cashier có chênh lệch nhiều
+
+### 2. **Audit Reports:**
+- Chi tiết từng giao dịch handover
+- Timeline đầy đủ với timestamps
+- User actions và approvals
+- Discrepancy resolution tracking
+
+### 3. **Performance Metrics:**
+- Accuracy rate per user
+- Average discrepancy amount
+- Resolution time
+- Manager approval frequency
+
+---
+
+## 🔒 Security & Compliance
+
+### 1. **Data Integrity:**
+- Immutable audit trail
+- Cryptographic signatures cho critical data
+- Backup và recovery procedures
+- Data retention policies
+
+### 2. **Access Control:**
+- Role-based permissions
+- Manager approval workflows
+- Audit log access restrictions
+- Sensitive data encryption
+
+### 3. **Compliance Features:**
+- SOX compliance reporting
+- Financial audit trails
+- Regulatory reporting
+- Data privacy protection
+
+---
+
+Thiết kế đối soát chi tiết này đảm bảo:
+- ✅ **Accuracy**: Đối soát chính xác giữa khai báo và thực tế
+- ✅ **Transparency**: Theo dõi đầy đủ mọi chênh lệch
+- ✅ **Accountability**: Xác định trách nhiệm rõ ràng
+- ✅ **Control**: Manager approval cho chênh lệch lớn
+- ✅ **Audit**: Audit trail hoàn chỉnh cho compliance
+- ✅ **Reporting**: Báo cáo chi tiết và thống kê
