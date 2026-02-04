@@ -40,6 +40,13 @@
           <span class="text-base font-medium text-center">Báo cáo</span>
         </router-link>
 
+        <!-- Discrepancy Management -->
+        <router-link to="/manager/discrepancies" @click="handleNavClick"
+          class="bg-gradient-to-br from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white rounded-xl p-6 flex flex-col items-center justify-center min-h-[120px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+          <div class="text-3xl mb-2">⚖️</div>
+          <span class="text-base font-medium text-center">Phê duyệt chênh lệch</span>
+        </router-link>
+
         <!-- Users Management -->
         <router-link to="/users" @click="handleNavClick"
           class="bg-gradient-to-br from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white rounded-xl p-6 flex flex-col items-center justify-center min-h-[120px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
@@ -90,6 +97,13 @@
           class="bg-gradient-to-br from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white rounded-xl p-4 flex flex-col items-center justify-center min-h-[100px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
           <div class="text-2xl mb-2">📊</div>
           <span class="text-sm font-medium text-center">Báo cáo</span>
+        </router-link>
+
+        <!-- Cash Handovers (Cashier only) -->
+        <router-link v-if="userRole === 'cashier'" to="/cashier/handovers" @click="handleNavClick"
+          class="bg-gradient-to-br from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white rounded-xl p-4 flex flex-col items-center justify-center min-h-[100px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+          <div class="text-2xl mb-2">💰</div>
+          <span class="text-sm font-medium text-center">Bàn giao tiền</span>
         </router-link>
       </div>
     </div>

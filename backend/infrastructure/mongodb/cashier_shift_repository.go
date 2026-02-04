@@ -87,6 +87,19 @@ func (r *CashierShiftRepository) Save(ctx context.Context, shift *cashier.Cashie
 	return err
 }
 
+// Update updates an existing cashier shift by ID.
+// This method follows the same pattern as other repositories.
+func (r *CashierShiftRepository) Update(ctx context.Context, id primitive.ObjectID, shift *cashier.CashierShift) error {
+	shift.UpdatedAt = time.Now()
+	
+	_, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"_id": id},
+		bson.M{"$set": shift},
+	)
+	return err
+}
+
 // FindOpenByCashier finds an open cashier shift for a specific cashier.
 // Returns nil if no open shift is found.
 func (r *CashierShiftRepository) FindOpenByCashier(ctx context.Context, cashierID primitive.ObjectID) (*cashier.CashierShift, error) {

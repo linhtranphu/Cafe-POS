@@ -14,6 +14,8 @@ import ManagerShiftView from '../views/ManagerShiftView.vue'
 import CashierDashboard from '../views/CashierDashboard.vue'
 import CashierReports from '../views/CashierReports.vue'
 import CashierShiftClosure from '../views/CashierShiftClosure.vue'
+import CashierHandoverView from '../views/CashierHandoverView.vue'
+import DiscrepancyApprovalView from '../views/DiscrepancyApprovalView.vue'
 import UserManagementView from '../views/UserManagementView.vue'
 import ProfileView from '../views/ProfileView.vue'
 
@@ -119,10 +121,22 @@ const routes = [
     meta: { requiresAuth: true, requiresCashier: true }
   },
   {
+    path: '/cashier/handovers',
+    name: 'CashierHandovers',
+    component: CashierHandoverView,
+    meta: { requiresAuth: true, requiresCashier: true }
+  },
+  {
     path: '/cashier/shift-closure/:id',
     name: 'CashierShiftClosure',
     component: CashierShiftClosure,
     meta: { requiresAuth: true, requiresCashier: true }
+  },
+  {
+    path: '/manager/discrepancies',
+    name: 'DiscrepancyApproval',
+    component: DiscrepancyApprovalView,
+    meta: { requiresAuth: true, requiresManager: true }
   }
 ]
 

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Cash Handover Frontend</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-item {
+            padding: 10px;
+            margin: 10px 0;
+            border-left: 4px solid #007bff;
+            background-color: #f8f9fa;
+        }
+        .success { border-left-color: #28a745; }
+        .warning { border-left-color: #ffc107; }
+        .error { border-left-color: #dc3545; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        .api-test { margin: 10px 0; }
+        .response { 
+            background: #f8f9fa; 
+            padding: 10px; 
+            border-radius: 4px; 
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Cash Handover Frontend Test</h1>
+    
+    <div class="test-section">
+        <h2>📋 Frontend Components Checklist</h2>
+        <div class="test-item success">✅ ShiftView.vue - Enhanced with handover functionality</div>
+        <div class="test-item success">✅ CashierDashboard.vue - Added handover notifications</div>
+        <div class="test-item success">✅ CashierHandoverView.vue - New dedicated handover management</div>
+        <div class="test-item success">✅ Stores - shift.js, cashier.js, manager.js enhanced</div>
+        <div class="test-item success">✅ Services - shift.js, cashier.js, manager.js with API calls</div>
+        <div class="test-item success">✅ Router - Added /cashier/handovers route</div>
+        <div class="test-item success">✅ Navigation - Added handover link for cashiers</div>
+    </div>
+
+    <div class="test-section">
+        <h2>🎯 Key Features Implemented</h2>
+        
+        <h3>👨‍💼 Waiter Features (ShiftView.vue)</h3>
+        <div class="test-item">💰 Create partial handover</div>
+        <div class="test-item">🏁 Create handover and end shift</div>
+        <div class="test-item">📋 View handover history</div>
+        <div class="test-item">❌ Cancel pending handover</div>
+        <div class="test-item">💵 Cash status display (current, handed over, remaining)</div>
+        
+        <h3>💰 Cashier Features (CashierHandoverView.vue)</h3>
+        <div class="test-item">🔔 Pending handover notifications</div>
+        <div class="test-item">✅ Quick confirm handovers</div>
+        <div class="test-item">⚖️ Reconcile with discrepancy handling</div>
+        <div class="test-item">❌ Reject handovers with reason</div>
+        <div class="test-item">📅 View today's handovers</div>
+        
+        <h3>👨‍💼 Manager Features (Future)</h3>
+        <div class="test-item warning">⏳ Discrepancy approval interface (Phase 4)</div>
+        <div class="test-item warning">⏳ Discrepancy statistics dashboard (Phase 4)</div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔗 API Integration Test</h2>
+        <p>Test the API endpoints (requires backend server running on localhost:3000)</p>
+        
+        <div class="api-test">
+            <button onclick="testLogin()">🔐 Test Login</button>
+            <button onclick="testPendingHandovers()">📋 Test Get Pending Handovers</button>
+            <button onclick="testTodayHandovers()">📅 Test Get Today's Handovers</button>
+            <button onclick="testDiscrepancyStats()">📊 Test Discrepancy Stats</button>
+        </div>
+        
+        <div id="api-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📱 Mobile UI Test</h2>
+        <p>Resize your browser window to test mobile responsiveness:</p>
+        <div class="test-item">📱 Mobile-first design with touch-friendly buttons</div>
+        <div class="test-item">🎨 Consistent styling with existing components</div>
+        <div class="test-item">⚡ Smooth transitions and animations</div>
+        <div class="test-item">🔄 Loading states and error handling</div>
+    </div>
+
+    <div class="test-section">
+        <h2>🚀 Next Steps (Phase 4)</h2>
+        <div class="test-item warning">👨‍💼 Manager discrepancy approval interface</div>
+        <div class="test-item warning">📊 Advanced reporting and analytics</div>
+        <div class="test-item warning">🔔 Real-time notifications (WebSocket)</div>
+        <div class="test-item warning">📈 Performance optimization</div>
+        <div class="test-item warning">🧪 Comprehensive testing suite</div>
+    </div>
+
+    <script>
+        let authToken = '';
+        
+        async function testLogin() {
+            try {
+                const response = await fetch('http://localhost:3000/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: 'admin', password: 'admin123' })
+                });
+                
+                const data = await response.json();
+                if (data.token) {
+                    authToken = data.token;
+                    showResult('Login successful! Token saved.', 'success');
+                } else {
+                    showResult('Login failed: ' + JSON.stringify(data), 'error');
+                }
+            } catch (error) {
+                showResult('Login error: ' + error.message, 'error');
+            }
+        }
+        
+        async function testPendingHandovers() {
+            if (!authToken) {
+                showResult('Please login first!', 'warning');
+                return;
+            }
+            
+            try {
+                const response = await fetch('http://localhost:3000/api/cash-handovers/pending', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                const data = await response.json();
+                showResult('Pending handovers: ' + JSON.stringify(data, null, 2), 'success');
+            } catch (error) {
+                showResult('Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function testTodayHandovers() {
+            if (!authToken) {
+                showResult('Please login first!', 'warning');
+                return;
+            }
+            
+            try {
+                const response = await fetch('http://localhost:3000/api/cash-handovers/today', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                const data = await response.json();
+                showResult('Today handovers: ' + JSON.stringify(data, null, 2), 'success');
+            } catch (error) {
+                showResult('Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function testDiscrepancyStats() {
+            if (!authToken) {
+                showResult('Please login first!', 'warning');
+                return;
+            }
+            
+            try {
+                const response = await fetch('http://localhost:3000/api/cash-handovers/discrepancy-stats', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                const data = await response.json();
+                showResult('Discrepancy stats: ' + JSON.stringify(data, null, 2), 'success');
+            } catch (error) {
+                showResult('Error: ' + error.message, 'error');
+            }
+        }
+        
+        function showResult(message, type) {
+            const resultsDiv = document.getElementById('api-results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `response ${type}`;
+            resultDiv.textContent = message;
+            resultsDiv.appendChild(resultDiv);
+        }
+    </script>
+</body>
+</html>

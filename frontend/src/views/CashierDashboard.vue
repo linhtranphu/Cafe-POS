@@ -38,6 +38,55 @@
       <!-- Cashier Shift Manager -->
       <CashierShiftManager />
 
+      <!-- Handover Notifications -->
+      <div v-if="pendingHandoverCount > 0" class="bg-gradient-to-r from-orange-400 to-red-500 text-white rounded-2xl p-4 mb-4 shadow-lg">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-bold">🔔 Yêu cầu bàn giao</h3>
+            <p class="text-sm text-orange-100">{{ pendingHandoverCount }} yêu cầu chờ xử lý</p>
+          </div>
+          <router-link to="/cashier/handovers" 
+            class="bg-white text-orange-600 px-4 py-2 rounded-xl font-bold text-sm hover:bg-orange-50 active:scale-95 transition-transform">
+            Xem ngay
+          </router-link>
+        </div>
+      </div>
+
+      <!-- Quick Handover Section -->
+      <div v-if="pendingHandovers.length > 0" class="bg-white rounded-2xl p-4 mb-4 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-bold">⚡ Xử lý nhanh</h3>
+          <router-link to="/cashier/handovers" class="text-blue-600 text-sm font-medium">
+            Xem tất cả →
+          </router-link>
+        </div>
+        
+        <div class="space-y-3">
+          <div v-for="handover in pendingHandovers.slice(0, 3)" :key="handover.id" 
+            class="border rounded-xl p-3">
+            <div class="flex justify-between items-start mb-2">
+              <div>
+                <p class="font-medium">{{ handover.waiter_name }}</p>
+                <p class="text-sm text-gray-500">{{ formatPrice(handover.requested_amount) }}</p>
+              </div>
+              <div class="flex gap-2">
+                <button @click="quickConfirmHandover(handover.id)" 
+                  :disabled="handoverLoading"
+                  class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg text-xs font-medium disabled:opacity-50">
+                  ✅
+                </button>
+                <button @click="showRejectModal(handover)" 
+                  :disabled="handoverLoading"
+                  class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-medium disabled:opacity-50">
+                  ❌
+                </button>
+              </div>
+            </div>
+            <p class="text-xs text-gray-600">{{ handover.waiter_notes || 'Không có ghi chú' }}</p>
+          </div>
+        </div>
+      </div>
+
       <!-- Shift Selector - Only Cashier Shifts -->
       <div class="bg-white rounded-2xl p-4 shadow-sm mb-4">
         <label class="block text-sm font-medium text-gray-700 mb-2">📅 Chọn ca thu ngân để xem</label>
@@ -260,13 +309,44 @@
       @confirm="handleReportDiscrepancy"
     />
 
+    <!-- Reject Handover Modal -->
+    <transition name="slide-up">
+      <div v-if="showRejectHandoverModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
+        <div class="bg-white rounded-t-3xl w-full p-6">
+          <h3 class="text-xl font-bold mb-4">❌ Từ chối bàn giao</h3>
+          <div v-if="selectedHandover" class="mb-4">
+            <p class="text-sm text-gray-600">Từ: {{ selectedHandover.waiter_name }}</p>
+            <p class="text-lg font-bold">{{ formatPrice(selectedHandover.requested_amount) }}</p>
+          </div>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium mb-2">Lý do từ chối *</label>
+              <textarea v-model="rejectReason" 
+                class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-red-500" 
+                rows="3" placeholder="Nhập lý do từ chối..." required></textarea>
+            </div>
+            <div class="flex gap-2">
+              <button type="button" @click="showRejectHandoverModal = false" 
+                class="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-xl font-medium">
+                Hủy
+              </button>
+              <button @click="rejectHandover" :disabled="handoverLoading"
+                class="flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-xl font-medium disabled:opacity-50">
+                {{ handoverLoading ? 'Đang xử lý...' : 'Từ chối' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
+
     <!-- Bottom Navigation -->
     <BottomNav />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useCashierStore } from '../stores/cashier'
 import { useCashierShiftStore } from '../stores/cashierShift'
 import BottomNav from '../components/BottomNav.vue'
@@ -287,6 +367,11 @@ const reconciliationForm = ref({
   notes: ''
 })
 
+// Handover states
+const showRejectHandoverModal = ref(false)
+const selectedHandover = ref(null)
+const rejectReason = ref('')
+
 // Computed
 const shiftStatus = computed(() => cashierStore.shiftStatus)
 const cashierShifts = computed(() => cashierShiftStore.cashierShifts)
@@ -297,6 +382,11 @@ const hasReconciliation = computed(() => cashierStore.hasReconciliation)
 const loading = computed(() => cashierStore.loading)
 const error = computed(() => cashierStore.error)
 
+// Handover computed properties
+const pendingHandovers = computed(() => cashierStore.pendingHandovers)
+const pendingHandoverCount = computed(() => cashierStore.pendingHandoverCount)
+const handoverLoading = computed(() => cashierStore.handoverLoading)
+
 // Methods
 const refreshData = async () => {
   if (selectedShift.value) {
@@ -305,7 +395,10 @@ const refreshData = async () => {
       cashierStore.getPaymentsByShift(selectedShift.value)
     ])
   }
-  await cashierStore.getPendingDiscrepancies()
+  await Promise.all([
+    cashierStore.getPendingDiscrepancies(),
+    cashierStore.fetchPendingHandovers()
+  ])
 }
 
 const loadPayments = async () => {
@@ -392,6 +485,40 @@ const performReconciliation = async () => {
 
 const clearError = () => {
   cashierStore.clearError()
+}
+
+// Handover methods
+const quickConfirmHandover = async (handoverId) => {
+  if (confirm('Xác nhận bàn giao với số tiền chính xác?')) {
+    try {
+      await cashierStore.quickConfirm(handoverId, 'Xác nhận nhanh từ dashboard')
+      await refreshData()
+    } catch (error) {
+      console.error('Quick confirm failed:', error)
+    }
+  }
+}
+
+const showRejectModal = (handover) => {
+  selectedHandover.value = handover
+  showRejectHandoverModal.value = true
+}
+
+const rejectHandover = async () => {
+  if (!rejectReason.value.trim()) {
+    alert('Vui lòng nhập lý do từ chối')
+    return
+  }
+  
+  try {
+    await cashierStore.rejectHandover(selectedHandover.value.id, rejectReason.value)
+    showRejectHandoverModal.value = false
+    selectedHandover.value = null
+    rejectReason.value = ''
+    await refreshData()
+  } catch (error) {
+    console.error('Reject handover failed:', error)
+  }
 }
 
 // Utility functions
@@ -490,7 +617,22 @@ const getDifferenceClass = (difference) => {
 onMounted(async () => {
   // Fetch cashier shifts instead of all shifts
   await cashierShiftStore.fetchMyCashierShifts()
-  await cashierStore.getPendingDiscrepancies()
+  await Promise.all([
+    cashierStore.getPendingDiscrepancies(),
+    cashierStore.fetchPendingHandovers()
+  ])
+  
+  // Set up auto-refresh for handovers every 30 seconds
+  const refreshInterval = setInterval(async () => {
+    if (!document.hidden) { // Only refresh when tab is visible
+      await cashierStore.fetchPendingHandovers()
+    }
+  }, 30000)
+  
+  // Cleanup interval on unmount
+  onUnmounted(() => {
+    clearInterval(refreshInterval)
+  })
 })
 </script>
 

@@ -63,6 +63,12 @@ type CashierShift struct {
 	// AuditLog maintains an immutable record of all actions performed during the shift
 	AuditLog []AuditLogEntry `json:"audit_log" bson:"audit_log"`
 
+	// Cash handover tracking fields
+	ReceivedCash     float64 `bson:"received_cash" json:"received_cash"`         // Total cash received from handovers
+	TotalDiscrepancy float64 `bson:"total_discrepancy" json:"total_discrepancy"` // Total discrepancy from handovers
+	HandoverCount    int     `bson:"handover_count" json:"handover_count"`       // Number of handovers received
+	DiscrepancyCount int     `bson:"discrepancy_count" json:"discrepancy_count"` // Number of handovers with discrepancies
+
 	// CreatedAt is when the shift record was created
 	CreatedAt time.Time `json:"created_at" bson:"created_at"`
 
@@ -369,5 +375,20 @@ func (cs *CashierShift) Close(userID, deviceID string, timestamp time.Time) erro
 //   - systemCash: The calculated system cash amount
 func (cs *CashierShift) UpdateSystemCash(systemCash float64) {
 	cs.SystemCash = systemCash
+	cs.UpdatedAt = time.Now()
+}
+
+// UpdateCashAfterHandover updates the cash amounts after receiving a handover
+func (cs *CashierShift) UpdateCashAfterHandover(receivedAmount, discrepancyAmount float64, hasDiscrepancy bool) {
+	cs.ReceivedCash += receivedAmount
+	cs.TotalDiscrepancy += discrepancyAmount
+	cs.HandoverCount++
+	
+	if hasDiscrepancy {
+		cs.DiscrepancyCount++
+	}
+	
+	// Update system cash to include received amount
+	cs.SystemCash += receivedAmount
 	cs.UpdatedAt = time.Now()
 }

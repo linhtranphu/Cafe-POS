@@ -16,11 +16,17 @@ export const useShiftStore = defineStore('shift', {
     // List of shifts (waiter/barista only)
     shifts: [],
     
+    // Cash handover state
+    pendingHandover: null,
+    handoverHistory: [],
+    
     // Loading state
     loading: false,
+    handoverLoading: false,
     
     // Error message
-    error: null
+    error: null,
+    handoverError: null
   }),
 
   getters: {
@@ -62,6 +68,30 @@ export const useShiftStore = defineStore('shift', {
      */
     baristaShifts: (state) => {
       return state.shifts.filter(s => s.role_type === 'barista')
+    },
+
+    /**
+     * Check if current shift has pending handover
+     * @returns {boolean} True if there's a pending handover
+     */
+    hasPendingHandover: (state) => {
+      return state.pendingHandover !== null && state.pendingHandover.status === 'PENDING'
+    },
+
+    /**
+     * Get available cash for handover
+     * @returns {number} Available cash amount
+     */
+    availableCash: (state) => {
+      return state.currentShift?.remaining_cash || 0
+    },
+
+    /**
+     * Check if shift can be ended (no pending handover and remaining cash is 0)
+     * @returns {boolean} True if shift can be ended
+     */
+    canEndShift: (state) => {
+      return !state.pendingHandover && (state.currentShift?.remaining_cash || 0) === 0
     }
   },
 
@@ -191,8 +221,127 @@ export const useShiftStore = defineStore('shift', {
     reset() {
       this.currentShift = null
       this.shifts = []
+      this.pendingHandover = null
+      this.handoverHistory = []
       this.loading = false
+      this.handoverLoading = false
       this.error = null
+      this.handoverError = null
+    },
+
+    // Cash Handover Actions
+
+    /**
+     * Create a cash handover request
+     * @param {string} shiftId - Shift ID
+     * @param {Object} handoverData - Handover data
+     * @returns {Promise<Object>} The created handover
+     */
+    async createCashHandover(shiftId, handoverData) {
+      this.handoverLoading = true
+      this.handoverError = null
+      try {
+        const handover = await shiftService.createCashHandover(shiftId, handoverData)
+        this.pendingHandover = handover
+        // Refresh current shift to update cash amounts
+        await this.fetchCurrentShift()
+        return handover
+      } catch (error) {
+        this.handoverError = error.response?.data?.error || 'Lỗi tạo yêu cầu bàn giao'
+        throw error
+      } finally {
+        this.handoverLoading = false
+      }
+    },
+
+    /**
+     * Create handover and end shift
+     * @param {string} shiftId - Shift ID
+     * @param {Object} handoverData - Handover data
+     * @returns {Promise<Object>} The created handover
+     */
+    async createHandoverAndEndShift(shiftId, handoverData) {
+      this.handoverLoading = true
+      this.handoverError = null
+      try {
+        const handover = await shiftService.createHandoverAndEndShift(shiftId, handoverData)
+        this.pendingHandover = handover
+        // Refresh current shift
+        await this.fetchCurrentShift()
+        return handover
+      } catch (error) {
+        this.handoverError = error.response?.data?.error || 'Lỗi bàn giao và kết ca'
+        throw error
+      } finally {
+        this.handoverLoading = false
+      }
+    },
+
+    /**
+     * Get pending handover for a shift
+     * @param {string} shiftId - Shift ID
+     * @returns {Promise<void>}
+     */
+    async fetchPendingHandover(shiftId) {
+      this.handoverLoading = true
+      this.handoverError = null
+      try {
+        this.pendingHandover = await shiftService.getPendingHandover(shiftId)
+      } catch (error) {
+        this.pendingHandover = null
+        if (error.response?.status !== 404) {
+          this.handoverError = error.response?.data?.error || 'Lỗi tải handover'
+        }
+      } finally {
+        this.handoverLoading = false
+      }
+    },
+
+    /**
+     * Get handover history for a shift
+     * @param {string} shiftId - Shift ID
+     * @returns {Promise<void>}
+     */
+    async fetchHandoverHistory(shiftId) {
+      this.handoverLoading = true
+      this.handoverError = null
+      try {
+        const response = await shiftService.getHandoverHistory(shiftId)
+        this.handoverHistory = response.handovers || []
+      } catch (error) {
+        this.handoverHistory = []
+        this.handoverError = error.response?.data?.error || 'Lỗi tải lịch sử bàn giao'
+      } finally {
+        this.handoverLoading = false
+      }
+    },
+
+    /**
+     * Cancel a handover
+     * @param {string} handoverId - Handover ID
+     * @returns {Promise<void>}
+     */
+    async cancelHandover(handoverId) {
+      this.handoverLoading = true
+      this.handoverError = null
+      try {
+        await shiftService.cancelHandover(handoverId)
+        this.pendingHandover = null
+        // Refresh current shift
+        await this.fetchCurrentShift()
+      } catch (error) {
+        this.handoverError = error.response?.data?.error || 'Lỗi hủy bàn giao'
+        throw error
+      } finally {
+        this.handoverLoading = false
+      }
+    },
+
+    /**
+     * Clear handover error message
+     */
+    clearHandoverError() {
+      this.handoverError = null
     }
   }
 })

@@ -80,6 +80,60 @@ export const shiftService = {
   async getShift(id) {
     const response = await api.get(`/shifts/${id}`)
     return response.data
+  },
+
+  // Cash Handover Functions
+
+  /**
+   * Create a cash handover request
+   * @param {string} shiftId - Shift ID
+   * @param {Object} handoverData - Handover data
+   * @returns {Promise<Object>} The created handover
+   */
+  async createCashHandover(shiftId, handoverData) {
+    const response = await api.post(`/shifts/${shiftId}/handover`, handoverData)
+    return response.data
+  },
+
+  /**
+   * Create handover and end shift
+   * @param {string} shiftId - Shift ID
+   * @param {Object} handoverData - Handover data
+   * @returns {Promise<Object>} The created handover
+   */
+  async createHandoverAndEndShift(shiftId, handoverData) {
+    const response = await api.post(`/shifts/${shiftId}/handover-and-end`, handoverData)
+    return response.data
+  },
+
+  /**
+   * Get pending handover for a shift
+   * @param {string} shiftId - Shift ID
+   * @returns {Promise<Object>} The pending handover
+   */
+  async getPendingHandover(shiftId) {
+    const response = await api.get(`/shifts/${shiftId}/pending-handover`)
+    return response.data
+  },
+
+  /**
+   * Get handover history for a shift
+   * @param {string} shiftId - Shift ID
+   * @returns {Promise<Object>} Handover history response
+   */
+  async getHandoverHistory(shiftId) {
+    const response = await api.get(`/shifts/${shiftId}/handovers`)
+    return response.data
+  },
+
+  /**
+   * Cancel a handover
+   * @param {string} handoverId - Handover ID
+   * @returns {Promise<Object>} Success response
+   */
+  async cancelHandover(handoverId) {
+    const response = await api.delete(`/cash-handovers/${handoverId}`)
+    return response.data
   }
 }
 

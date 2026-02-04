@@ -9,8 +9,17 @@ export const useCashierStore = defineStore('cashier', {
     reconciliation: null,
     reports: [],
     audits: [],
+    
+    // Cash handover state
+    pendingHandovers: [],
+    todayHandovers: [],
+    discrepancyStats: null,
+    discrepancyThreshold: 50000, // VND
+    
     loading: false,
-    error: null
+    handoverLoading: false,
+    error: null,
+    handoverError: null
   }),
 
   getters: {
@@ -36,7 +45,28 @@ export const useCashierStore = defineStore('cashier', {
     
     hasReconciliation: (state) => !!state.reconciliation,
     
-    reconciliationStatus: (state) => state.reconciliation?.status || null
+    reconciliationStatus: (state) => state.reconciliation?.status || null,
+
+    // Cash handover getters
+    pendingHandoverCount: (state) => state.pendingHandovers.length,
+    
+    todayHandoverCount: (state) => state.todayHandovers.length,
+    
+    confirmedHandovers: (state) => 
+      state.todayHandovers.filter(h => h.status === 'CONFIRMED'),
+    
+    discrepancyHandovers: (state) => 
+      state.todayHandovers.filter(h => h.status === 'DISCREPANCY'),
+    
+    rejectedHandovers: (state) => 
+      state.todayHandovers.filter(h => h.status === 'REJECTED'),
+    
+    totalHandoverAmount: (state) => 
+      state.todayHandovers
+        .filter(h => h.status === 'CONFIRMED')
+        .reduce((sum, h) => sum + (h.actual_amount || h.requested_amount), 0),
+    
+    hasDiscrepancyStats: (state) => !!state.discrepancyStats
   },
 
   actions: {
@@ -232,8 +262,150 @@ export const useCashierStore = defineStore('cashier', {
       this.reconciliation = null
       this.reports = []
       this.audits = []
+      this.pendingHandovers = []
+      this.todayHandovers = []
+      this.discrepancyStats = null
       this.loading = false
+      this.handoverLoading = false
       this.error = null
+      this.handoverError = null
+    },
+
+    // Cash Handover Actions
+
+    /**
+     * Fetch pending handovers for cashier
+     * @returns {Promise<void>}
+     */
+    async fetchPendingHandovers() {
+      this.handoverLoading = true
+      this.handoverError = null
+      try {
+        const response = await cashierService.getPendingHandovers()
+        this.pendingHandovers = response.handovers || []
+      } catch (error) {
+        this.pendingHandovers = []
+        this.handoverError = error.response?.data?.error || 'Lỗi tải handovers chờ xử lý'
+      } finally {
+        this.handoverLoading = false
+      }
+    },
+
+    /**
+     * Fetch today's handovers
+     * @returns {Promise<void>}
+     */
+    async fetchTodayHandovers() {
+      this.handoverLoading = true
+      this.handoverError = null
+      try {
+        const response = await cashierService.getTodayHandovers()
+        this.todayHandovers = response.handovers || []
+      } catch (error) {
+        this.todayHandovers = []
+        this.handoverError = error.response?.data?.error || 'Lỗi tải handovers hôm nay'
+      } finally {
+        this.handoverLoading = false
+      }
+    },
+
+    /**
+     * Quick confirm handover with exact amount
+     * @param {string} handoverId - Handover ID
+     * @param {string} cashierNotes - Optional notes
+     * @returns {Promise<void>}
+     */
+    async quickConfirm(handoverId, cashierNotes = '') {
+      this.handoverLoading = true
+      this.handoverError = null
+      try {
+        await cashierService.quickConfirmHandover(handoverId, { cashier_notes: cashierNotes })
+        // Refresh handovers
+        await Promise.all([
+          this.fetchPendingHandovers(),
+          this.fetchTodayHandovers()
+        ])
+      } catch (error) {
+        this.handoverError = error.response?.data?.error || 'Lỗi xác nhận handover'
+        throw error
+      } finally {
+        this.handoverLoading = false
+      }
+    },
+
+    /**
+     * Reconcile handover with actual amount and discrepancy details
+     * @param {string} handoverId - Handover ID
+     * @param {Object} reconcileData - Reconciliation data
+     * @returns {Promise<void>}
+     */
+    async reconcileHandover(handoverId, reconcileData) {
+      this.handoverLoading = true
+      this.handoverError = null
+      try {
+        await cashierService.reconcileHandover(handoverId, reconcileData)
+        // Refresh handovers
+        await Promise.all([
+          this.fetchPendingHandovers(),
+          this.fetchTodayHandovers()
+        ])
+      } catch (error) {
+        this.handoverError = error.response?.data?.error || 'Lỗi đối soát handover'
+        throw error
+      } finally {
+        this.handoverLoading = false
+      }
+    },
+
+    /**
+     * Reject handover
+     * @param {string} handoverId - Handover ID
+     * @param {string} reason - Rejection reason
+     * @returns {Promise<void>}
+     */
+    async rejectHandover(handoverId, reason) {
+      this.handoverLoading = true
+      this.handoverError = null
+      try {
+        await cashierService.rejectHandover(handoverId, { reason })
+        // Refresh handovers
+        await Promise.all([
+          this.fetchPendingHandovers(),
+          this.fetchTodayHandovers()
+        ])
+      } catch (error) {
+        this.handoverError = error.response?.data?.error || 'Lỗi từ chối handover'
+        throw error
+      } finally {
+        this.handoverLoading = false
+      }
+    },
+
+    /**
+     * Get discrepancy statistics
+     * @param {string} startDate - Start date (YYYY-MM-DD)
+     * @param {string} endDate - End date (YYYY-MM-DD)
+     * @returns {Promise<void>}
+     */
+    async getDiscrepancyStats(startDate, endDate) {
+      this.handoverLoading = true
+      this.handoverError = null
+      try {
+        const response = await cashierService.getDiscrepancyStats(startDate, endDate)
+        this.discrepancyStats = response.stats
+      } catch (error) {
+        this.discrepancyStats = null
+        this.handoverError = error.response?.data?.error || 'Lỗi tải thống kê chênh lệch'
+      } finally {
+        this.handoverLoading = false
+      }
+    },
+
+    /**
+     * Clear handover error message
+     */
+    clearHandoverError() {
+      this.handoverError = null
     }
   }
 })

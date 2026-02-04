@@ -1,6 +1,7 @@
 package order
 
 import (
+	"errors"
 	"time"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -69,6 +70,14 @@ type Shift struct {
 	EndCash       float64            `bson:"end_cash" json:"end_cash"`
 	TotalRevenue  float64            `bson:"total_revenue" json:"total_revenue"`
 	TotalOrders   int                `bson:"total_orders" json:"total_orders"`
+	
+	// Cash handover tracking fields
+	CurrentCash      float64 `bson:"current_cash" json:"current_cash"`           // Current cash amount in possession
+	HandedOverCash   float64 `bson:"handed_over_cash" json:"handed_over_cash"`   // Total amount handed over to cashiers
+	RemainingCash    float64 `bson:"remaining_cash" json:"remaining_cash"`       // Cash remaining after handovers
+	TotalDiscrepancy float64 `bson:"total_discrepancy" json:"total_discrepancy"` // Total discrepancy from all handovers
+	HandoverCount    int     `bson:"handover_count" json:"handover_count"`       // Number of handovers made
+	
 	StartedAt     time.Time          `bson:"started_at" json:"started_at"`
 	EndedAt       *time.Time         `bson:"ended_at,omitempty" json:"ended_at,omitempty"`
 	CreatedAt     time.Time          `bson:"created_at" json:"created_at"`
@@ -84,4 +93,35 @@ type StartShiftRequest struct {
 
 type EndShiftRequest struct {
 	EndCash float64 `json:"end_cash" binding:"min=0"`
+}
+
+// UpdateCashAfterHandover updates the cash amounts after a handover
+func (s *Shift) UpdateCashAfterHandover(handedOverAmount, discrepancyAmount float64) {
+	s.HandedOverCash += handedOverAmount
+	s.TotalDiscrepancy += discrepancyAmount
+	s.HandoverCount++
+	s.RemainingCash = s.CurrentCash - s.HandedOverCash
+	s.UpdatedAt = time.Now()
+}
+
+// CanHandover checks if the shift can perform a handover of the specified amount
+func (s *Shift) CanHandover(amount float64) error {
+	if s.Status != ShiftOpen {
+		return errors.New("cannot handover cash from closed shift")
+	}
+	
+	if amount <= 0 {
+		return errors.New("handover amount must be greater than 0")
+	}
+	
+	if amount > s.RemainingCash {
+		return errors.New("handover amount exceeds remaining cash")
+	}
+	
+	return nil
+}
+
+// GetAvailableCash returns the amount of cash available for handover
+func (s *Shift) GetAvailableCash() float64 {
+	return s.RemainingCash
 }

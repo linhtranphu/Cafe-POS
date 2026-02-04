@@ -33,8 +33,8 @@ const navItems = computed(() => {
     return [
       { path: '/dashboard', icon: '🏠', label: 'Dashboard' },
       { path: '/manager/shifts', icon: '⏰', label: 'Quản lý ca' },
+      { path: '/manager/discrepancies', icon: '⚖️', label: 'Phê duyệt' },
       { path: '/cashier/reports', icon: '📊', label: 'Báo cáo' },
-      { path: '/users', icon: '👥', label: 'Nhân viên' },
       { path: '/profile', icon: '👤', label: 'Cá nhân' }
     ]
   }
