@@ -48,6 +48,9 @@ func main() {
 	cashReconciliationRepo := mongodb.NewCashReconciliationRepository(db)
 	paymentDiscrepancyRepo := mongodb.NewPaymentDiscrepancyRepository(db)
 	paymentAuditRepo := mongodb.NewPaymentAuditRepository(db)
+	// Handover repositories
+	cashHandoverRepo := mongodb.NewCashHandoverRepository(db)
+	cashDiscrepancyRepo := mongodb.NewCashDiscrepancyRepository(db)
 
 	// State Machine Manager
 	smManager := domain.NewStateMachineManager()
@@ -68,6 +71,8 @@ func main() {
 	cashReconciliationService := services.NewCashReconciliationService(cashReconciliationRepo, shiftRepo, orderRepo)
 	paymentOversightService := services.NewPaymentOversightService(orderRepo, paymentDiscrepancyRepo, paymentAuditRepo)
 	cashierReportService := services.NewCashierReportService(orderRepo, cashReconciliationRepo, shiftRepo, paymentAuditRepo)
+	// Handover service
+	cashHandoverService := services.NewCashHandoverService(cashHandoverRepo, cashDiscrepancyRepo, shiftRepo, cashierShiftRepo, orderRepo)
 
 	// Handlers
 	authHandler := http.NewAuthHandler(authService)
@@ -78,6 +83,8 @@ func main() {
 	cashierShiftHandler := http.NewCashierShiftHandler(cashierShiftService)
 	cashierShiftClosureHandler := http.NewCashierShiftClosureHandler(cashierShiftService, smManager)
 	cashierHandler := http.NewCashierHandler(cashReconciliationService, paymentOversightService, cashierReportService)
+	// Handover handler
+	cashHandoverHandler := http.NewCashHandoverHandler(cashHandoverService)
 	// State machine handler
 	stateMachineHandler := http.NewStateMachineHandler(smManager)
 	menuRepo := mongodb.NewMenuRepository(db)
@@ -143,6 +150,31 @@ func main() {
 				shifts.GET("/current", shiftHandler.GetCurrentShift)
 				shifts.GET("/my", shiftHandler.GetMyShifts)
 				shifts.GET("/:id", shiftHandler.GetShift)
+				
+				// Cash handover routes (waiter)
+				shifts.POST("/:id/handover", cashHandoverHandler.CreateHandover)
+				shifts.POST("/:id/handover-and-end", cashHandoverHandler.CreateHandoverAndEndShift)
+				shifts.GET("/:id/pending-handover", cashHandoverHandler.GetPendingHandover)
+				shifts.GET("/:id/handovers", cashHandoverHandler.GetHandoverHistory)
+			}
+			
+			// Cash handover management
+			cashHandovers := protected.Group("/cash-handovers")
+			{
+				// Cashier routes
+				cashHandovers.GET("/pending", http.RequireRole(user.RoleCashier, user.RoleManager), cashHandoverHandler.GetPendingHandovers)
+				cashHandovers.GET("/all-pending", http.RequireRole(user.RoleCashier, user.RoleManager), cashHandoverHandler.GetAllPendingHandovers)
+				cashHandovers.GET("/today", http.RequireRole(user.RoleCashier, user.RoleManager), cashHandoverHandler.GetTodayHandovers)
+				cashHandovers.POST("/:id/confirm", http.RequireRole(user.RoleCashier, user.RoleManager), cashHandoverHandler.ConfirmHandover)
+				cashHandovers.POST("/:id/quick-confirm", http.RequireRole(user.RoleCashier, user.RoleManager), cashHandoverHandler.QuickConfirm)
+				
+				// Waiter can cancel their own pending handover
+				cashHandovers.DELETE("/:id", cashHandoverHandler.CancelHandover)
+				
+				// Manager routes
+				cashHandovers.GET("/pending-approval", http.RequireRole(user.RoleManager), cashHandoverHandler.GetPendingApprovals)
+				cashHandovers.POST("/:id/approve", http.RequireRole(user.RoleManager), cashHandoverHandler.ApproveDiscrepancy)
+				cashHandovers.GET("/discrepancy-stats", http.RequireRole(user.RoleManager), cashHandoverHandler.GetDiscrepancyStats)
 			}
 			
 			// Cashier shift management - separate from waiter/barista shifts
@@ -239,7 +271,6 @@ func main() {
 				cashier.POST("/orders/:id/lock", cashierHandler.LockOrder)
 				cashier.GET("/reports/shift/:id", cashierHandler.GenerateShiftReport)
 				cashier.GET("/reports/daily", cashierHandler.GetDailyReport)
-				cashier.POST("/handover", cashierHandler.HandoverShift)
 				cashier.GET("/orders/:id/audits", cashierHandler.GetOrderAudits)
 			}
 

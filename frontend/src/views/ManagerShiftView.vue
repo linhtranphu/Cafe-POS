@@ -1,5 +1,11 @@
 <template>
   <div class="min-h-screen bg-gray-50">
+    <!-- Pull to Refresh Indicator -->
+    <PullToRefresh 
+      :pull-distance="pullDistance" 
+      :is-refreshing="isRefreshing"
+      :threshold="80" />
+    
     <!-- Mobile Header - Fixed -->
     <div class="sticky top-0 z-40 bg-white shadow-sm">
       <div class="px-4 py-3">
@@ -371,6 +377,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useShiftStore } from '../stores/shift'
 import { useCashierShiftStore } from '../stores/cashierShift'
 import BottomNav from '../components/BottomNav.vue'
+import PullToRefresh from '../components/PullToRefresh.vue'
+import { usePullToRefresh } from '../composables/usePullToRefresh'
 import { formatDate, formatDateTime, formatPrice } from '../utils/formatters'
 
 const shiftStore = useShiftStore()
@@ -443,6 +451,9 @@ const refreshData = async () => {
     cashierShiftStore.fetchAllShifts()
   ])
 }
+
+// Pull to refresh
+const { pullDistance, isRefreshing } = usePullToRefresh(refreshData)
 
 const getRoleTypeText = (roleType) => {
   const roles = {

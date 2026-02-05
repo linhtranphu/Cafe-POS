@@ -1,5 +1,11 @@
 <template>
   <div class="h-screen w-screen overflow-hidden flex flex-col bg-gray-50">
+    <!-- Pull to Refresh Indicator -->
+    <PullToRefresh 
+      :pull-distance="pullDistance" 
+      :is-refreshing="isRefreshing"
+      :threshold="80" />
+    
     <!-- Mobile Header - Fixed -->
     <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
       <div class="px-4 py-4">
@@ -400,6 +406,8 @@ import { useShiftStore } from '../stores/shift'
 import { useOrderStore } from '../stores/order'
 import { useBaristaStore } from '../stores/barista'
 import BottomNav from '../components/BottomNav.vue'
+import PullToRefresh from '../components/PullToRefresh.vue'
+import { usePullToRefresh } from '../composables/usePullToRefresh'
 
 const authStore = useAuthStore()
 const shiftStore = useShiftStore()
@@ -651,11 +659,8 @@ const getStatusText = (status) => {
   return texts[status] || status
 }
 
-// Lifecycle
-onMounted(async () => {
-  updateTime()
-  timeInterval = setInterval(updateTime, 1000)
-  
+// Refresh data function
+const refreshData = async () => {
   // Manager doesn't need shift data
   if (user.value?.role === 'manager') {
     await orderStore.fetchOrders()
@@ -683,6 +688,16 @@ onMounted(async () => {
       orderStore.fetchOrders()
     ])
   }
+}
+
+// Pull to refresh
+const { pullDistance, isRefreshing } = usePullToRefresh(refreshData)
+
+// Lifecycle
+onMounted(async () => {
+  updateTime()
+  timeInterval = setInterval(updateTime, 1000)
+  await refreshData()
 })
 
 onUnmounted(() => {

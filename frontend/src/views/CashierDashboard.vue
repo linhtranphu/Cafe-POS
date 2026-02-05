@@ -1,5 +1,11 @@
 <template>
   <div class="min-h-screen bg-gray-50">
+    <!-- Pull to Refresh Indicator -->
+    <PullToRefresh 
+      :pull-distance="pullDistance" 
+      :is-refreshing="isRefreshing"
+      :threshold="80" />
+    
     <!-- Mobile Header - Fixed -->
     <div class="sticky top-0 z-40 bg-white shadow-sm">
       <div class="px-4 py-4">
@@ -35,27 +41,53 @@
         </div>
       </div>
 
+      <!-- Quick Access: Handover Management -->
+      <div class="bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-2xl p-6 shadow-lg mb-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-xl font-bold mb-2">💰 Quản lý bàn giao</h3>
+            <p class="text-sm opacity-90">Xác nhận bàn giao từ phục vụ</p>
+          </div>
+          <button 
+            @click="$router.push('/cashier/handovers')"
+            class="bg-white text-orange-600 px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl active:scale-95 transition-all">
+            Xem ngay →
+          </button>
+        </div>
+      </div>
+
       <!-- Cashier Shift Manager -->
       <CashierShiftManager />
 
-      <!-- Shift Selector - Only Cashier Shifts -->
+      <!-- Shift Selector - Waiter Shifts for Payment Monitoring -->
       <div class="bg-white rounded-2xl p-4 shadow-sm mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-2">📅 Chọn ca thu ngân để xem</label>
+        <label class="block text-sm font-medium text-gray-700 mb-2">📅 Chọn ca phục vụ để xem thanh toán</label>
+        <p class="text-xs text-gray-500 mb-2">💡 Chọn ca của waiter để xem các thanh toán trong ca đó</p>
+        
+        <!-- Debug info -->
+        <p v-if="waiterShifts.length === 0" class="text-xs text-red-500 mb-2">
+          ⚠️ Không có ca phục vụ nào. Waiter cần mở ca trước.
+        </p>
+        
         <select 
           v-model="selectedShift" 
           @change="loadPayments" 
           class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-yellow-500"
         >
-          <option value="">-- Chọn ca thu ngân --</option>
-          <option v-for="shift in cashierShifts" :key="shift.id" :value="shift.id">
-            {{ formatDate(shift.start_time) }} - {{ shift.cashier_name }} - {{ getStatusText(shift.status) }}
+          <option value="">-- Chọn ca phục vụ --</option>
+          <option v-for="shift in waiterShifts" :key="shift.id" :value="shift.id">
+            {{ formatDate(shift.started_at) }} - 
+            {{ shift.user_name }} 
+            ({{ shift.role_type }}) - 
+            {{ getStatusText(shift.status) }}
           </option>
         </select>
       </div>
 
-      <!-- Shift Status Card -->
+      <!-- Shift Status Card - Shows stats of selected waiter shift -->
       <div v-if="shiftStatus" class="bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-2xl p-6 shadow-lg mb-4">
-        <h2 class="text-lg font-bold mb-4">📊 Tổng quan ca làm</h2>
+        <h2 class="text-lg font-bold mb-4">📊 Tổng quan ca phục vụ</h2>
+        <p class="text-xs opacity-90 mb-3">Thống kê của ca đang xem</p>
         <div class="grid grid-cols-2 gap-3">
           <div class="bg-white/20 rounded-xl p-3 backdrop-blur-sm">
             <div class="text-2xl font-bold">{{ shiftStatus.total_orders }}</div>
@@ -119,8 +151,20 @@
         </div>
       </div>
 
-      <!-- Cash Reconciliation -->
-      <div v-if="selectedShift" class="bg-white rounded-2xl p-4 shadow-sm mb-4">
+      <!-- Cash Reconciliation - DISABLED in Distribution Model -->
+      <!-- 
+        In distribution model:
+        - Waiter collects cash and holds it in their shift
+        - Cashier receives cash via handover process
+        - Cashier does NOT reconcile waiter's cash
+        - Reconciliation happens during handover confirmation
+        
+        This section is hidden because:
+        1. Selected shift is a WAITER shift (not cashier's own shift)
+        2. Cashier cannot reconcile cash they don't physically hold
+        3. Cash reconciliation happens in handover flow instead
+      -->
+      <div v-if="false" class="bg-white rounded-2xl p-4 shadow-sm mb-4">
         <h2 class="text-lg font-bold text-gray-800 mb-4">💰 Đối soát tiền mặt</h2>
         
         <div v-if="!hasReconciliation" class="space-y-4">
@@ -269,13 +313,19 @@
 import { ref, computed, onMounted } from 'vue'
 import { useCashierStore } from '../stores/cashier'
 import { useCashierShiftStore } from '../stores/cashierShift'
+import { useShiftStore } from '../stores/shift'
 import BottomNav from '../components/BottomNav.vue'
+import PullToRefresh from '../components/PullToRefresh.vue'
+import { usePullToRefresh } from '../composables/usePullToRefresh'
 import CashierShiftManager from '../components/CashierShiftManager.vue'
 import OverridePaymentModal from '../components/OverridePaymentModal.vue'
 import DiscrepancyModal from '../components/DiscrepancyModal.vue'
+import { SHIFT_STATUS, CASHIER_SHIFT_STATUS, SHIFT_TYPE } from '../constants/shift'
+import { ORDER_STATUS, PAYMENT_METHOD } from '../constants/order'
 
 const cashierStore = useCashierStore()
 const cashierShiftStore = useCashierShiftStore()
+const shiftStore = useShiftStore()
 
 const selectedShift = ref('')
 const showOverride = ref(false)
@@ -290,12 +340,16 @@ const reconciliationForm = ref({
 // Computed
 const shiftStatus = computed(() => cashierStore.shiftStatus)
 const cashierShifts = computed(() => cashierShiftStore.cashierShifts)
+const waiterShifts = computed(() => shiftStore.shifts) // All shifts including waiter shifts
 const payments = computed(() => cashierStore.payments)
 const pendingDiscrepancies = computed(() => cashierStore.pendingDiscrepancies)
 const reconciliation = computed(() => cashierStore.reconciliation)
 const hasReconciliation = computed(() => cashierStore.hasReconciliation)
 const loading = computed(() => cashierStore.loading)
 const error = computed(() => cashierStore.error)
+
+// Pull to refresh
+const { pullDistance, isRefreshing } = usePullToRefresh(refreshData)
 
 // Methods
 const refreshData = async () => {
@@ -306,6 +360,7 @@ const refreshData = async () => {
     ])
   }
   await cashierStore.getPendingDiscrepancies()
+  await cashierStore.fetchPendingHandovers()
 }
 
 const loadPayments = async () => {
@@ -424,58 +479,61 @@ const formatDateTime = (date) => {
 }
 
 const getStatusText = (status) => {
-  // Handle both shift status and order status
+  // Handle both shift status and order status using constants
   const statusMap = {
     // Shift statuses
-    'OPEN': '🟢 Đang mở',
-    'CLOSURE_INITIATED': '🟡 Đang đóng',
-    'CLOSED': '🔴 Đã đóng',
+    [SHIFT_STATUS.OPEN]: '🟢 Đang mở',
+    [SHIFT_STATUS.CLOSED]: '🔴 Đã đóng',
+    // Cashier Shift statuses
+    [CASHIER_SHIFT_STATUS.OPEN]: '🟢 Đang mở',
+    [CASHIER_SHIFT_STATUS.CLOSURE_INITIATED]: '🟡 Đang đóng',
+    [CASHIER_SHIFT_STATUS.CLOSED]: '🔴 Đã đóng',
     // Order statuses
-    'PAID': '✓ Đã thu',
-    'QUEUED': '⏳ Chờ pha',
-    'IN_PROGRESS': '🍹 Đang pha',
-    'READY': '✅ Sẵn sàng',
-    'SERVED': '🎯 Hoàn tất',
-    'LOCKED': '🔒 Đã khóa'
+    [ORDER_STATUS.PAID]: '✓ Đã thu',
+    [ORDER_STATUS.QUEUED]: '⏳ Chờ pha',
+    [ORDER_STATUS.IN_PROGRESS]: '🍹 Đang pha',
+    [ORDER_STATUS.READY]: '✅ Sẵn sàng',
+    [ORDER_STATUS.SERVED]: '🎯 Hoàn tất',
+    [ORDER_STATUS.LOCKED]: '🔒 Đã khóa'
   }
   return statusMap[status] || status
 }
 
 const getShiftTypeText = (type) => {
   const types = {
-    MORNING: '☀️ Ca sáng',
-    AFTERNOON: '🌤️ Ca chiều',
-    EVENING: '🌙 Ca tối'
+    [SHIFT_TYPE.MORNING]: '☀️ Ca sáng',
+    [SHIFT_TYPE.AFTERNOON]: '🌤️ Ca chiều',
+    [SHIFT_TYPE.EVENING]: '🌙 Ca tối'
   }
   return types[type] || type
 }
 
 const getPaymentMethodBadge = (method) => {
   const badges = {
-    CASH: 'px-2 py-1 text-xs rounded-full bg-green-100 text-green-700 font-medium',
-    TRANSFER: 'px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-700 font-medium',
-    QR: 'px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 font-medium'
+    [PAYMENT_METHOD.CASH]: 'px-2 py-1 text-xs rounded-full bg-green-100 text-green-700 font-medium',
+    [PAYMENT_METHOD.TRANSFER]: 'px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-700 font-medium',
+    [PAYMENT_METHOD.QR]: 'px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 font-medium'
   }
   return badges[method] || 'px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700 font-medium'
 }
 
 const getPaymentMethodText = (method) => {
   const texts = {
-    CASH: '💵 Tiền mặt',
-    TRANSFER: '💳 CK',
-    QR: '📱 QR'
+    [PAYMENT_METHOD.CASH]: '💵 Tiền mặt',
+    [PAYMENT_METHOD.TRANSFER]: '💳 CK',
+    [PAYMENT_METHOD.QR]: '📱 QR'
   }
   return texts[method] || method
 }
 
 const getStatusBadge = (status) => {
   const badges = {
-    PAID: 'px-3 py-1 text-xs rounded-full bg-green-100 text-green-700 font-medium inline-block',
-    QUEUED: 'px-3 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700 font-medium inline-block',
-    IN_PROGRESS: 'px-3 py-1 text-xs rounded-full bg-blue-100 text-blue-700 font-medium inline-block',
-    READY: 'px-3 py-1 text-xs rounded-full bg-purple-100 text-purple-700 font-medium inline-block',
-    SERVED: 'px-3 py-1 text-xs rounded-full bg-green-100 text-green-700 font-medium inline-block',
-    LOCKED: 'px-3 py-1 text-xs rounded-full bg-red-100 text-red-700 font-medium inline-block'
+    [ORDER_STATUS.PAID]: 'px-3 py-1 text-xs rounded-full bg-green-100 text-green-700 font-medium inline-block',
+    [ORDER_STATUS.QUEUED]: 'px-3 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700 font-medium inline-block',
+    [ORDER_STATUS.IN_PROGRESS]: 'px-3 py-1 text-xs rounded-full bg-blue-100 text-blue-700 font-medium inline-block',
+    [ORDER_STATUS.READY]: 'px-3 py-1 text-xs rounded-full bg-purple-100 text-purple-700 font-medium inline-block',
+    [ORDER_STATUS.SERVED]: 'px-3 py-1 text-xs rounded-full bg-green-100 text-green-700 font-medium inline-block',
+    [ORDER_STATUS.LOCKED]: 'px-3 py-1 text-xs rounded-full bg-red-100 text-red-700 font-medium inline-block'
   }
   return badges[status] || 'px-3 py-1 text-xs rounded-full bg-gray-100 text-gray-700 font-medium inline-block'
 }
@@ -488,9 +546,14 @@ const getDifferenceClass = (difference) => {
 
 // Lifecycle
 onMounted(async () => {
-  // Fetch cashier shifts instead of all shifts
+  // Fetch cashier shifts for cashier shift manager
   await cashierShiftStore.fetchMyCashierShifts()
+  // Fetch all shifts (including waiter shifts) for payment monitoring
+  await shiftStore.fetchAllShifts()
+  console.log('DEBUG: Waiter shifts loaded:', shiftStore.shifts)
+  console.log('DEBUG: First shift structure:', shiftStore.shifts[0])
   await cashierStore.getPendingDiscrepancies()
+  await cashierStore.fetchPendingHandovers()
 })
 </script>
 

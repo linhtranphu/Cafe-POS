@@ -6,11 +6,16 @@
         :key="item.path"
         @click="navigate(item.path)"
         :class="[
-          'flex flex-col items-center py-2 px-4 rounded-lg transition-colors',
+          'flex flex-col items-center py-2 px-4 rounded-lg transition-colors relative',
           isActive(item.path) ? 'text-blue-500' : 'text-gray-600'
         ]">
         <span class="text-2xl mb-1">{{ item.icon }}</span>
         <span class="text-xs font-medium">{{ item.label }}</span>
+        <!-- Badge for pending items -->
+        <span v-if="item.badge && item.badge > 0" 
+          class="absolute top-1 right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+          {{ item.badge > 9 ? '9+' : item.badge }}
+        </span>
       </button>
     </div>
   </div>
@@ -20,10 +25,12 @@
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { useCashierStore } from '../stores/cashier'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const cashierStore = useCashierStore()
 
 const navItems = computed(() => {
   const role = authStore.user?.role
@@ -49,11 +56,12 @@ const navItems = computed(() => {
     ]
   }
 
-  // Cashier navigation
+  // Cashier navigation with badge
   if (role === 'cashier') {
+    const pendingCount = cashierStore.pendingHandovers?.length || 0
     return [
       { path: '/dashboard', icon: '🏠', label: 'Trang chủ' },
-      { path: '/cashier', icon: '💰', label: 'Thu ngân' },
+      { path: '/cashier', icon: '💰', label: 'Thu ngân', badge: pendingCount },
       { path: '/orders', icon: '📋', label: 'Orders' },
       { path: '/shifts', icon: '⏰', label: 'Ca làm' },
       { path: '/profile', icon: '👤', label: 'Cá nhân' }

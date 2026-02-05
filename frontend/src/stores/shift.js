@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { shiftService } from '../services/shift'
+import { handoverService } from '../services/handover'
 
 /**
  * Shift Store
@@ -193,6 +194,99 @@ export const useShiftStore = defineStore('shift', {
       this.shifts = []
       this.loading = false
       this.error = null
+    },
+
+    // ==================== CASH HANDOVER METHODS ====================
+
+    /**
+     * Create a cash handover request (partial or full)
+     * @param {string} shiftId - Waiter shift ID
+     * @param {Object} handoverData - { declared_amount, handover_type, waiter_note }
+     * @returns {Promise<Object>} The created handover
+     */
+    async createCashHandover(shiftId, handoverData) {
+      this.error = null
+      try {
+        const response = await handoverService.createHandover(shiftId, handoverData)
+        return response.data
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi tạo yêu cầu bàn giao'
+        throw error
+      }
+    },
+
+    /**
+     * Create handover and end shift in one action
+     * @param {string} shiftId - Waiter shift ID
+     * @param {Object} handoverData - { declared_amount, waiter_note, end_cash }
+     * @returns {Promise<Object>} The created handover
+     */
+    async createHandoverAndEndShift(shiftId, handoverData) {
+      this.error = null
+      try {
+        const response = await handoverService.createHandoverAndEndShift(shiftId, handoverData)
+        // Clear current shift since it will be closed after cashier confirms
+        this.currentShift = null
+        return response.data
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi bàn giao và đóng ca'
+        throw error
+      }
+    },
+
+    /**
+     * Get pending handover for a shift
+     * @param {string} shiftId - Waiter shift ID
+     * @returns {Promise<Object|null>} Pending handover or null
+     */
+    async getPendingHandover(shiftId) {
+      try {
+        const response = await handoverService.getPendingHandover(shiftId)
+        // Normalize response - backend may return {handover: null} or handover object directly
+        const data = response.data
+        if (data && data.handover === null) {
+          return null
+        }
+        return data || null
+      } catch (error) {
+        // Return null if no pending handover (not an error)
+        if (error.response?.status === 404) {
+          return null
+        }
+        console.error('Error fetching pending handover:', error)
+        return null
+      }
+    },
+
+    /**
+     * Get handover history for a shift
+     * @param {string} shiftId - Waiter shift ID
+     * @returns {Promise<Array>} Array of handovers
+     */
+    async getHandoverHistory(shiftId) {
+      try {
+        const response = await handoverService.getHandoverHistory(shiftId)
+        return response.data || []
+      } catch (error) {
+        console.error('Error fetching handover history:', error)
+        return []
+      }
+    },
+
+    /**
+     * Cancel a pending handover
+     * @param {string} handoverId - Handover ID
+     * @returns {Promise<Object>} Success message
+     */
+    async cancelHandover(handoverId) {
+      this.error = null
+      try {
+        const response = await handoverService.cancelHandover(handoverId)
+        return response.data
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi hủy bàn giao'
+        throw error
+      }
     }
   }
 })

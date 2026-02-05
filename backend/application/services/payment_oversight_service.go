@@ -39,12 +39,15 @@ type PaymentSummary struct {
 }
 
 // FR-CASH-04: Giám sát thanh toán
+// In distribution model: Cashier monitors payments from waiter shifts
+// Orders belong to waiter shifts, cashier receives cash via handovers
 func (s *PaymentOversightService) GetPaymentsByShift(shiftID string) ([]*PaymentSummary, error) {
 	shiftObjID, err := primitive.ObjectIDFromHex(shiftID)
 	if err != nil {
 		return nil, errors.New("invalid shift ID")
 	}
 
+	// Find orders by waiter shift ID
 	orders, err := s.orderRepo.FindByShiftID(context.Background(), shiftObjID)
 	if err != nil {
 		return nil, err
@@ -52,7 +55,9 @@ func (s *PaymentOversightService) GetPaymentsByShift(shiftID string) ([]*Payment
 
 	var payments []*PaymentSummary
 	for _, ord := range orders {
-		if ord.Status == order.StatusPaid || ord.Status == order.StatusInProgress || ord.Status == order.StatusServed {
+		// Include all paid orders
+		if ord.Status == order.StatusPaid || ord.Status == order.StatusInProgress || 
+		   ord.Status == order.StatusServed || ord.Status == order.StatusQueued {
 			payment := &PaymentSummary{
 				OrderID:       ord.ID.Hex(),
 				OrderNumber:   ord.OrderNumber,
@@ -62,6 +67,42 @@ func (s *PaymentOversightService) GetPaymentsByShift(shiftID string) ([]*Payment
 				PaidAt:        *ord.PaidAt,
 			}
 			payments = append(payments, payment)
+		}
+	}
+
+	return payments, nil
+}
+
+// GetTodayPayments - For cashier to view all payments today
+// In distribution model, cashier doesn't have direct orders
+// Cashier monitors all payments and receives cash via handovers
+func (s *PaymentOversightService) GetTodayPayments() ([]*PaymentSummary, error) {
+	// Get all orders
+	orders, err := s.orderRepo.FindAll(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter today's paid orders
+	today := time.Now().Truncate(24 * time.Hour)
+	var payments []*PaymentSummary
+	
+	for _, ord := range orders {
+		// Only include paid orders
+		if ord.Status == order.StatusPaid || ord.Status == order.StatusInProgress || 
+		   ord.Status == order.StatusServed || ord.Status == order.StatusQueued {
+			// Check if paid today
+			if ord.PaidAt != nil && ord.PaidAt.Truncate(24*time.Hour).Equal(today) {
+				payment := &PaymentSummary{
+					OrderID:       ord.ID.Hex(),
+					OrderNumber:   ord.OrderNumber,
+					Amount:        ord.Total,
+					PaymentMethod: string(ord.PaymentMethod),
+					Status:        string(ord.Status),
+					PaidAt:        *ord.PaidAt,
+				}
+				payments = append(payments, payment)
+			}
 		}
 	}
 

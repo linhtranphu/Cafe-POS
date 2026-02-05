@@ -1,5 +1,11 @@
 <template>
   <div class="min-h-screen bg-gray-50">
+    <!-- Pull to Refresh Indicator -->
+    <PullToRefresh 
+      :pull-distance="pullDistance" 
+      :is-refreshing="isRefreshing"
+      :threshold="80" />
+    
     <!-- Mobile Header - Fixed -->
     <div class="sticky top-0 z-40 bg-white shadow-sm">
       <div class="px-4 py-4">
@@ -65,30 +71,6 @@
             class="w-full py-3 bg-green-500 text-white rounded-xl font-medium active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {{ loading ? '⏳ Đang tạo...' : '✓ Tạo báo cáo ngày' }}
-          </button>
-        </div>
-
-        <!-- Shift Handover -->
-        <div class="bg-white rounded-2xl p-4 shadow-sm">
-          <h3 class="font-bold text-gray-800 mb-3">🔄 Bàn giao ca</h3>
-          <input
-            v-model="handoverForm.toCashierID"
-            type="text"
-            placeholder="ID thu ngân tiếp nhận"
-            class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base mb-3 focus:outline-none focus:border-orange-500"
-          />
-          <textarea
-            v-model="handoverForm.notes"
-            placeholder="Ghi chú bàn giao (tùy chọn)"
-            rows="2"
-            class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base mb-3 focus:outline-none focus:border-orange-500 resize-none"
-          ></textarea>
-          <button
-            @click="performHandover"
-            :disabled="!handoverForm.toCashierID || loading"
-            class="w-full py-3 bg-orange-500 text-white rounded-xl font-medium active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {{ loading ? '⏳ Đang xử lý...' : '✓ Xác nhận bàn giao' }}
           </button>
         </div>
       </div>
@@ -255,6 +237,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useCashierStore } from '../stores/cashier'
 import { useShiftStore } from '../stores/shift'
 import BottomNav from '../components/BottomNav.vue'
+import PullToRefresh from '../components/PullToRefresh.vue'
+import { usePullToRefresh } from '../composables/usePullToRefresh'
 
 const cashierStore = useCashierStore()
 const shiftStore = useShiftStore()
@@ -262,10 +246,6 @@ const shiftStore = useShiftStore()
 const selectedShiftForReport = ref('')
 const selectedDate = ref(new Date().toISOString().split('T')[0])
 const currentReport = ref(null)
-const handoverForm = ref({
-  toCashierID: '',
-  notes: ''
-})
 
 // Computed
 const loading = computed(() => cashierStore.loading)
@@ -295,22 +275,6 @@ const generateDailyReport = async () => {
     }
   } catch (error) {
     console.error('Generate daily report failed:', error)
-  }
-}
-
-const performHandover = async () => {
-  if (!confirm('Bạn có chắc muốn bàn giao ca? Không thể hoàn tác!')) return
-
-  try {
-    await cashierStore.handoverShift({
-      from_cashier_id: 'current_user',
-      to_cashier_id: handoverForm.value.toCashierID,
-      notes: handoverForm.value.notes
-    })
-    handoverForm.value = { toCashierID: '', notes: '' }
-    alert('✓ Bàn giao ca thành công!')
-  } catch (error) {
-    console.error('Handover failed:', error)
   }
 }
 
@@ -444,9 +408,17 @@ const getReportTitle = (report) => {
   return 'Báo cáo tổng hợp'
 }
 
+// Refresh data function
+const refreshData = async () => {
+  await shiftStore.fetchAllShifts()
+}
+
+// Pull to refresh
+const { pullDistance, isRefreshing } = usePullToRefresh(refreshData)
+
 // Lifecycle
 onMounted(async () => {
-  await shiftStore.fetchAllShifts()
+  await refreshData()
 })
 </script>
 

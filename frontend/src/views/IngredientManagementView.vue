@@ -1,5 +1,11 @@
 <template>
   <div class="h-screen w-screen overflow-hidden flex flex-col bg-gray-50">
+    <!-- Pull to Refresh Indicator -->
+    <PullToRefresh 
+      :pull-distance="pullDistance" 
+      :is-refreshing="isRefreshing"
+      :threshold="80" />
+    
     <!-- Mobile Header - Fixed -->
     <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
       <div class="px-4 py-3">
@@ -404,6 +410,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useIngredientStore } from '../stores/ingredient'
 import BottomNav from '../components/BottomNav.vue'
+import PullToRefresh from '../components/PullToRefresh.vue'
+import { usePullToRefresh } from '../composables/usePullToRefresh'
 import {
   INGREDIENT_UNIT_OPTIONS,
   ADJUSTMENT_TYPE_OPTIONS,
@@ -416,7 +424,8 @@ import {
 export default {
   name: 'IngredientManagementView',
   components: {
-    BottomNav
+    BottomNav,
+    PullToRefresh
   },
   setup() {
     const ingredientStore = useIngredientStore()
@@ -630,9 +639,17 @@ export default {
       alert('Chức năng lịch sử nhập kho đang được phát triển')
     }
 
-    onMounted(async () => {
+    // Refresh data function
+    const refreshData = async () => {
       await ingredientStore.fetchCategories()
       await ingredientStore.fetchIngredients()
+    }
+
+    // Pull to refresh
+    const { pullDistance, isRefreshing } = usePullToRefresh(refreshData)
+
+    onMounted(async () => {
+      await refreshData()
     })
 
     return {
@@ -676,7 +693,9 @@ export default {
       showLowStock,
       addCategory,
       deleteCategory,
-      getCategoryCount
+      getCategoryCount,
+      pullDistance,
+      isRefreshing
     }
   }
 }

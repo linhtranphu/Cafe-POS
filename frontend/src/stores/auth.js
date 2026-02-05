@@ -8,7 +8,8 @@ export const useAuthStore = defineStore('auth', {
     token: null,
     isAuthenticated: false,
     loading: false,
-    error: null
+    error: null,
+    _initialized: false  // Flag to track if auth has been initialized
   }),
 
   getters: {
@@ -78,6 +79,7 @@ export const useAuthStore = defineStore('auth', {
           this.token = token
           this.user = JSON.parse(user)
           this.isAuthenticated = true
+          this._initialized = true
           
           // Set token cho API requests
           api.defaults.headers.common['Authorization'] = `Bearer ${token}`
@@ -85,6 +87,8 @@ export const useAuthStore = defineStore('auth', {
           console.error('Error restoring auth:', error)
           this.logout()
         }
+      } else {
+        this._initialized = true
       }
     },
 

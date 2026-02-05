@@ -15,4 +15,14 @@ app.use(router)
 const authStore = useAuthStore()
 authStore.initAuth()
 
+// Validate token with backend on app load
+if (authStore.isAuthenticated) {
+  authStore.validateToken().catch(() => {
+    // Token invalid, logout and show message
+    authStore.logout()
+    alert('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.')
+    router.push('/login')
+  })
+}
+
 app.mount('#app')

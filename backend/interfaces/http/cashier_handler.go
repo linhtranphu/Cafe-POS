@@ -152,24 +152,6 @@ func (h *CashierHandler) GenerateShiftReport(c *gin.Context) {
 	c.JSON(http.StatusOK, report)
 }
 
-// FR-CASH-11: Bàn giao ca
-func (h *CashierHandler) HandoverShift(c *gin.Context) {
-	var req services.HandoverData
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	err := h.reportService.HandoverShift(&req)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Shift handover completed successfully"})
-}
-
 // Get pending discrepancies
 func (h *CashierHandler) GetPendingDiscrepancies(c *gin.Context) {
 	discrepancies, err := h.oversightService.GetPendingDiscrepancies()

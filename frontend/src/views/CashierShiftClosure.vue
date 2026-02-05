@@ -1,5 +1,11 @@
 <template>
   <div class="min-h-screen bg-gray-50">
+    <!-- Pull to Refresh -->
+    <PullToRefresh 
+      :pull-distance="pullDistance" 
+      :is-refreshing="isRefreshing"
+      :threshold="80" />
+
     <!-- Header -->
     <div class="sticky top-0 z-40 bg-white shadow-sm">
       <div class="px-4 py-4">
@@ -247,6 +253,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import cashierShiftService from '../services/cashierShift'
+import PullToRefresh from '../components/PullToRefresh.vue'
+import { usePullToRefresh } from '../composables/usePullToRefresh'
 
 const router = useRouter()
 const route = useRoute()
@@ -433,9 +441,15 @@ const getVarianceClass = (amount) => {
 }
 
 // Lifecycle
-onMounted(() => {
-  loadShift()
-  checkWaiterShiftsStatus()
+const refreshData = async () => {
+  await loadShift()
+  await checkWaiterShiftsStatus()
+}
+
+const { pullDistance, isRefreshing } = usePullToRefresh(refreshData)
+
+onMounted(async () => {
+  await refreshData()
 })
 
 // Auto-check waiter shifts status

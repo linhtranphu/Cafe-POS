@@ -1,5 +1,11 @@
 <template>
   <div class="min-h-screen bg-gray-100">
+    <!-- Pull to Refresh Indicator -->
+    <PullToRefresh 
+      :pull-distance="pullDistance" 
+      :is-refreshing="isRefreshing"
+      :threshold="80" />
+    
     <Navigation />
     <div class="p-4">
       <div class="flex flex-col lg:flex-row justify-between items-center mb-6">
@@ -166,6 +172,8 @@
 import { ref, onMounted, computed } from 'vue'
 import { useMenuStore } from '../stores/menu'
 import Navigation from '../components/Navigation.vue'
+import PullToRefresh from '../components/PullToRefresh.vue'
+import { usePullToRefresh } from '../composables/usePullToRefresh'
 
 const menuStore = useMenuStore()
 
@@ -210,8 +218,16 @@ const groupedItems = computed(() => {
   return Object.values(groups)
 })
 
+// Refresh data function
+const refreshData = async () => {
+  await menuStore.fetchMenuItems()
+}
+
+// Pull to refresh
+const { pullDistance, isRefreshing } = usePullToRefresh(refreshData)
+
 onMounted(() => {
-  menuStore.fetchMenuItems()
+  refreshData()
 })
 
 const formatPrice = (price) => {

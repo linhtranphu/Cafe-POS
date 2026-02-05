@@ -1,5 +1,11 @@
 <template>
   <div class="h-screen w-screen overflow-hidden flex flex-col bg-gray-50">
+    <!-- Pull to Refresh Indicator -->
+    <PullToRefresh 
+      :pull-distance="pullDistance" 
+      :is-refreshing="isRefreshing"
+      :threshold="80" />
+    
     <!-- Mobile Header - Fixed -->
     <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
       <div class="px-4 py-3">
@@ -297,8 +303,8 @@
             <!-- Khu vực & Trạng thái - Responsive Grid -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-3">Khu vực *</label>
-                <input v-model="formData.area" type="text" placeholder="VD: Quầy bar"
+                <label class="block text-sm font-medium text-gray-700 mb-3">Khu vực</label>
+                <input v-model="formData.area" type="text" placeholder="Mặc định"
                   class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
               </div>
               <div>
@@ -380,6 +386,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useFacilityStore } from '../stores/facility'
 import BottomNav from '../components/BottomNav.vue'
+import PullToRefresh from '../components/PullToRefresh.vue'
+import { usePullToRefresh } from '../composables/usePullToRefresh'
 import { 
   FACILITY_STATUS, 
   FACILITY_STATUS_OPTIONS,
@@ -404,7 +412,7 @@ const newCategoryName = ref('')
 const formData = ref({
   name: '',
   type: '',
-  area: '',
+  area: 'Mặc định',
   quantity: 1,
   status: FACILITY_STATUS.IN_USE,
   purchase_date: '',
@@ -526,7 +534,7 @@ const openCreateModal = () => {
   formData.value = {
     name: '',
     type: '',
-    area: '',
+    area: 'Mặc định',
     quantity: 1,
     status: FACILITY_STATUS.IN_USE,
     purchase_date: todayDate,
@@ -543,7 +551,7 @@ const openEditModal = (facility) => {
   formData.value = {
     name: facility.name || '',
     type: facility.type || '',
-    area: facility.area || '',
+    area: facility.area || 'Mặc định',
     quantity: facility.quantity || 1,
     status: facility.status || FACILITY_STATUS.IN_USE,
     purchase_date: facility.purchase_date || '',
@@ -569,11 +577,24 @@ const deleteFacility = async (facility) => {
 
 const saveFacility = async () => {
   try {
+    // Prepare data - convert date format
+    const dataToSend = { ...formData.value }
+    
+    // Remove empty purchase_date or convert to ISO format
+    if (!dataToSend.purchase_date) {
+      delete dataToSend.purchase_date
+    } else {
+      // Convert YYYY-MM-DD to ISO format YYYY-MM-DDT00:00:00Z
+      dataToSend.purchase_date = dataToSend.purchase_date + 'T00:00:00Z'
+    }
+    
+    console.log('Sending facility data:', dataToSend)
+    
     if (editingFacility.value) {
-      await facilityStore.updateFacility(editingFacility.value.id, formData.value)
+      await facilityStore.updateFacility(editingFacility.value.id, dataToSend)
       alert('Cập nhật thiết bị thành công')
     } else {
-      await facilityStore.createFacility(formData.value)
+      await facilityStore.createFacility(dataToSend)
       alert('Thêm thiết bị thành công')
     }
     
@@ -581,7 +602,7 @@ const saveFacility = async () => {
     formData.value = {
       name: '',
       type: '',
-      area: '',
+      area: 'Mặc định',
       quantity: 1,
       status: FACILITY_STATUS.IN_USE,
       purchase_date: '',
@@ -607,11 +628,19 @@ const viewDetails = (facility) => {
   openEditModal(facility)
 }
 
-onMounted(async () => {
+// Refresh data function
+const refreshData = async () => {
   await facilityStore.fetchFacilities()
   await facilityStore.fetchFacilityTypes()
   maintenanceSchedule.value = await facilityStore.fetchScheduledMaintenance()
   issueReports.value = await facilityStore.fetchIssueReports()
+}
+
+// Pull to refresh
+const { pullDistance, isRefreshing } = usePullToRefresh(refreshData)
+
+onMounted(async () => {
+  await refreshData()
 })
 </script>
 

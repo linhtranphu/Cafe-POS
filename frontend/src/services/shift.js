@@ -62,13 +62,14 @@ export const shiftService = {
   },
 
   /**
-   * Get all shifts (manager only)
+   * Get all shifts (manager or cashier)
    * Note: This returns waiter/barista shifts only
    * For cashier shifts, use cashierShift.getAllCashierShifts()
+   * Cashier can access via /cashier/shifts endpoint
    * @returns {Promise<Array>} List of all shifts
    */
   async getAllShifts() {
-    const response = await api.get('/shifts')
+    const response = await api.get('/cashier/shifts')
     return response.data
   },
 

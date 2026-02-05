@@ -1,5 +1,11 @@
 <template>
   <div class="min-h-screen bg-gray-50">
+    <!-- Pull to Refresh Indicator -->
+    <PullToRefresh 
+      :pull-distance="pullDistance" 
+      :is-refreshing="isRefreshing"
+      :threshold="80" />
+    
     <!-- Mobile Header - Fixed -->
     <div class="sticky top-0 z-40 bg-white shadow-sm">
       <div class="px-4 py-3">
@@ -240,6 +246,8 @@ import { useRouter } from 'vue-router'
 import { useBaristaStore } from '../stores/barista'
 import { useShiftStore } from '../stores/shift'
 import BottomNav from '../components/BottomNav.vue'
+import PullToRefresh from '../components/PullToRefresh.vue'
+import { usePullToRefresh } from '../composables/usePullToRefresh'
 
 const router = useRouter()
 const baristaStore = useBaristaStore()
@@ -265,6 +273,9 @@ const refreshAll = async () => {
     shiftStore.fetchCurrentShift()
   ])
 }
+
+// Pull to refresh
+const { pullDistance, isRefreshing } = usePullToRefresh(refreshAll)
 
 const acceptOrder = async (id) => {
   // Check shift before accepting

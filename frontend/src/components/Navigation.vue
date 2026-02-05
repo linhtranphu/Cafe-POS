@@ -85,6 +85,18 @@
           <span class="text-sm font-medium text-center">Thu ngân</span>
         </router-link>
 
+        <!-- Cash Handover (Cashier only) -->
+        <router-link v-if="userRole === 'cashier'" to="/cashier/handovers" @click="handleNavClick"
+          class="bg-gradient-to-br from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white rounded-xl p-4 flex flex-col items-center justify-center min-h-[100px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+          <div class="text-2xl mb-2">💰</div>
+          <span class="text-sm font-medium text-center">Bàn giao</span>
+        </router-link>
+        
+        <!-- DEBUG: Show if link should appear -->
+        <div v-if="false" class="bg-red-500 text-white p-2 text-xs">
+          DEBUG: userRole = {{ userRole }}, isCashier = {{ userRole === 'cashier' }}
+        </div>
+
         <!-- Cashier Reports (Cashier only) -->
         <router-link v-if="userRole === 'cashier'" to="/cashier/reports" @click="handleNavClick"
           class="bg-gradient-to-br from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white rounded-xl p-4 flex flex-col items-center justify-center min-h-[100px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">

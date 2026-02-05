@@ -1,5 +1,11 @@
 <template>
   <div class="h-screen w-screen overflow-hidden flex flex-col bg-gray-50">
+    <!-- Pull to Refresh -->
+    <PullToRefresh 
+      :pull-distance="pullDistance" 
+      :is-refreshing="isRefreshing"
+      :threshold="80" />
+
     <!-- Mobile Header - Fixed -->
     <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
       <div class="px-4 py-3">
@@ -203,6 +209,8 @@ import { useUserStore } from '../stores/user'
 import { useAuthStore } from '../stores/auth'
 import { useRouter } from 'vue-router'
 import BottomNav from '../components/BottomNav.vue'
+import PullToRefresh from '../components/PullToRefresh.vue'
+import { usePullToRefresh } from '../composables/usePullToRefresh'
 
 const userStore = useUserStore()
 const authStore = useAuthStore()
@@ -227,12 +235,19 @@ const isPasswordFormValid = computed(() => {
          passwordForm.value.newPassword.length >= 6
 })
 
-onMounted(async () => {
+// Pull to refresh
+const refreshData = async () => {
   try {
     await userStore.fetchCurrentUser()
   } catch (error) {
     console.error('Error loading profile:', error)
   }
+}
+
+const { pullDistance, isRefreshing } = usePullToRefresh(refreshData)
+
+onMounted(async () => {
+  await refreshData()
 })
 
 const changePassword = async () => {

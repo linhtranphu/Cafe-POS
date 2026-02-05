@@ -18,7 +18,6 @@ export const cashierService = {
   // Reports
   generateShiftReport: (shiftId) => api.get(`/cashier/reports/shift/${shiftId}`),
   getDailyReport: (date) => api.get(`/cashier/reports/daily?date=${date}`),
-  handoverShift: (data) => api.post('/cashier/handover', data),
   
   // Audit
   getOrderAudits: (orderId) => api.get(`/cashier/orders/${orderId}/audits`)

@@ -63,6 +63,12 @@ type CashierShift struct {
 	// AuditLog maintains an immutable record of all actions performed during the shift
 	AuditLog []AuditLogEntry `json:"audit_log" bson:"audit_log"`
 
+	// Cash handover fields
+	ReceivedCash     float64 `json:"received_cash" bson:"received_cash"`
+	TotalDiscrepancy float64 `json:"total_discrepancy" bson:"total_discrepancy"`
+	HandoverCount    int     `json:"handover_count" bson:"handover_count"`
+	DiscrepancyCount int     `json:"discrepancy_count" bson:"discrepancy_count"`
+
 	// CreatedAt is when the shift record was created
 	CreatedAt time.Time `json:"created_at" bson:"created_at"`
 

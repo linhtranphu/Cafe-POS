@@ -1,5 +1,11 @@
 <template>
   <div class="min-h-screen bg-gray-50 flex flex-col">
+    <!-- Pull to Refresh Indicator -->
+    <PullToRefresh 
+      :pull-distance="pullDistance" 
+      :is-refreshing="isRefreshing"
+      :threshold="80" />
+    
     <!-- Mobile Header - Fixed -->
     <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
       <div class="px-4 py-3">
@@ -283,6 +289,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useExpenseStore } from '../stores/expense'
 import BottomNav from '../components/BottomNav.vue'
+import PullToRefresh from '../components/PullToRefresh.vue'
+import { usePullToRefresh } from '../composables/usePullToRefresh'
 import { formatDate, formatPrice } from '../utils/formatters'
 import { PAYMENT_METHODS, PAYMENT_METHOD_OPTIONS, getPaymentMethodLabel } from '../constants/expense'
 
@@ -417,11 +425,19 @@ const cancelEdit = () => {
 
 const saveExpense = async () => {
   try {
+    // Prepare data - convert date to ISO format
+    const dataToSend = { ...formData.value }
+    if (dataToSend.date) {
+      dataToSend.date = dataToSend.date + 'T00:00:00Z'
+    } else {
+      delete dataToSend.date
+    }
+    
     if (isEditing.value) {
-      await expenseStore.updateExpense(currentExpense.value.id, formData.value)
+      await expenseStore.updateExpense(currentExpense.value.id, dataToSend)
       alert('Cập nhật chi phí thành công')
     } else {
-      await expenseStore.createExpense(formData.value)
+      await expenseStore.createExpense(dataToSend)
       alert('Thêm chi phí thành công')
     }
     showCreateForm.value = false
@@ -472,10 +488,18 @@ const deleteCategory = async (categoryId) => {
   }
 }
 
-onMounted(async () => {
+// Refresh data function
+const refreshData = async () => {
   await expenseStore.fetchCategories()
   await expenseStore.fetchExpenses()
   await expenseStore.fetchRecurringExpenses()
+}
+
+// Pull to refresh
+const { pullDistance, isRefreshing } = usePullToRefresh(refreshData)
+
+onMounted(async () => {
+  await refreshData()
 })
 </script>
 

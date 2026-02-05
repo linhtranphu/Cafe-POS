@@ -101,62 +101,6 @@ func (s *CashierReportService) GenerateShiftReport(shiftID string) (*ShiftReport
 	return report, nil
 }
 
-type HandoverData struct {
-	FromCashierID string `json:"from_cashier_id"`
-	ToCashierID   string `json:"to_cashier_id"`
-	Notes         string `json:"notes"`
-}
-
-// FR-CASH-11: Bàn giao ca
-func (s *CashierReportService) HandoverShift(data *HandoverData) error {
-	// Find open shifts for from_cashier
-	openShifts, err := s.shiftRepo.FindOpenShifts(context.Background())
-	if err != nil {
-		return err
-	}
-
-	var fromCashierShifts []*order.Shift
-	for _, shift := range openShifts {
-		if shift.UserID.Hex() == data.FromCashierID {
-			fromCashierShifts = append(fromCashierShifts, shift)
-		}
-	}
-
-	if len(fromCashierShifts) == 0 {
-		return errors.New("no open shifts found for cashier")
-	}
-
-	// Transfer shifts to new cashier
-	toCashierObjID, err := primitive.ObjectIDFromHex(data.ToCashierID)
-	if err != nil {
-		return errors.New("invalid to_cashier_id")
-	}
-
-	for _, shift := range fromCashierShifts {
-		shift.UserID = toCashierObjID
-		shift.UpdatedAt = time.Now()
-		
-		err = s.shiftRepo.Update(context.Background(), shift.ID, shift)
-		if err != nil {
-			return err
-		}
-
-		// Create audit record for handover
-		audit := cashier.NewPaymentAudit(
-			"", // No specific order
-			"HANDOVER",
-			data.FromCashierID,
-			"Shift handover to "+data.ToCashierID+": "+data.Notes,
-			"OPEN",
-			"TRANSFERRED",
-			0,
-		)
-		s.auditRepo.Create(audit)
-	}
-
-	return nil
-}
-
 func (s *CashierReportService) GetDailyReport(date time.Time) (*ShiftReport, error) {
 	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
 	endOfDay := startOfDay.Add(24 * time.Hour)

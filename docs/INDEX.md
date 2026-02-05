@@ -35,6 +35,11 @@
 ### 💰 Quản Lý Thu Ngân
 - **[CASHIER_COMPLETE_REDESIGN.md](./CASHIER_COMPLETE_REDESIGN.md)** - Thiết kế lại hoàn toàn thu ngân
 - **[CASHIER_IMPLEMENTATION.md](./CASHIER_IMPLEMENTATION.md)** - Triển khai chức năng thu ngân
+- **[CASHIER_DASHBOARD_DISTRIBUTION_MODEL.md](./CASHIER_DASHBOARD_DISTRIBUTION_MODEL.md)** - 📋 Cashier Dashboard trong mô hình distribution
+- **[CASHIER_DASHBOARD_RESTRUCTURE.md](./CASHIER_DASHBOARD_RESTRUCTURE.md)** - 🔄 Restructure: Tách biệt handover khỏi dashboard
+- **[CASHIER_PAYMENT_MONITORING_FIX.md](./CASHIER_PAYMENT_MONITORING_FIX.md)** - 🔧 Fix: Payment monitoring theo waiter shift
+- **[CASHIER_PAYMENT_LIST_LOGIC.md](./CASHIER_PAYMENT_LIST_LOGIC.md)** - 📋 Logic hiển thị danh sách thanh toán
+- **[PAYMENT_DISCREPANCY_IMPLEMENTATION.md](./PAYMENT_DISCREPANCY_IMPLEMENTATION.md)** - ✅ Payment Discrepancy - Fully implemented
 
 ### 👨‍💼 Quản Lý Ca Làm Việc
 - **[SHIFT_HANDLER_STATE_MACHINE_INTEGRATION.md](./SHIFT_HANDLER_STATE_MACHINE_INTEGRATION.md)** - Tích hợp State Machine cho ca làm việc
@@ -62,6 +67,27 @@
 - **[AUTO_EXPENSE_FINAL_SUMMARY.md](./AUTO_EXPENSE_FINAL_SUMMARY.md)** - Tóm tắt cuối cùng auto expense
 - **[AUTO_EXPENSE_TRACKING.md](./AUTO_EXPENSE_TRACKING.md)** - Theo dõi auto expense
 
+### 💰 Quản Lý Bàn Giao Tiền (Cash Handover)
+- **[CASH_HANDOVER_README.md](./CASH_HANDOVER_README.md)** - ⭐ BẮT ĐẦU TẠI ĐÂY - Tổng quan và hướng dẫn
+- **[CASH_HANDOVER_COMPLETE_SUMMARY.md](./CASH_HANDOVER_COMPLETE_SUMMARY.md)** - ✅ Tổng kết hoàn thành (32 files, 13,510 lines)
+- **[CASH_HANDOVER_UI_GUIDE.md](./CASH_HANDOVER_UI_GUIDE.md)** - 🎨 Hướng dẫn giao diện người dùng
+- **[CASH_HANDOVER_UI_IMPROVEMENTS.md](./CASH_HANDOVER_UI_IMPROVEMENTS.md)** - 🔧 Cải tiến UI & Navigation
+- **[CASH_HANDOVER_ROUTES_COMPONENTS.md](./CASH_HANDOVER_ROUTES_COMPONENTS.md)** - 🗺️ Routes & Components Reference
+- **[CASH_HANDOVER_FEATURE_ANALYSIS.md](./CASH_HANDOVER_FEATURE_ANALYSIS.md)** - Phân tích chi tiết tính năng bàn giao tiền
+- **[CASH_HANDOVER_IMPLEMENTATION_TASKS.md](./CASH_HANDOVER_IMPLEMENTATION_TASKS.md)** - Tasks triển khai từng bước
+- **[CASH_HANDOVER_QUICK_CHECKLIST.md](./CASH_HANDOVER_QUICK_CHECKLIST.md)** - Checklist nhanh cho implementation
+- **[CASH_HANDOVER_FLOW_DIAGRAM.md](./CASH_HANDOVER_FLOW_DIAGRAM.md)** - Sơ đồ luồng và kiến trúc hệ thống
+- **[CASH_HANDOVER_API_DOCUMENTATION.md](./CASH_HANDOVER_API_DOCUMENTATION.md)** - API documentation
+- **[CASH_HANDOVER_USER_GUIDE.md](./CASH_HANDOVER_USER_GUIDE.md)** - Hướng dẫn sử dụng
+- **[CASH_HANDOVER_E2E_TESTS.md](./CASH_HANDOVER_E2E_TESTS.md)** - E2E test scenarios
+- **[CASH_HANDOVER_ARCHITECTURE_DECISION.md](./CASH_HANDOVER_ARCHITECTURE_DECISION.md)** - 🏗️ Architecture: Client-side data composition
+- **[CASH_HANDOVER_DISCREPANCY_FIX.md](./CASH_HANDOVER_DISCREPANCY_FIX.md)** - 🔧 Fix: Discrepancy warning (declared vs actual)
+- **[CASH_HANDOVER_SHIFT_CASH_WARNING.md](./CASH_HANDOVER_SHIFT_CASH_WARNING.md)** - ⚠️ Fix: Shift cash warning
+- **[CASH_HANDOVER_REJECT_FIX.md](./CASH_HANDOVER_REJECT_FIX.md)** - 🔧 Fix: Reject validation error
+- **[CASH_HANDOVER_QUICK_CONFIRM_FIX.md](./CASH_HANDOVER_QUICK_CONFIRM_FIX.md)** - ⚡ Fix: Quick confirm 500 error
+- **[CASH_HANDOVER_TROUBLESHOOTING.md](./CASH_HANDOVER_TROUBLESHOOTING.md)** - 🐛 Troubleshooting guide
+- **[CASH_HANDOVER_WAITER_GUIDE.md](./CASH_HANDOVER_WAITER_GUIDE.md)** - 👤 Waiter user guide
+
 ## 🎨 Giao Diện Người Dùng
 
 ### 📱 Mobile & Responsive
@@ -74,8 +100,62 @@
 
 ## 🔧 Tiện Ích & Tools
 
+### 📱 Pull-to-Refresh
+- **[PULL_TO_REFRESH_IMPLEMENTATION.md](./PULL_TO_REFRESH_IMPLEMENTATION.md)** - 📱 Full implementation guide cho pull-to-refresh
+- **[PULL_TO_REFRESH_QUICK_GUIDE.md](./PULL_TO_REFRESH_QUICK_GUIDE.md)** - ⚡ Quick guide 5 phút/view
+- **[PULL_TO_REFRESH_STATUS.md](./PULL_TO_REFRESH_STATUS.md)** - 📊 Implementation status (13/15 views completed - 87%) ✅ COMPLETE
+
+**Implemented Views (All Applicable Views):**
+- ✅ CashierHandoverView.vue
+- ✅ OrderView.vue
+- ✅ CashierDashboard.vue
+- ✅ ShiftView.vue
+- ✅ FacilityManagementView.vue
+- ✅ IngredientManagementView.vue
+- ✅ ExpenseManagementView.vue
+- ✅ ManagerShiftView.vue
+- ✅ BaristaView.vue
+- ✅ DashboardView.vue
+- ✅ CashierReports.vue
+- ✅ MenuView.vue
+- ✅ UserManagementView.vue
+- ✅ ProfileView.vue
+- ✅ CashierShiftClosure.vue
+
+**Components & Composables:**
+- `frontend/src/components/PullToRefresh.vue` - UI component
+- `frontend/src/composables/usePullToRefresh.js` - Logic composable
+- `scripts/add-pull-to-refresh.sh` - Helper script
+
 ### 🛠️ Formatters & Utilities
 - **[FORMATTERS_UTILITY_IMPLEMENTATION.md](./FORMATTERS_UTILITY_IMPLEMENTATION.md)** - Triển khai tiện ích formatters
+
+### 📋 Constants & Patterns
+- **[CONSTANTS_PATTERN.md](./CONSTANTS_PATTERN.md)** - ⭐ Pattern sử dụng constants để đồng bộ frontend/backend, tránh lỗi hardcode strings
+- **[CONSTANTS_QUICK_REFERENCE.md](./CONSTANTS_QUICK_REFERENCE.md)** - 📋 Quick reference card cho developers
+- **[CONSTANTS_IMPLEMENTATION_SUMMARY.md](./CONSTANTS_IMPLEMENTATION_SUMMARY.md)** - Tóm tắt implementation
+- **[CONSTANTS_VIOLATIONS_AUDIT.md](./CONSTANTS_VIOLATIONS_AUDIT.md)** - 🚨 Full audit report: 15+ files vi phạm (CRITICAL)
+- **[SHIFT_CONSTANTS_MIGRATION.md](./SHIFT_CONSTANTS_MIGRATION.md)** - 🔄 Migration guide: Shift constants (In Progress)
+
+**Available Constants Files:**
+- `frontend/src/constants/order.js` - Order status, payment methods
+- `frontend/src/constants/shift.js` - Shift status, shift types, role types ⭐ NEW
+- `frontend/src/constants/expense.js` - Expense categories, types
+- `frontend/src/constants/facility.js` - Facility types, areas
+- `frontend/src/constants/ingredient.js` - Ingredient categories, units
+
+### 🎨 UI/UX Best Practices
+- **[../.kiro/best-practices/DATE_INPUT_FIELDS.md](../.kiro/best-practices/DATE_INPUT_FIELDS.md)** - 📅 Best practices cho date input fields (mobile-friendly styling)
+
+### 💰 Quản Lý Bàn Giao Tiền
+- **[CASH_HANDOVER_FEATURE_ANALYSIS.md](./CASH_HANDOVER_FEATURE_ANALYSIS.md)** - Phân tích tính năng bàn giao tiền
+- **[CASH_HANDOVER_IMPLEMENTATION_TASKS.md](./CASH_HANDOVER_IMPLEMENTATION_TASKS.md)** - Tasks triển khai chi tiết
+- **[CASH_HANDOVER_QUICK_CHECKLIST.md](./CASH_HANDOVER_QUICK_CHECKLIST.md)** - Checklist nhanh
+- **[CASH_HANDOVER_API_DOCUMENTATION.md](./CASH_HANDOVER_API_DOCUMENTATION.md)** - API documentation
+- **[CASH_HANDOVER_USER_GUIDE.md](./CASH_HANDOVER_USER_GUIDE.md)** - Hướng dẫn sử dụng
+- **[CASH_HANDOVER_E2E_TESTS.md](./CASH_HANDOVER_E2E_TESTS.md)** - E2E test scenarios
+- **[CASH_HANDOVER_README.md](./CASH_HANDOVER_README.md)** - Tổng quan tính năng
+- **[CASH_HANDOVER_FLOW_DIAGRAM.md](./CASH_HANDOVER_FLOW_DIAGRAM.md)** - Sơ đồ luồng
 
 ## 🧪 Testing & Quality
 

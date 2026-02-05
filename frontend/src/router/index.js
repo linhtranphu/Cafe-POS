@@ -123,6 +123,12 @@ const routes = [
     name: 'CashierShiftClosure',
     component: CashierShiftClosure,
     meta: { requiresAuth: true, requiresCashier: true }
+  },
+  {
+    path: '/cashier/handovers',
+    name: 'CashierHandovers',
+    component: () => import('../views/CashierHandoverView.vue'),
+    meta: { requiresAuth: true, requiresCashier: true }
   }
 ]
 
@@ -131,8 +137,14 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
+  
+  // Ensure auth is initialized before checking
+  if (!authStore._initialized) {
+    authStore.initAuth()
+    authStore._initialized = true
+  }
   
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/login')

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { cashierService } from '../services/cashier'
+import { handoverService } from '../services/handover'
 
 export const useCashierStore = defineStore('cashier', {
   state: () => ({
@@ -9,6 +10,11 @@ export const useCashierStore = defineStore('cashier', {
     reconciliation: null,
     reports: [],
     audits: [],
+    
+    // Cash handover state
+    pendingHandovers: [],
+    todayHandovers: [],
+    
     loading: false,
     error: null
   }),
@@ -36,7 +42,12 @@ export const useCashierStore = defineStore('cashier', {
     
     hasReconciliation: (state) => !!state.reconciliation,
     
-    reconciliationStatus: (state) => state.reconciliation?.status || null
+    reconciliationStatus: (state) => state.reconciliation?.status || null,
+    
+    // Cash handover getters
+    pendingHandoversCount: (state) => state.pendingHandovers.length,
+    
+    hasPendingHandovers: (state) => state.pendingHandovers.length > 0
   },
 
   actions: {
@@ -191,21 +202,6 @@ export const useCashierStore = defineStore('cashier', {
       }
     },
 
-    // FR-CASH-11: Bàn giao ca
-    async handoverShift(data) {
-      this.loading = true
-      this.error = null
-      try {
-        await cashierService.handoverShift(data)
-        return true
-      } catch (error) {
-        this.error = error.response?.data?.error || 'Failed to handover shift'
-        throw error
-      } finally {
-        this.loading = false
-      }
-    },
-
     async getOrderAudits(orderId) {
       this.loading = true
       this.error = null
@@ -232,8 +228,149 @@ export const useCashierStore = defineStore('cashier', {
       this.reconciliation = null
       this.reports = []
       this.audits = []
+      this.pendingHandovers = []
+      this.todayHandovers = []
       this.loading = false
       this.error = null
+    },
+
+    // ==================== CASH HANDOVER METHODS ====================
+
+    /**
+     * Fetch pending handovers for current cashier
+     * @returns {Promise<void>}
+     */
+    async fetchPendingHandovers() {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await handoverService.getPendingHandovers()
+        this.pendingHandovers = response.data || []
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi tải yêu cầu bàn giao'
+        this.pendingHandovers = []
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    /**
+     * Fetch today's handovers
+     * @returns {Promise<void>}
+     */
+    async fetchTodayHandovers() {
+      this.error = null
+      try {
+        const response = await handoverService.getTodayHandovers()
+        this.todayHandovers = response.data || []
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi tải bàn giao hôm nay'
+        this.todayHandovers = []
+        throw error
+      }
+    },
+
+    /**
+     * Confirm or reject a handover with reconciliation
+     * @param {string} handoverId - Handover ID
+     * @param {Object} confirmData - { actual_amount, status, cashier_note, discrepancy_reason, discrepancy_responsibility }
+     * @returns {Promise<Object>} Success message
+     */
+    async confirmHandover(handoverId, confirmData) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await handoverService.confirmHandover(handoverId, confirmData)
+        // Refresh pending handovers after confirmation
+        await this.fetchPendingHandovers()
+        return response.data
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi xác nhận bàn giao'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    /**
+     * Quick confirm/reject without detailed reconciliation
+     * @param {string} handoverId - Handover ID
+     * @param {string} status - 'CONFIRMED' or 'REJECTED'
+     * @returns {Promise<Object>} Success message
+     */
+    async quickConfirm(handoverId, status) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await handoverService.quickConfirm(handoverId, status)
+        // Refresh pending handovers after quick confirm
+        await this.fetchPendingHandovers()
+        return response.data
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi xác nhận nhanh'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    /**
+     * Get handovers requiring manager approval
+     * @returns {Promise<Array>} Array of handovers requiring approval
+     */
+    async fetchPendingApprovals() {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await handoverService.getPendingApprovals()
+        return response.data || []
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi tải yêu cầu phê duyệt'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    /**
+     * Approve or reject a discrepancy (manager only)
+     * @param {string} handoverId - Handover ID
+     * @param {Object} approvalData - { approved, manager_note }
+     * @returns {Promise<Object>} Success message
+     */
+    async approveDiscrepancy(handoverId, approvalData) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await handoverService.approveDiscrepancy(handoverId, approvalData)
+        return response.data
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi phê duyệt chênh lệch'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    /**
+     * Get discrepancy statistics
+     * @param {string} startDate - Start date (YYYY-MM-DD)
+     * @param {string} endDate - End date (YYYY-MM-DD)
+     * @returns {Promise<Object>} Discrepancy statistics
+     */
+    async getDiscrepancyStats(startDate, endDate) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await handoverService.getDiscrepancyStats(startDate, endDate)
+        return response.data
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi tải thống kê chênh lệch'
+        throw error
+      } finally {
+        this.loading = false
+      }
     }
   }
 })

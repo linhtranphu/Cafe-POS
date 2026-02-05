@@ -101,6 +101,32 @@ func (s *OrderService) CollectPayment(ctx context.Context, id primitive.ObjectID
 		o.PaidAt = &now
 	}
 
+	// Update shift cash if payment is cash and order has shift_id
+	if req.PaymentMethod == order.PaymentCash && !o.ShiftID.IsZero() {
+		fmt.Printf("DEBUG: Updating shift cash - ShiftID: %s, Amount: %.2f\n", o.ShiftID.Hex(), req.Amount)
+		shift, err := s.shiftRepo.FindByID(ctx, o.ShiftID)
+		if err == nil && shift != nil {
+			fmt.Printf("DEBUG: Found shift - Current RemainingCash: %.2f\n", shift.RemainingCash)
+			// Add cash to shift
+			shift.RemainingCash += req.Amount
+			shift.CurrentCash += req.Amount
+			shift.TotalRevenue += req.Amount
+			fmt.Printf("DEBUG: New RemainingCash: %.2f\n", shift.RemainingCash)
+			
+			// Update shift
+			if err := s.shiftRepo.Update(ctx, o.ShiftID, shift); err != nil {
+				// Log error but don't fail the payment
+				fmt.Printf("ERROR: Failed to update shift cash: %v\n", err)
+			} else {
+				fmt.Printf("DEBUG: Shift cash updated successfully\n")
+			}
+		} else {
+			fmt.Printf("DEBUG: Shift not found or error: %v\n", err)
+		}
+	} else {
+		fmt.Printf("DEBUG: Not updating shift - PaymentMethod: %s, ShiftID.IsZero: %v\n", req.PaymentMethod, o.ShiftID.IsZero())
+	}
+
 	if err := s.orderRepo.Update(ctx, id, o); err != nil {
 		return nil, err
 	}

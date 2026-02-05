@@ -69,6 +69,14 @@ type Shift struct {
 	EndCash       float64            `bson:"end_cash" json:"end_cash"`
 	TotalRevenue  float64            `bson:"total_revenue" json:"total_revenue"`
 	TotalOrders   int                `bson:"total_orders" json:"total_orders"`
+	
+	// Cash handover fields
+	CurrentCash      float64 `bson:"current_cash" json:"current_cash"`
+	HandedOverCash   float64 `bson:"handed_over_cash" json:"handed_over_cash"`
+	RemainingCash    float64 `bson:"remaining_cash" json:"remaining_cash"`
+	TotalDiscrepancy float64 `bson:"total_discrepancy" json:"total_discrepancy"`
+	HandoverCount    int     `bson:"handover_count" json:"handover_count"`
+	
 	StartedAt     time.Time          `bson:"started_at" json:"started_at"`
 	EndedAt       *time.Time         `bson:"ended_at,omitempty" json:"ended_at,omitempty"`
 	CreatedAt     time.Time          `bson:"created_at" json:"created_at"`

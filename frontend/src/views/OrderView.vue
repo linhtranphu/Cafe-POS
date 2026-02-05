@@ -1,5 +1,11 @@
 <template>
   <div class="min-h-screen bg-gray-50">
+    <!-- Pull to Refresh Indicator -->
+    <PullToRefresh 
+      :pull-distance="pullDistance" 
+      :is-refreshing="isRefreshing"
+      :threshold="80" />
+    
     <!-- Mobile Header - Fixed -->
     <div class="sticky top-0 z-40 bg-white shadow-sm">
       <div class="px-4 py-3">
@@ -85,22 +91,22 @@
 
           <!-- Quick Actions -->
           <div class="mt-3 flex gap-2">
-            <button v-if="order.status === 'CREATED'" 
+            <button v-if="isStatus(order, ORDER_STATUS.CREATED)" 
               @click.stop="quickPayment(order)"
               class="flex-1 bg-green-500 text-white py-2 rounded-lg text-sm font-medium active:bg-green-600">
               💰 Thu tiền
             </button>
-            <button v-if="order.status === 'PAID' && order.amount_due <= 0" 
+            <button v-if="isStatus(order, ORDER_STATUS.PAID) && order.amount_due <= 0" 
               @click.stop="sendToBar(order.id)"
               class="flex-1 bg-blue-500 text-white py-2 rounded-lg text-sm font-medium active:bg-blue-600">
               🍹 Gửi bar
             </button>
-            <button v-if="order.status === 'READY'" 
+            <button v-if="isStatus(order, ORDER_STATUS.READY)" 
               @click.stop="serveOrder(order.id)"
               class="flex-1 bg-purple-500 text-white py-2 rounded-lg text-sm font-medium active:bg-purple-600">
               🎉 Giao khách
             </button>
-            <button v-if="order.status === 'QUEUED' || order.status === 'IN_PROGRESS'" 
+            <button v-if="isAnyStatus(order, [ORDER_STATUS.QUEUED, ORDER_STATUS.IN_PROGRESS])" 
               class="flex-1 bg-gray-300 text-gray-600 py-2 rounded-lg text-sm font-medium cursor-not-allowed">
               ⏳ Đang pha...
             </button>
@@ -258,27 +264,27 @@
 
             <!-- Actions -->
             <div class="space-y-2">
-              <button v-if="selectedOrder.status === 'CREATED'" 
+              <button v-if="isStatus(selectedOrder, ORDER_STATUS.CREATED)" 
                 @click="showPaymentModal(selectedOrder)"
                 class="w-full bg-green-500 text-white py-3 rounded-xl font-medium active:bg-green-600">
                 💰 Thu tiền
               </button>
-              <button v-if="selectedOrder.status === 'CREATED'" 
+              <button v-if="isStatus(selectedOrder, ORDER_STATUS.CREATED)" 
                 @click="editOrder(selectedOrder)"
                 class="w-full bg-blue-500 text-white py-3 rounded-xl font-medium active:bg-blue-600">
                 ✏️ Chỉnh sửa
               </button>
-              <button v-if="selectedOrder.status === 'PAID' && selectedOrder.amount_due <= 0" 
+              <button v-if="isStatus(selectedOrder, ORDER_STATUS.PAID) && selectedOrder.amount_due <= 0" 
                 @click="sendToBar(selectedOrder.id)"
                 class="w-full bg-blue-500 text-white py-3 rounded-xl font-medium active:bg-blue-600">
                 🍹 Gửi quầy bar
               </button>
-              <button v-if="selectedOrder.status === 'READY'" 
+              <button v-if="isStatus(selectedOrder, ORDER_STATUS.READY)" 
                 @click="serveOrder(selectedOrder.id)"
                 class="w-full bg-purple-500 text-white py-3 rounded-xl font-medium active:bg-purple-600">
                 🎉 Giao cho khách
               </button>
-              <div v-if="selectedOrder.status === 'QUEUED' || selectedOrder.status === 'IN_PROGRESS'" 
+              <div v-if="isAnyStatus(selectedOrder, [ORDER_STATUS.QUEUED, ORDER_STATUS.IN_PROGRESS])" 
                 class="w-full bg-gray-100 text-gray-600 py-3 rounded-xl font-medium text-center">
                 ⏳ Barista đang pha chế...
               </div>
@@ -352,6 +358,15 @@ import { useShiftStore } from '../stores/shift'
 import { useMenuStore } from '../stores/menu'
 import { useRouter } from 'vue-router'
 import BottomNav from '../components/BottomNav.vue'
+import PullToRefresh from '../components/PullToRefresh.vue'
+import { usePullToRefresh } from '../composables/usePullToRefresh'
+import { 
+  ORDER_STATUS, 
+  PAYMENT_METHOD, 
+  PAYMENT_METHOD_DISPLAY,
+  ORDER_STATUS_DISPLAY,
+  STATUS_FILTER_OPTIONS
+} from '../constants/order'
 
 const router = useRouter()
 const orderStore = useOrderStore()
@@ -365,7 +380,7 @@ const selectedOrder = ref(null)
 const showPayment = ref(false)
 const paymentOrder = ref(null)
 const paymentAmount = ref(0)
-const paymentMethod = ref('CASH')
+const paymentMethod = ref(PAYMENT_METHOD.CASH)
 
 // Create Order State
 const customerName = ref('')
@@ -373,15 +388,7 @@ const selectedCategory = ref('all')
 const cart = ref([])
 
 // Data
-const statuses = [
-  { value: 'ALL', label: 'Tất cả', icon: '📋' },
-  { value: 'CREATED', label: 'Mới', icon: '🆕' },
-  { value: 'PAID', label: 'Đã thu', icon: '💰' },
-  { value: 'QUEUED', label: 'Chờ pha', icon: '⏳' },
-  { value: 'IN_PROGRESS', label: 'Đang pha', icon: '🍹' },
-  { value: 'READY', label: 'Sẵn sàng', icon: '✅' },
-  { value: 'SERVED', label: 'Hoàn tất', icon: '🎉' }
-]
+const statuses = STATUS_FILTER_OPTIONS
 
 const categories = [
   { id: 'all', name: 'Tất cả', icon: '📋' },
@@ -391,11 +398,7 @@ const categories = [
   { id: 'food', name: 'Đồ ăn', icon: '🍰' }
 ]
 
-const paymentMethods = [
-  { value: 'CASH', label: 'Tiền mặt', icon: '💵' },
-  { value: 'QR', label: 'QR', icon: '📱' },
-  { value: 'TRANSFER', label: 'CK', icon: '🏦' }
-]
+const paymentMethods = PAYMENT_METHOD_DISPLAY
 
 // Computed
 const loading = computed(() => orderStore.loading)
@@ -417,10 +420,17 @@ const cartTotal = computed(() => {
   return cart.value.reduce((sum, item) => sum + (item.price * item.quantity), 0)
 })
 
+// Helper to check order status
+const isStatus = (order, status) => order.status === status
+const isAnyStatus = (order, statuses) => statuses.includes(order.status)
+
 // Methods
 const refreshOrders = async () => {
   await orderStore.fetchOrders()
 }
+
+// Pull to refresh
+const { pullDistance, isRefreshing } = usePullToRefresh(refreshOrders)
 
 const getOrderCountByStatus = (status) => {
   if (status === 'ALL') return orders.value.length
@@ -428,29 +438,11 @@ const getOrderCountByStatus = (status) => {
 }
 
 const getStatusBadge = (status) => {
-  const badges = {
-    CREATED: 'bg-gray-100 text-gray-800',
-    PAID: 'bg-green-100 text-green-800',
-    QUEUED: 'bg-yellow-100 text-yellow-800',
-    IN_PROGRESS: 'bg-blue-100 text-blue-800',
-    READY: 'bg-purple-100 text-purple-800',
-    SERVED: 'bg-green-100 text-green-800',
-    CANCELLED: 'bg-red-100 text-red-800'
-  }
-  return badges[status] || 'bg-gray-100 text-gray-800'
+  return ORDER_STATUS_DISPLAY[status]?.badge || 'bg-gray-100 text-gray-800'
 }
 
 const getStatusText = (status) => {
-  const texts = {
-    CREATED: 'Mới tạo',
-    PAID: 'Đã thanh toán',
-    QUEUED: 'Chờ pha chế',
-    IN_PROGRESS: 'Đang pha chế',
-    READY: 'Sẵn sàng',
-    SERVED: 'Đã phục vụ',
-    CANCELLED: 'Đã hủy'
-  }
-  return texts[status] || status
+  return ORDER_STATUS_DISPLAY[status]?.label || status
 }
 
 const formatPrice = (price) => {
@@ -541,7 +533,7 @@ const confirmOrder = async () => {
 const quickPayment = (order) => {
   paymentOrder.value = order
   paymentAmount.value = order.amount_due || order.total
-  paymentMethod.value = 'CASH'
+  paymentMethod.value = PAYMENT_METHOD.CASH
   showPayment.value = true
   selectedOrder.value = null
 }
@@ -549,7 +541,7 @@ const quickPayment = (order) => {
 const showPaymentModal = (order) => {
   paymentOrder.value = order
   paymentAmount.value = order.amount_due || order.total
-  paymentMethod.value = 'CASH'
+  paymentMethod.value = PAYMENT_METHOD.CASH
   showPayment.value = true
   selectedOrder.value = null
 }

@@ -1,5 +1,11 @@
 <template>
   <div class="h-screen w-screen overflow-hidden flex flex-col bg-gray-50">
+    <!-- Pull to Refresh Indicator -->
+    <PullToRefresh 
+      :pull-distance="pullDistance" 
+      :is-refreshing="isRefreshing"
+      :threshold="80" />
+    
     <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
       <div class="px-4 py-3">
         <h1 class="text-xl font-bold text-gray-800">👥 Quản lý User</h1>
@@ -193,6 +199,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useUserStore } from '../stores/user'
 import BottomNav from '../components/BottomNav.vue'
+import PullToRefresh from '../components/PullToRefresh.vue'
+import { usePullToRefresh } from '../composables/usePullToRefresh'
 
 const userStore = useUserStore()
 const searchQuery = ref('')
@@ -311,8 +319,16 @@ const deleteUser = async () => {
   }
 }
 
-onMounted(async () => {
+// Refresh data function
+const refreshData = async () => {
   await userStore.fetchUsers()
+}
+
+// Pull to refresh
+const { pullDistance, isRefreshing } = usePullToRefresh(refreshData)
+
+onMounted(async () => {
+  await refreshData()
 })
 </script>
 
