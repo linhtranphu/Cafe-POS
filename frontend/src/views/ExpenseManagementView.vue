@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-50 flex flex-col">
+  <div class="h-screen w-screen overflow-hidden flex flex-col bg-gray-50">
     <!-- Pull to Refresh Indicator -->
     <PullToRefresh 
       :pull-distance="pullDistance" 
@@ -8,7 +8,7 @@
     
     <!-- Mobile Header - Fixed -->
     <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
-      <div class="px-4 py-3">
+      <div class="px-4 py-3" style="padding-top: max(0.75rem, env(safe-area-inset-top))">
         <div class="flex items-center justify-between mb-3">
           <h1 class="text-xl font-bold text-gray-800">💰 Chi phí</h1>
         </div>

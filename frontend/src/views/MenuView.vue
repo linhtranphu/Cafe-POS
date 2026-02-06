@@ -1,184 +1,297 @@
 <template>
-  <div class="min-h-screen bg-gray-100">
+  <div class="h-screen w-screen overflow-hidden flex flex-col bg-gray-50">
     <!-- Pull to Refresh Indicator -->
     <PullToRefresh 
       :pull-distance="pullDistance" 
       :is-refreshing="isRefreshing"
       :threshold="80" />
     
-    <Navigation />
-    <div class="p-4">
-      <div class="flex flex-col lg:flex-row justify-between items-center mb-6">
-        <h2 class="text-xl lg:text-2xl font-semibold text-gray-800 mb-4 lg:mb-0">
-          🍽️ Quản lý Menu
-        </h2>
-        <div class="flex flex-wrap gap-2">
-          <button @click="showCategoryForm = true" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-            📁 Quản lý danh mục
+    <!-- Mobile Header - Fixed -->
+    <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
+      <div class="px-4 py-3" style="padding-top: max(0.75rem, env(safe-area-inset-top))">
+        <div class="flex items-center justify-between mb-3">
+          <h1 class="text-xl font-bold text-gray-800">🍽️ Quản lý Menu</h1>
+        </div>
+        
+        <!-- Search Bar -->
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Tìm kiếm món..."
+          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="flex-1 overflow-y-auto px-4 py-4 pb-24">
+      <!-- Loading & Error States -->
+      <div v-if="loading" class="text-center py-16">
+        <div class="text-6xl mb-4">⏳</div>
+        <p class="text-gray-500">Đang tải...</p>
+      </div>
+      
+      <div v-else-if="error" class="text-center py-16">
+        <div class="text-6xl mb-4">⚠️</div>
+        <p class="text-red-600">{{ error }}</p>
+      </div>
+
+      <!-- Quick Actions -->
+      <div v-else class="mb-4">
+        <h2 class="text-sm font-bold text-gray-800 mb-2">⚡ Thao tác nhanh</h2>
+        <div class="grid grid-cols-2 gap-2">
+          <button @click="openCreateModal"
+            class="bg-gradient-to-br from-blue-500 to-cyan-500 text-white rounded-xl p-4 shadow-md active:scale-95 transition-transform">
+            <div class="text-2xl mb-1">➕</div>
+            <div class="text-sm font-bold">Thêm món</div>
           </button>
-          <button @click="showCreateForm = true" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-            + Thêm món mới
+          <button @click="showCategoryModal = true"
+            class="bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-xl p-4 shadow-md active:scale-95 transition-transform">
+            <div class="text-2xl mb-1">📁</div>
+            <div class="text-sm font-bold">Danh mục</div>
           </button>
         </div>
       </div>
 
-      <div v-if="loading" class="text-center py-10 text-gray-600 text-lg">Đang tải...</div>
-      <div v-if="error" class="text-center py-10 text-red-600 bg-red-50 border border-red-200 rounded-lg">{{ error }}</div>
-
-      <div class="grid grid-cols-1 gap-4">
-        <div v-for="category in groupedItems" :key="category.name" class="bg-white rounded-xl p-4 shadow-sm">
-          <h3 class="text-lg font-bold text-gray-800 mb-4 pb-2 border-b-2 border-blue-500">{{ category.name }}</h3>
+      <!-- Menu Items by Category -->
+      <div v-if="!loading && !error" class="space-y-4">
+        <div v-for="category in filteredGroupedItems" :key="category.name" class="bg-white rounded-2xl p-4 shadow-sm">
+          <div class="flex items-center gap-3 mb-4 pb-3 border-b-2 border-blue-500">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center text-2xl" :class="getCategoryColor(category.name)">
+              {{ getCategoryIcon(category.name) }}
+            </div>
+            <div>
+              <h3 class="text-lg font-bold text-gray-800">{{ category.name }}</h3>
+              <p class="text-xs text-gray-500">{{ category.items.length }} món</p>
+            </div>
+          </div>
+          
           <div class="space-y-3">
-            <div v-for="item in category.items" :key="item.id" class="rounded-xl p-4 bg-gray-50">
-              <div class="flex items-center justify-between mb-3">
-                <div class="flex items-center space-x-3">
-                  <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl" :class="getCategoryColor(item.category)">
-                    {{ getCategoryIcon(item.category) }}
-                  </div>
-                  <div>
-                    <h4 class="font-bold text-gray-800">{{ item.name }}</h4>
-                    <p class="text-sm text-gray-500">{{ item.description || 'Chưa có mô tả' }}</p>
-                  </div>
+            <div v-for="item in category.items" :key="item.id" 
+              @click="viewDetails(item)"
+              class="rounded-xl p-4 bg-gray-50 active:scale-98 transition-transform">
+              
+              <!-- Item Header -->
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex-1 min-w-0">
+                  <h4 class="font-bold text-lg text-gray-900 truncate">{{ item.name }}</h4>
+                  <p class="text-sm text-gray-600 line-clamp-2">{{ item.description || 'Chưa có mô tả' }}</p>
                 </div>
-                <div class="text-right">
-                  <span class="px-3 py-1 rounded-full text-xs font-medium" :class="item.available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
-                    {{ item.available ? 'Có sẵn' : 'Hết hàng' }}
-                  </span>
-                </div>
+                <span class="ml-3 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap flex-shrink-0" 
+                  :class="item.available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
+                  {{ item.available ? '✅ Có' : '❌ Hết' }}
+                </span>
               </div>
 
-              <div class="grid grid-cols-1 gap-3 mb-4">
-                <div class="bg-white rounded-lg p-3">
-                  <div class="text-2xl font-bold text-green-600">{{ formatPrice(item.price) }}</div>
-                  <div class="text-xs text-gray-500">Giá bán</div>
-                </div>
-                <div v-if="item.ingredients && item.ingredients.length > 0" class="bg-white rounded-lg p-3">
-                  <div class="text-sm font-semibold text-gray-700 mb-2">Nguyên liệu:</div>
-                  <ul class="text-xs text-gray-600 space-y-1">
-                    <li v-for="ingredient in item.ingredients" :key="ingredient.name">
-                      • {{ ingredient.name }}: {{ ingredient.quantity }} {{ ingredient.unit }}
-                    </li>
-                  </ul>
-                </div>
+              <!-- Price -->
+              <div class="bg-white rounded-lg p-3 mb-3">
+                <div class="text-2xl font-bold text-green-600">{{ formatPrice(item.price) }}</div>
+                <div class="text-xs text-gray-500">Giá bán</div>
               </div>
 
-              <div class="grid grid-cols-3 gap-2">
-                <button @click="editItem(item)" class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
-                  📝 Sửa
+              <!-- Ingredients (if any) -->
+              <div v-if="item.ingredients && item.ingredients.length > 0" class="bg-white rounded-lg p-3 mb-3">
+                <div class="text-sm font-semibold text-gray-700 mb-2">🥘 Nguyên liệu:</div>
+                <ul class="text-xs text-gray-600 space-y-1">
+                  <li v-for="ingredient in item.ingredients" :key="ingredient.name">
+                    • {{ ingredient.name }}: {{ ingredient.quantity }} {{ ingredient.unit }}
+                  </li>
+                </ul>
+              </div>
+
+              <!-- Quick Actions -->
+              <div class="grid grid-cols-3 gap-2 pt-3 border-t">
+                <button @click.stop="editItem(item)"
+                  class="bg-yellow-500 text-white py-2 rounded-lg text-sm font-medium active:bg-yellow-600">
+                  ✏️ Sửa
                 </button>
-                <button @click="toggleAvailable(item)" :class="item.available ? 'bg-gray-500 hover:bg-gray-600' : 'bg-green-500 hover:bg-green-600'" class="text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+                <button @click.stop="toggleAvailable(item)"
+                  :class="item.available ? 'bg-gray-500 active:bg-gray-600' : 'bg-green-500 active:bg-green-600'"
+                  class="text-white py-2 rounded-lg text-sm font-medium">
                   {{ item.available ? '🙈 Ẩn' : '👁️ Hiện' }}
                 </button>
-                <button @click="deleteItem(item.id)" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+                <button @click.stop="deleteItem(item.id)"
+                  class="bg-red-500 text-white py-2 rounded-lg text-sm font-medium active:bg-red-600">
                   🗑️ Xóa
                 </button>
               </div>
             </div>
           </div>
         </div>
+
+        <!-- Empty State -->
+        <div v-if="filteredGroupedItems.length === 0" class="text-center py-16">
+          <div class="text-6xl mb-4">📭</div>
+          <p class="text-gray-500">{{ searchQuery ? 'Không tìm thấy món nào' : 'Chưa có món nào' }}</p>
+        </div>
       </div>
+    </div>
 
-      <!-- Category Management Modal -->
-      <div v-if="showCategoryForm" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-xl p-6 w-full max-w-md max-h-[80vh] overflow-y-auto">
-          <h3 class="text-xl font-bold text-gray-800 mb-4">📁 Quản lý Danh mục Menu</h3>
+    <!-- Bottom Navigation -->
+    <BottomNav />
+
+    <!-- Category Management Modal - Mobile Optimized -->
+    <transition name="slide-up">
+      <div v-if="showCategoryModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
+        <div class="bg-white rounded-t-3xl w-full h-[85vh] flex flex-col">
+          <!-- Fixed Header -->
+          <div class="flex-shrink-0 bg-white px-4 py-4 border-b flex justify-between items-center rounded-t-3xl">
+            <h3 class="text-lg font-bold">📁 Quản lý Danh mục</h3>
+            <button @click="showCategoryModal = false" class="text-2xl text-gray-400">×</button>
+          </div>
           
-          <div class="bg-gray-50 rounded-lg p-4 mb-4">
-            <h4 class="font-semibold text-gray-800 mb-3">Thêm danh mục mới</h4>
-            <form @submit.prevent="addCategory">
-              <input v-model="categoryForm.name" type="text" required placeholder="Ví dụ: Cà phê" class="w-full p-3 border border-gray-300 rounded-lg mb-3" />
-              <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium">+ Thêm danh mục</button>
-            </form>
-          </div>
-
-          <div class="space-y-2 max-h-96 overflow-y-auto">
-            <div v-for="cat in menuCategories" :key="cat.id" class="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between">
-              <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl" :class="getCategoryColor(cat.name)">
-                  {{ getCategoryIcon(cat.name) }}
-                </div>
-                <div>
-                  <div class="font-medium text-gray-800">{{ cat.name }}</div>
-                  <div class="text-xs text-gray-500">{{ getMenuCountByCategory(cat.name) }} món</div>
-                </div>
-              </div>
-              <button @click="deleteCategory(cat.id, cat.name)" class="text-red-500 hover:text-red-700 p-2">
-                🗑️
-              </button>
+          <!-- Scrollable Content -->
+          <div class="flex-1 overflow-y-auto px-4 py-4">
+            <!-- Add New Category -->
+            <div class="bg-gray-50 rounded-xl p-4 mb-4 flex-shrink-0">
+              <h4 class="font-semibold text-gray-800 mb-3">Thêm danh mục mới</h4>
+              <form @submit.prevent="addCategory" class="flex flex-col sm:flex-row gap-2">
+                <input v-model="categoryForm.name" type="text" required placeholder="VD: Cà phê, Trà..." 
+                  class="flex-1 px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" />
+                <button type="submit" class="bg-purple-500 text-white px-6 py-3 rounded-lg font-medium text-base active:bg-purple-600 whitespace-nowrap">
+                  Thêm
+                </button>
+              </form>
             </div>
-          </div>
 
-          <div class="mt-4">
-            <button type="button" @click="showCategoryForm = false" class="w-full bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium">Đóng</button>
+            <!-- Category List -->
+            <div class="space-y-3 pb-4">
+              <div v-for="cat in menuCategories" :key="cat.id" 
+                class="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
+                <div class="flex items-center gap-3 flex-1 min-w-0">
+                  <div class="w-12 h-12 rounded-lg flex items-center justify-center text-2xl flex-shrink-0" :class="getCategoryColor(cat.name)">
+                    {{ getCategoryIcon(cat.name) }}
+                  </div>
+                  <div class="min-w-0">
+                    <div class="font-medium text-gray-800 truncate">{{ cat.name }}</div>
+                    <div class="text-xs text-gray-500">{{ getMenuCountByCategory(cat.name) }} món</div>
+                  </div>
+                </div>
+                <button @click="deleteCategory(cat.id, cat.name)" class="text-red-500 hover:text-red-700 p-2 flex-shrink-0 ml-2">
+                  🗑️
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
+    </transition>
 
-      <!-- Create/Edit Form Modal -->
-      <div v-if="showCreateForm || editingItem" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-xl p-6 w-full max-w-md max-h-[80vh] overflow-y-auto">
-          <h3 class="text-xl font-bold text-gray-800 mb-4">{{ editingItem ? 'Sửa món' : 'Thêm món mới' }}</h3>
-          <form @submit.prevent="saveItem" class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Tên món *</label>
-              <input v-model="form.name" type="text" required placeholder="Nhập tên món" class="w-full p-3 border border-gray-300 rounded-lg" />
+    <!-- Create/Edit Form Modal - Slide from Right -->
+    <transition name="slide-right">
+      <div v-if="showMenuForm" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
+        <div class="bg-gray-50 w-full h-screen flex flex-col">
+          <!-- Mobile Header - Fixed -->
+          <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
+            <div class="px-4 py-3">
+              <div class="flex items-center justify-between">
+                <button @click="cancelEdit" class="text-2xl text-gray-600">←</button>
+                <h1 class="text-xl font-bold text-gray-800">{{ editingItem ? '✏️ Cập nhật món' : '➕ Thêm món mới' }}</h1>
+                <div class="w-8"></div>
+              </div>
             </div>
+          </div>
+
+          <!-- Scrollable Content -->
+          <div class="flex-1 overflow-y-auto px-4 py-6 space-y-5">
+            <!-- Tên món -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Danh mục *</label>
-              <select v-model="form.category" required class="w-full p-3 border border-gray-300 rounded-lg">
-                <option value="">Chọn danh mục</option>
-                <option v-for="cat in menuCategories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
-              </select>
+              <label class="block text-sm font-medium text-gray-700 mb-3">Tên món *</label>
+              <input v-model="form.name" type="text" required placeholder="VD: Cà phê sữa đá"
+                class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Giá (VNĐ) *</label>
-              <input v-model.number="form.price" type="number" min="0" step="1000" required placeholder="0" class="w-full p-3 border border-gray-300 rounded-lg" />
+
+            <!-- Danh mục & Giá - Responsive Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-3">Danh mục *</label>
+                <select v-model="form.category" required
+                  class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                  <option value="">Chọn danh mục</option>
+                  <option v-for="cat in menuCategories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-3">Giá (VNĐ) *</label>
+                <input v-model.number="form.price" type="number" min="0" step="1000" required placeholder="0"
+                  class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              </div>
             </div>
+
+            <!-- Mô tả -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Mô tả</label>
-              <textarea v-model="form.description" rows="3" placeholder="Mô tả món ăn..." class="w-full p-3 border border-gray-300 rounded-lg"></textarea>
+              <label class="block text-sm font-medium text-gray-700 mb-3">Mô tả</label>
+              <textarea v-model="form.description" rows="3" placeholder="Mô tả món ăn..."
+                class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"></textarea>
             </div>
+
+            <!-- Nguyên liệu -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Nguyên liệu</label>
-              <div class="border border-gray-300 rounded-lg p-3 bg-gray-50">
-                <div v-if="form.ingredients.length === 0" class="text-center text-gray-500 italic py-4">
-                  Chưa có nguyên liệu nào
+              <label class="block text-sm font-medium text-gray-700 mb-3">🥘 Nguyên liệu</label>
+              <div class="border border-gray-300 rounded-lg p-4 bg-white">
+                <div v-if="form.ingredients.length === 0" class="text-center text-gray-500 italic py-8">
+                  <div class="text-4xl mb-2">📋</div>
+                  <p>Chưa có nguyên liệu nào</p>
                 </div>
-                <div v-for="(ingredient, index) in form.ingredients" :key="index" class="flex gap-2 mb-2">
-                  <input v-model="ingredient.name" placeholder="Tên" class="flex-1 p-2 border border-gray-300 rounded" required />
-                  <input v-model.number="ingredient.quantity" type="number" min="0" step="0.1" placeholder="SL" class="w-20 p-2 border border-gray-300 rounded" required />
-                  <input v-model="ingredient.unit" placeholder="Đơn vị" class="w-20 p-2 border border-gray-300 rounded" required />
-                  <button type="button" @click="removeIngredient(index)" class="bg-red-500 text-white px-3 rounded hover:bg-red-600">×</button>
+                <div v-else class="space-y-3 mb-3">
+                  <div v-for="(ingredient, index) in form.ingredients" :key="index" 
+                    class="bg-gray-50 rounded-lg p-3">
+                    <div class="flex gap-2 mb-2">
+                      <input v-model="ingredient.name" placeholder="Tên nguyên liệu" required
+                        class="flex-1 px-3 py-2 text-base border border-gray-300 rounded-lg" />
+                      <button type="button" @click="removeIngredient(index)" 
+                        class="bg-red-500 text-white px-4 rounded-lg hover:bg-red-600 flex-shrink-0">
+                        ×
+                      </button>
+                    </div>
+                    <div class="flex gap-2">
+                      <input v-model.number="ingredient.quantity" type="number" min="0" step="0.1" placeholder="Số lượng" required
+                        class="flex-1 px-3 py-2 text-base border border-gray-300 rounded-lg" />
+                      <input v-model="ingredient.unit" placeholder="Đơn vị" required
+                        class="flex-1 px-3 py-2 text-base border border-gray-300 rounded-lg" />
+                    </div>
+                  </div>
                 </div>
-                <button type="button" @click="addIngredient" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg mt-2">
+                <button type="button" @click="addIngredient" 
+                  class="w-full bg-blue-500 text-white py-3 rounded-lg font-medium text-base active:bg-blue-600">
                   + Thêm nguyên liệu
                 </button>
               </div>
             </div>
-            <div class="flex gap-2">
-              <button type="button" @click="cancelEdit" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium">Hủy</button>
-              <button type="submit" class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium" :disabled="!form.name || !form.category || form.price <= 0">
-                {{ editingItem ? 'Cập nhật' : 'Thêm món' }}
-              </button>
-            </div>
-          </form>
+
+            <!-- Spacer for bottom buttons -->
+            <div class="h-24"></div>
+          </div>
+
+          <!-- Fixed Footer -->
+          <div class="flex-shrink-0 bg-white px-4 py-4 border-t flex gap-3 pb-safe">
+            <button @click="cancelEdit" 
+              class="flex-1 bg-gray-200 text-gray-700 py-4 rounded-xl font-medium text-base active:bg-gray-300 transition-colors">
+              Hủy
+            </button>
+            <button @click="saveItem" :disabled="!form.name || !form.category || form.price <= 0"
+              class="flex-1 bg-green-500 text-white py-4 rounded-xl font-medium text-base active:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              {{ editingItem ? 'Cập nhật' : 'Thêm món' }}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </transition>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useMenuStore } from '../stores/menu'
-import Navigation from '../components/Navigation.vue'
+import BottomNav from '../components/BottomNav.vue'
 import PullToRefresh from '../components/PullToRefresh.vue'
 import { usePullToRefresh } from '../composables/usePullToRefresh'
 
 const menuStore = useMenuStore()
 
-const showCreateForm = ref(false)
-const showCategoryForm = ref(false)
+const searchQuery = ref('')
+const showMenuForm = ref(false)
+const showCategoryModal = ref(false)
 const editingItem = ref(null)
 const form = ref({
   name: '',
@@ -218,6 +331,22 @@ const groupedItems = computed(() => {
   return Object.values(groups)
 })
 
+const filteredGroupedItems = computed(() => {
+  if (!searchQuery.value) return groupedItems.value
+  
+  const query = searchQuery.value.toLowerCase()
+  return groupedItems.value
+    .map(category => ({
+      ...category,
+      items: category.items.filter(item => 
+        item.name?.toLowerCase().includes(query) ||
+        item.description?.toLowerCase().includes(query) ||
+        item.category?.toLowerCase().includes(query)
+      )
+    }))
+    .filter(category => category.items.length > 0)
+})
+
 // Refresh data function
 const refreshData = async () => {
   await menuStore.fetchMenuItems()
@@ -237,6 +366,22 @@ const formatPrice = (price) => {
   }).format(price)
 }
 
+const openCreateModal = () => {
+  form.value = {
+    name: '',
+    category: '',
+    price: 0,
+    description: '',
+    ingredients: []
+  }
+  editingItem.value = null
+  showMenuForm.value = true
+}
+
+const viewDetails = (item) => {
+  editItem(item)
+}
+
 const editItem = (item) => {
   editingItem.value = item
   form.value = {
@@ -246,11 +391,11 @@ const editItem = (item) => {
     description: item.description,
     ingredients: item.ingredients ? [...item.ingredients] : []
   }
-  showCreateForm.value = false
+  showMenuForm.value = true
 }
 
 const cancelEdit = () => {
-  showCreateForm.value = false
+  showMenuForm.value = false
   editingItem.value = null
   form.value = { name: '', category: '', price: 0, description: '', ingredients: [] }
 }
@@ -274,6 +419,9 @@ const saveItem = async () => {
   
   if (success) {
     cancelEdit()
+    alert(editingItem.value ? 'Cập nhật món thành công' : 'Thêm món thành công')
+  } else {
+    alert('Lỗi: ' + (menuStore.error || 'Có lỗi xảy ra'))
   }
 }
 
@@ -287,8 +435,10 @@ const toggleAvailable = async (item) => {
 const deleteItem = async (id) => {
   if (confirm('Bạn có chắc muốn xóa món này? Hành động này không thể hoàn tác.')) {
     const success = await menuStore.deleteMenuItem(id)
-    if (!success && menuStore.error) {
-      alert('Lỗi: ' + menuStore.error)
+    if (success) {
+      alert('Xóa món thành công')
+    } else {
+      alert('Lỗi: ' + (menuStore.error || 'Có lỗi xảy ra'))
     }
   }
 }
@@ -296,12 +446,19 @@ const deleteItem = async (id) => {
 const addCategory = () => {
   if (!categoryForm.value.name) return
   
+  // Check if category already exists
+  if (menuCategories.value.some(c => c.name.toLowerCase() === categoryForm.value.name.toLowerCase())) {
+    alert('Danh mục đã tồn tại!')
+    return
+  }
+  
   menuCategories.value.push({
     id: Date.now().toString(),
     name: categoryForm.value.name
   })
   
   categoryForm.value = { name: '' }
+  alert('Thêm danh mục thành công')
 }
 
 const deleteCategory = (id, name) => {
@@ -314,6 +471,7 @@ const deleteCategory = (id, name) => {
   
   if (confirm(`Bạn có chắc muốn xóa danh mục "${name}"?`)) {
     menuCategories.value = menuCategories.value.filter(c => c.id !== id)
+    alert('Xóa danh mục thành công')
   }
 }
 
@@ -349,6 +507,51 @@ const getCategoryColor = (category) => {
 </script>
 
 <style scoped>
+.active\:scale-95:active {
+  transform: scale(0.95);
+}
+
+.active\:scale-98:active {
+  transform: scale(0.98);
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.slide-up-enter-from {
+  transform: translateY(100%);
+}
+
+.slide-up-leave-to {
+  transform: translateY(100%);
+}
+
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.slide-right-enter-from {
+  transform: translateX(100%);
+}
+
+.slide-right-leave-to {
+  transform: translateX(100%);
+}
+
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;

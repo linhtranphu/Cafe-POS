@@ -8,7 +8,7 @@
     
     <!-- Mobile Header - Fixed -->
     <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
-      <div class="px-4 py-4">
+      <div class="px-4 py-4" style="padding-top: max(1rem, env(safe-area-inset-top))">
         <div class="flex items-center justify-between">
           <div>
             <h1 class="text-2xl font-bold text-gray-800">👋 Xin chào</h1>

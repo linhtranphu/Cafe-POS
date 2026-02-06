@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="h-screen w-screen overflow-hidden flex flex-col bg-gray-50">
     <!-- Pull to Refresh Indicator -->
     <PullToRefresh 
       :pull-distance="pullDistance" 
@@ -7,14 +7,14 @@
       :threshold="80" />
     
     <!-- Mobile Header - Fixed -->
-    <div class="sticky top-0 z-40 bg-white shadow-sm">
-      <div class="px-4 py-3">
+    <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
+      <div class="px-4 py-3" style="padding-top: max(0.75rem, env(safe-area-inset-top))">
         <h1 class="text-xl font-bold text-gray-800">⏰ Ca làm việc</h1>
       </div>
     </div>
 
     <!-- Content -->
-    <div class="px-4 py-4 pb-24">
+    <div class="flex-1 overflow-y-auto px-4 py-4 pb-24">
       <!-- Current Shift -->
       <div v-if="currentShift" class="bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-2xl p-6 mb-4 shadow-lg">
         <div class="flex justify-between items-start mb-4">

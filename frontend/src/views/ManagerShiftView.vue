@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="h-screen w-screen overflow-hidden flex flex-col bg-gray-50">
     <!-- Pull to Refresh Indicator -->
     <PullToRefresh 
       :pull-distance="pullDistance" 
@@ -7,8 +7,8 @@
       :threshold="80" />
     
     <!-- Mobile Header - Fixed -->
-    <div class="sticky top-0 z-40 bg-white shadow-sm">
-      <div class="px-4 py-3">
+    <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
+      <div class="px-4 py-3" style="padding-top: max(0.75rem, env(safe-area-inset-top))">
         <div class="flex items-center justify-between mb-3">
           <h1 class="text-xl font-bold text-gray-800">⏰ Quản lý ca làm việc</h1>
           <button @click="refreshData" class="p-2 rounded-lg bg-blue-500 text-white">
@@ -38,7 +38,7 @@
     </div>
 
     <!-- Content -->
-    <div class="px-4 py-4 pb-24">
+    <div class="flex-1 overflow-y-auto px-4 py-4 pb-24">
       <!-- Stats Cards - Single Row -->
       <div class="bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl p-4 mb-4 text-white shadow-lg">
         <div class="text-xs opacity-90 mb-2">Tổng quan ca làm</div>

@@ -7,7 +7,7 @@
       :threshold="80" />
     
     <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
-      <div class="px-4 py-3">
+      <div class="px-4 py-3" style="padding-top: max(0.75rem, env(safe-area-inset-top))">
         <h1 class="text-xl font-bold text-gray-800">👥 Quản lý User</h1>
         <input v-model="searchQuery" type="text" placeholder="Tìm kiếm user..." class="w-full px-4 py-2 border border-gray-300 rounded-lg mt-2 focus:ring-2 focus:ring-blue-500" />
       </div>

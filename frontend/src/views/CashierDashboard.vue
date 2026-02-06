@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="h-screen w-screen overflow-hidden flex flex-col bg-gray-50">
     <!-- Pull to Refresh Indicator -->
     <PullToRefresh 
       :pull-distance="pullDistance" 
@@ -7,8 +7,8 @@
       :threshold="80" />
     
     <!-- Mobile Header - Fixed -->
-    <div class="sticky top-0 z-40 bg-white shadow-sm">
-      <div class="px-4 py-4">
+    <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
+      <div class="px-4 py-4" style="padding-top: max(1rem, env(safe-area-inset-top))">
         <div class="flex items-center justify-between">
           <div>
             <h1 class="text-2xl font-bold text-gray-800">💵 Thu ngân</h1>
@@ -26,7 +26,7 @@
     </div>
 
     <!-- Content -->
-    <div class="px-4 py-4 pb-24">
+    <div class="flex-1 overflow-y-auto px-4 py-4 pb-24">
       <!-- Error Alert -->
       <div v-if="error" class="bg-red-50 border-2 border-red-200 rounded-2xl p-4 mb-4">
         <div class="flex items-start justify-between">

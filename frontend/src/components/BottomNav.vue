@@ -1,5 +1,5 @@
 <template>
-  <div class="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-40 safe-area-bottom">
+  <div class="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-40">
     <div class="flex justify-around py-2">
       <button 
         v-for="item in navItems" 
@@ -87,7 +87,5 @@ const navigate = (path) => {
 </script>
 
 <style scoped>
-.safe-area-bottom {
-  padding-bottom: env(safe-area-inset-bottom);
-}
+/* No safe area padding - container scroll handles spacing with pb-24 */
 </style>

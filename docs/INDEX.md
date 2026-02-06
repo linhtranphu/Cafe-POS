@@ -130,6 +130,18 @@
 ### 🛠️ Formatters & Utilities
 - **[FORMATTERS_UTILITY_IMPLEMENTATION.md](./FORMATTERS_UTILITY_IMPLEMENTATION.md)** - Triển khai tiện ích formatters
 
+### 📱 iPhone Safe Area & Mobile Optimization
+- **[IPHONE_NOTCH_FIX.md](./IPHONE_NOTCH_FIX.md)** - 📱 iPhone notch & safe area implementation guide
+- **[../IPHONE_SAFE_AREA_COMPLETE.md](../IPHONE_SAFE_AREA_COMPLETE.md)** - ✅ Safe area implementation complete (15/15 views fixed)
+- **[../MENU_VIEW_MOBILE_REDESIGN.md](../MENU_VIEW_MOBILE_REDESIGN.md)** - 🍽️ MenuView mobile-first redesign complete
+
+**Status:** ✅ Complete - Ready for Device Testing
+- All 15 views with sticky headers fixed
+- Bottom navigation safe area support
+- Global CSS safe area utilities
+- MenuView redesigned mobile-first
+- Ready for iPhone testing (X, 11, 12, 13, 14, 15)
+
 ### 📋 Constants & Patterns
 - **[CONSTANTS_PATTERN.md](./CONSTANTS_PATTERN.md)** - ⭐ Pattern sử dụng constants để đồng bộ frontend/backend, tránh lỗi hardcode strings
 - **[CONSTANTS_QUICK_REFERENCE.md](./CONSTANTS_QUICK_REFERENCE.md)** - 📋 Quick reference card cho developers

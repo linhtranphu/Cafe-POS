@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="h-screen w-screen overflow-hidden flex flex-col bg-gray-50">
     <!-- Pull to Refresh -->
     <PullToRefresh 
       :pull-distance="pullDistance" 
@@ -7,8 +7,8 @@
       :threshold="80" />
 
     <!-- Header -->
-    <div class="sticky top-0 z-40 bg-white shadow-sm">
-      <div class="px-4 py-4">
+    <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
+      <div class="px-4 py-4" style="padding-top: max(1rem, env(safe-area-inset-top))">
         <div class="flex items-center gap-3">
           <button
             @click="goBack"
@@ -25,7 +25,7 @@
     </div>
 
     <!-- Content -->
-    <div class="px-4 py-4 pb-24">
+    <div class="flex-1 overflow-y-auto px-4 py-4 pb-24">
       <!-- Loading -->
       <div v-if="loading" class="text-center py-12">
         <div class="animate-spin text-5xl mb-3">⏳</div>
