@@ -21,32 +21,18 @@
           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
         
-        <!-- Source Type Filter -->
+        <!-- Creator Filter -->
         <div class="mt-2 flex gap-2 overflow-x-auto pb-2">
-          <button @click="sourceFilter = ''" 
-            :class="sourceFilter === '' ? 'bg-purple-500 text-white' : 'bg-white text-gray-700 border border-gray-300'"
+          <button @click="creatorFilter = ''" 
+            :class="creatorFilter === '' ? 'bg-purple-500 text-white' : 'bg-white text-gray-700 border border-gray-300'"
             class="px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap">
-            Tất cả
+            👥 Tất cả
           </button>
-          <button @click="sourceFilter = 'manual'" 
-            :class="sourceFilter === 'manual' ? 'bg-purple-500 text-white' : 'bg-white text-gray-700 border border-gray-300'"
+          <button v-for="creator in uniqueCreators" :key="creator"
+            @click="creatorFilter = creator" 
+            :class="creatorFilter === creator ? 'bg-purple-500 text-white' : 'bg-white text-gray-700 border border-gray-300'"
             class="px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap">
-            ✍️ Thủ công
-          </button>
-          <button @click="sourceFilter = 'ingredient'" 
-            :class="sourceFilter === 'ingredient' ? 'bg-green-500 text-white' : 'bg-white text-gray-700 border border-gray-300'"
-            class="px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap">
-            🥬 Nguyên liệu
-          </button>
-          <button @click="sourceFilter = 'facility'" 
-            :class="sourceFilter === 'facility' ? 'bg-blue-500 text-white' : 'bg-white text-gray-700 border border-gray-300'"
-            class="px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap">
-            🏢 Cơ sở vật chất
-          </button>
-          <button @click="sourceFilter = 'maintenance'" 
-            :class="sourceFilter === 'maintenance' ? 'bg-orange-500 text-white' : 'bg-white text-gray-700 border border-gray-300'"
-            class="px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap">
-            🔧 Bảo trì
+            👤 {{ creator }}
           </button>
         </div>
       </div>
@@ -56,23 +42,24 @@
     <div class="flex-1 overflow-y-auto px-4 py-4 pb-24">
       <!-- Stats Cards -->
       <div class="bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl p-4 mb-4 text-white shadow-lg">
-        <div class="text-xs opacity-90 mb-2">Tổng quan chi phí</div>
-        <div class="grid grid-cols-4 gap-1.5">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-xs opacity-90">Chi phí</div>
+          <div v-if="creatorFilter" class="text-xs opacity-90 bg-white/20 px-2 py-1 rounded-full">
+            👤 {{ creatorFilter }}
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
           <div class="text-center">
-            <div class="text-lg font-bold">{{ expenses.length }}</div>
-            <div class="text-[10px] opacity-90 whitespace-nowrap">Tổng</div>
+            <div class="text-base font-bold leading-tight">{{ formatCompactPrice(totalAllTime) }}</div>
+            <div class="text-[10px] opacity-90 whitespace-nowrap mt-1">Tổng từ đầu</div>
           </div>
           <div class="text-center">
-            <div class="text-lg font-bold">{{ formatPrice(totalThisMonth) }}</div>
-            <div class="text-[10px] opacity-90 whitespace-nowrap">Tháng này</div>
+            <div class="text-base font-bold leading-tight">{{ formatCompactPrice(totalThisMonth) }}</div>
+            <div class="text-[10px] opacity-90 whitespace-nowrap mt-1">Tháng này</div>
           </div>
           <div class="text-center">
-            <div class="text-lg font-bold">{{ recurringCount }}</div>
-            <div class="text-[10px] opacity-90 whitespace-nowrap">Định kỳ</div>
-          </div>
-          <div class="text-center">
-            <div class="text-lg font-bold">{{ categories.length }}</div>
-            <div class="text-[10px] opacity-90 whitespace-nowrap">Danh mục</div>
+            <div class="text-base font-bold leading-tight">{{ recurringCount }}</div>
+            <div class="text-[10px] opacity-90 whitespace-nowrap mt-1">Định kỳ</div>
           </div>
         </div>
       </div>
@@ -297,7 +284,7 @@ import { PAYMENT_METHODS, PAYMENT_METHOD_OPTIONS, getPaymentMethodLabel } from '
 const expenseStore = useExpenseStore()
 
 const searchQuery = ref('')
-const sourceFilter = ref('')
+const creatorFilter = ref('')
 const showCreateForm = ref(false)
 const showCategoryForm = ref(false)
 const isEditing = ref(false)
@@ -317,16 +304,22 @@ const formData = ref({
 const expenses = computed(() => expenseStore.expenses || [])
 const categories = computed(() => expenseStore.categories || [])
 
+// Get unique creators from expenses
+const uniqueCreators = computed(() => {
+  const creators = expenses.value
+    .map(e => e.created_by || 'Hệ thống')
+    .filter((value, index, self) => self.indexOf(value) === index)
+  return creators.sort()
+})
+
 const filteredExpenses = computed(() => {
   let filtered = expenses.value
   
-  // Filter by source type
-  if (sourceFilter.value) {
+  // Filter by creator
+  if (creatorFilter.value) {
     filtered = filtered.filter(e => {
-      if (sourceFilter.value === 'manual') {
-        return !e.source_type || e.source_type === 'manual'
-      }
-      return e.source_type === sourceFilter.value
+      const creator = e.created_by || 'Hệ thống'
+      return creator === creatorFilter.value
     })
   }
   
@@ -339,7 +332,12 @@ const filteredExpenses = computed(() => {
     )
   }
   
-  return filtered
+  // Sort by date (newest first)
+  return [...filtered].sort((a, b) => {
+    const dateA = new Date(a.date || a.created_at || 0)
+    const dateB = new Date(b.date || b.created_at || 0)
+    return dateB - dateA // Newest first
+  })
 })
 
 const totalThisMonth = computed(() => {
@@ -347,7 +345,17 @@ const totalThisMonth = computed(() => {
   const thisMonth = now.getMonth()
   const thisYear = now.getFullYear()
   
-  return expenses.value
+  let filtered = expenses.value
+  
+  // Filter by creator if selected
+  if (creatorFilter.value) {
+    filtered = filtered.filter(e => {
+      const creator = e.created_by || 'Hệ thống'
+      return creator === creatorFilter.value
+    })
+  }
+  
+  return filtered
     .filter(e => {
       const expenseDate = new Date(e.date)
       return expenseDate.getMonth() === thisMonth && expenseDate.getFullYear() === thisYear
@@ -355,9 +363,41 @@ const totalThisMonth = computed(() => {
     .reduce((sum, e) => sum + e.amount, 0)
 })
 
+const totalAllTime = computed(() => {
+  let filtered = expenses.value
+  
+  // Filter by creator if selected
+  if (creatorFilter.value) {
+    filtered = filtered.filter(e => {
+      const creator = e.created_by || 'Hệ thống'
+      return creator === creatorFilter.value
+    })
+  }
+  
+  return filtered.reduce((sum, e) => sum + e.amount, 0)
+})
+
 const recurringCount = computed(() => {
   return expenseStore.recurringExpenses?.length || 0
 })
+
+// Format price in compact form - always show in thousands (÷1000)
+const formatCompactPrice = (value) => {
+  if (value === undefined || value === null || isNaN(value)) {
+    return '0k'
+  }
+  
+  // Always divide by 1000 to show in thousands
+  const thousands = value / 1000
+  
+  // If it's a whole number of thousands
+  if (thousands % 1 === 0) {
+    return `${thousands}k`
+  }
+  
+  // If it has decimals, show 1 decimal place
+  return `${thousands.toFixed(1)}k`
+}
 
 const getCategoryName = (categoryId) => {
   const category = categories.value.find(c => c.id === categoryId)

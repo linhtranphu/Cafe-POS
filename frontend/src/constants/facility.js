@@ -26,6 +26,7 @@ export const FACILITY_STATUS_CLASSES = {
 }
 
 // Facility Types
+// Must match backend: backend/domain/facility/facility.go
 export const FACILITY_TYPES = {
   FURNITURE: 'Bàn ghế',
   MACHINE: 'Máy móc',
@@ -34,12 +35,13 @@ export const FACILITY_TYPES = {
   OTHER: 'Khác'
 }
 
+// For backward compatibility and convenience
 export const FACILITY_TYPE_OPTIONS = [
-  { value: FACILITY_TYPES.FURNITURE, label: 'Bàn ghế' },
-  { value: FACILITY_TYPES.MACHINE, label: 'Máy móc' },
-  { value: FACILITY_TYPES.UTENSIL, label: 'Dụng cụ' },
-  { value: FACILITY_TYPES.ELECTRIC, label: 'Điện tử' },
-  { value: FACILITY_TYPES.OTHER, label: 'Khác' }
+  { value: FACILITY_TYPES.FURNITURE, label: FACILITY_TYPES.FURNITURE },
+  { value: FACILITY_TYPES.MACHINE, label: FACILITY_TYPES.MACHINE },
+  { value: FACILITY_TYPES.UTENSIL, label: FACILITY_TYPES.UTENSIL },
+  { value: FACILITY_TYPES.ELECTRIC, label: FACILITY_TYPES.ELECTRIC },
+  { value: FACILITY_TYPES.OTHER, label: FACILITY_TYPES.OTHER }
 ]
 
 // Facility Areas

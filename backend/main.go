@@ -297,7 +297,12 @@ func main() {
 				manager.GET("/ingredients/:id/history", ingredientHandler.GetStockHistory)
 				manager.PUT("/ingredients/:id", ingredientHandler.UpdateIngredient)
 				manager.DELETE("/ingredients/:id", ingredientHandler.DeleteIngredient)
-				manager.POST("/ingredients/:id/adjust", ingredientHandler.AdjustStock)
+				
+				// Stock operations
+				manager.POST("/ingredients/:id/stock-in", ingredientHandler.StockIn)       // Add stock (purchase)
+				manager.POST("/ingredients/:id/stock-out", ingredientHandler.StockOut)     // Remove stock (usage/waste)
+				manager.POST("/ingredients/:id/stock-adjust", ingredientHandler.StockAdjust) // Set to specific quantity
+				manager.POST("/ingredients/:id/adjust", ingredientHandler.AdjustStock)     // Legacy endpoint
 				
 				// Ingredient category routes
 				manager.POST("/ingredient-categories", ingredientHandler.CreateCategory)

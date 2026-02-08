@@ -21,10 +21,21 @@ func NewIngredientRepository(db *mongo.Database) *IngredientRepository {
 }
 
 func (r *IngredientRepository) Create(ctx context.Context, item *ingredient.Ingredient) error {
-	item.CreatedAt = time.Now()
+	// Only set CreatedAt if not already set (allow custom creation date)
+	if item.CreatedAt.IsZero() {
+		item.CreatedAt = time.Now()
+	}
+	// Always update UpdatedAt
 	item.UpdatedAt = time.Now()
-	_, err := r.collection.InsertOne(ctx, item)
-	return err
+	result, err := r.collection.InsertOne(ctx, item)
+	if err != nil {
+		return err
+	}
+	// Set the ID from the inserted document
+	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
+		item.ID = oid
+	}
+	return nil
 }
 
 func (r *IngredientRepository) FindAll(ctx context.Context) ([]*ingredient.Ingredient, error) {

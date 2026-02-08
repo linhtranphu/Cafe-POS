@@ -69,7 +69,7 @@
         </div>
 
         <!-- Step 1: Initiate Closure -->
-        <div v-if="shift.status === 'OPEN'" class="bg-white rounded-2xl p-6 shadow-sm">
+        <div v-if="shift.status === CASHIER_SHIFT_STATUS.OPEN" class="bg-white rounded-2xl p-6 shadow-sm">
           <h3 class="text-lg font-bold text-gray-800 mb-4">Bước 1: Bắt đầu đóng ca</h3>
           <p class="text-sm text-gray-600 mb-4">
             Xác nhận bắt đầu quy trình đóng ca. Sau khi bắt đầu, bạn cần hoàn thành tất cả các bước.
@@ -84,7 +84,7 @@
         </div>
 
         <!-- Step 2: Record Actual Cash -->
-        <div v-if="shift.status === 'CLOSURE_INITIATED' && !shift.actual_cash" class="bg-white rounded-2xl p-6 shadow-sm">
+        <div v-if="shift.status === CASHIER_SHIFT_STATUS.CLOSURE_INITIATED && !shift.actual_cash" class="bg-white rounded-2xl p-6 shadow-sm">
           <h3 class="text-lg font-bold text-gray-800 mb-4">Bước 2: Nhập tiền thực tế</h3>
           <p class="text-sm text-gray-600 mb-4">
             Đếm tiền mặt trong két và nhập số tiền thực tế.
@@ -231,7 +231,7 @@
         </div>
 
         <!-- Completed -->
-        <div v-if="shift.status === 'CLOSED'" class="bg-white rounded-2xl p-6 shadow-sm text-center">
+        <div v-if="shift.status === CASHIER_SHIFT_STATUS.CLOSED" class="bg-white rounded-2xl p-6 shadow-sm text-center">
           <div class="text-6xl mb-4">✅</div>
           <h3 class="text-xl font-bold text-gray-800 mb-2">Ca làm đã đóng</h3>
           <p class="text-sm text-gray-600 mb-4">
@@ -255,6 +255,7 @@ import { useRouter, useRoute } from 'vue-router'
 import cashierShiftService from '../services/cashierShift'
 import PullToRefresh from '../components/PullToRefresh.vue'
 import { usePullToRefresh } from '../composables/usePullToRefresh'
+import { CASHIER_SHIFT_STATUS } from '../constants/shift'
 
 const router = useRouter()
 const route = useRoute()
@@ -273,7 +274,7 @@ const varianceNotes = ref('')
 // Computed
 const canConfirmResponsibility = computed(() => {
   if (!shift.value) return false
-  if (shift.value.status !== 'CLOSURE_INITIATED') return false
+  if (shift.value.status !== CASHIER_SHIFT_STATUS.CLOSURE_INITIATED) return false
   if (!shift.value.actual_cash) return false
   if (shift.value.confirmation) return false
   
@@ -287,7 +288,7 @@ const canConfirmResponsibility = computed(() => {
 
 const canCloseShift = computed(() => {
   if (!shift.value) return false
-  if (shift.value.status !== 'CLOSURE_INITIATED') return false
+  if (shift.value.status !== CASHIER_SHIFT_STATUS.CLOSURE_INITIATED) return false
   return shift.value.confirmation !== null
 })
 
@@ -427,9 +428,9 @@ const formatDateTime = (date) => {
 
 const getStatusText = (status) => {
   const statusMap = {
-    'OPEN': '🟢 Đang mở',
-    'CLOSURE_INITIATED': '🟡 Đang đóng',
-    'CLOSED': '🔴 Đã đóng'
+    [CASHIER_SHIFT_STATUS.OPEN]: '🟢 Đang mở',
+    [CASHIER_SHIFT_STATUS.CLOSURE_INITIATED]: '🟡 Đang đóng',
+    [CASHIER_SHIFT_STATUS.CLOSED]: '🔴 Đã đóng'
   }
   return statusMap[status] || status
 }

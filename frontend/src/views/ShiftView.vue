@@ -189,9 +189,9 @@
                   {{ getRoleTypeText(shift.role_type) }}
                 </p>
               </div>
-              <span :class="shift.status === 'OPEN' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'"
+              <span :class="shift.status === SHIFT_STATUS.OPEN ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'"
                 class="px-3 py-1 rounded-full text-xs font-medium">
-                {{ shift.status === 'OPEN' ? 'Đang mở' : 'Đã đóng' }}
+                {{ shift.status === SHIFT_STATUS.OPEN ? 'Đang mở' : 'Đã đóng' }}
               </span>
             </div>
 
@@ -419,6 +419,8 @@ import { useAuthStore } from '../stores/auth'
 import BottomNav from '../components/BottomNav.vue'
 import PullToRefresh from '../components/PullToRefresh.vue'
 import { usePullToRefresh } from '../composables/usePullToRefresh'
+import { USER_ROLES } from '../constants/user'
+import { SHIFT_STATUS } from '../constants/shift'
 
 const shiftStore = useShiftStore()
 const authStore = useAuthStore()
@@ -459,8 +461,8 @@ const handoverEndShiftForm = ref({
 const loading = computed(() => shiftStore.loading)
 const currentShift = computed(() => shiftStore.currentShift)
 const shifts = computed(() => shiftStore.shifts)
-const isCashier = computed(() => authStore.user?.role === 'cashier' || authStore.user?.role === 'manager')
-const isWaiter = computed(() => authStore.user?.role === 'waiter')
+const isCashier = computed(() => authStore.user?.role === USER_ROLES.CASHIER || authStore.user?.role === USER_ROLES.MANAGER)
+const isWaiter = computed(() => authStore.user?.role === USER_ROLES.WAITER)
 
 // Refresh data function
 const refreshData = async () => {

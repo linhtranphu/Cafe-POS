@@ -36,13 +36,14 @@ type Ingredient struct {
 }
 
 type CreateIngredientRequest struct {
-	Name        string   `json:"name" binding:"required"`
-	Category    string   `json:"category" binding:"required"`
-	Unit        UnitType `json:"unit" binding:"required"`
-	Quantity    float64  `json:"quantity" binding:"required,min=0"`
-	MinStock    float64  `json:"min_stock" binding:"min=0"`
-	CostPerUnit float64  `json:"cost_per_unit" binding:"min=0"`
-	Supplier    string   `json:"supplier"`
+	Name        string    `json:"name" binding:"required"`
+	Category    string    `json:"category" binding:"required"`
+	Unit        UnitType  `json:"unit" binding:"required"`
+	Quantity    float64   `json:"quantity" binding:"required,min=0"`
+	MinStock    float64   `json:"min_stock" binding:"min=0"`
+	CostPerUnit float64   `json:"cost_per_unit" binding:"min=0"`
+	Supplier    string    `json:"supplier"`
+	CreatedDate *string   `json:"created_date"` // Optional: custom creation date (ISO 8601 format)
 }
 
 type UpdateIngredientRequest struct {
@@ -55,11 +56,48 @@ type UpdateIngredientRequest struct {
 	Supplier    string   `json:"supplier"`
 }
 
-type StockAdjustmentRequest struct {
-	Quantity float64 `json:"quantity" binding:"required"`
+// Stock Operation Types - Must match frontend constants
+type StockOperationType string
+
+const (
+	StockOperationIn     StockOperationType = "in"     // Stock IN (purchase)
+	StockOperationOut    StockOperationType = "out"    // Stock OUT (usage/waste)
+	StockOperationAdjust StockOperationType = "adjust" // Stock ADJUST (inventory correction)
+)
+
+// StockInRequest - For purchasing/receiving stock
+type StockInRequest struct {
+	Quantity    float64 `json:"quantity" binding:"required,gt=0"`
+	CostPerUnit float64 `json:"cost_per_unit" binding:"min=0"` // Optional: if 0, use current price
+	Reason      string  `json:"reason"`
+	UserID      string  `json:"user_id"`
+	Username    string  `json:"username"`
+}
+
+// StockOutRequest - For using/removing stock
+type StockOutRequest struct {
+	Quantity float64 `json:"quantity" binding:"required,gt=0"`
 	Reason   string  `json:"reason" binding:"required"`
 	UserID   string  `json:"user_id"`
 	Username string  `json:"username"`
+}
+
+// StockAdjustRequest - For inventory corrections (set to specific quantity)
+type StockAdjustRequest struct {
+	NewQuantity float64 `json:"new_quantity" binding:"required,min=0"` // Target quantity
+	CostPerUnit float64 `json:"cost_per_unit" binding:"min=0"`         // Optional: if increase due to purchase
+	Reason      string  `json:"reason" binding:"required"`
+	UserID      string  `json:"user_id"`
+	Username    string  `json:"username"`
+}
+
+// Legacy request for backward compatibility
+type StockAdjustmentRequest struct {
+	Quantity    float64 `json:"quantity" binding:"required"`
+	Reason      string  `json:"reason" binding:"required"`
+	CostPerUnit float64 `json:"cost_per_unit"` // Optional: price for this purchase (if different from current)
+	UserID      string  `json:"user_id"`
+	Username    string  `json:"username"`
 }
 
 // IngredientCategory represents a category for ingredients

@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"time"
 	"cafe-pos/backend/domain/ingredient"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -42,7 +43,7 @@ func (s *IngredientService) SetAutoExpenseService(autoExpenseService *AutoExpens
 	s.autoExpenseService = autoExpenseService
 }
 
-func (s *IngredientService) CreateIngredient(ctx context.Context, req *ingredient.CreateIngredientRequest, username string) (*ingredient.Ingredient, error) {
+func (s *IngredientService) CreateIngredient(ctx context.Context, req *ingredient.CreateIngredientRequest, userIDStr string, username string) (*ingredient.Ingredient, error) {
 	item := &ingredient.Ingredient{
 		Name:        req.Name,
 		Category:    req.Category,
@@ -52,10 +53,56 @@ func (s *IngredientService) CreateIngredient(ctx context.Context, req *ingredien
 		CostPerUnit: req.CostPerUnit,
 		Supplier:    req.Supplier,
 	}
+	
+	// Set created_at from request if provided, otherwise use current time
+	if req.CreatedDate != nil && *req.CreatedDate != "" {
+		if parsedTime, err := time.Parse(time.RFC3339, *req.CreatedDate); err == nil {
+			item.CreatedAt = parsedTime
+		} else {
+			// Try parsing as datetime-local format (YYYY-MM-DDTHH:MM)
+			if parsedTime, err := time.Parse("2006-01-02T15:04", *req.CreatedDate); err == nil {
+				item.CreatedAt = parsedTime
+			} else {
+				item.CreatedAt = time.Now() // Fallback to current time
+			}
+		}
+	} else {
+		item.CreatedAt = time.Now()
+	}
+	item.UpdatedAt = item.CreatedAt
 
 	err := s.ingredientRepo.Create(ctx, item)
 	if err != nil {
 		return nil, err
+	}
+
+	// Create initial stock history record if quantity > 0
+	if req.Quantity > 0 {
+		userID := primitive.NilObjectID
+		if userIDStr != "" {
+			if oid, err := primitive.ObjectIDFromHex(userIDStr); err == nil {
+				userID = oid
+			}
+		}
+		
+		history := &ingredient.StockHistory{
+			IngredientID: item.ID,
+			Type:         ingredient.TransactionPurchase,
+			Quantity:     req.Quantity,
+			BeforeQty:    0,                              // Initial creation, before quantity is 0
+			AfterQty:     req.Quantity,
+			Reason:       "Tạo nguyên liệu mới - Nhập kho đầu tiên",
+			UserID:       userID,
+			Username:     username,
+			CostPerUnit:  req.CostPerUnit,
+			TotalCost:    req.Quantity * req.CostPerUnit,
+			CreatedAt:    item.CreatedAt, // Use the same created_at as ingredient
+		}
+		
+		// Create stock history (don't fail if this fails)
+		if err := s.stockHistoryRepo.Create(ctx, history); err != nil {
+			// Log error but don't fail the operation
+		}
 	}
 
 	// Track expense for initial purchase if AutoExpenseService is configured
@@ -117,6 +164,174 @@ func (s *IngredientService) DeleteIngredient(ctx context.Context, id primitive.O
 	return s.ingredientRepo.Delete(ctx, id)
 }
 
+// StockIn - Add stock (purchase/receive)
+func (s *IngredientService) StockIn(ctx context.Context, id primitive.ObjectID, req *ingredient.StockInRequest) (*ingredient.Ingredient, error) {
+	item, err := s.ingredientRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	beforeQty := item.Quantity
+	item.Quantity += req.Quantity
+	afterQty := item.Quantity
+
+	// Determine cost per unit for this transaction
+	costPerUnit := req.CostPerUnit  // Use provided price, or 0 if not provided
+	userProvidedNewPrice := req.CostPerUnit > 0 // Track if user provided a new price
+
+	// Calculate weighted average cost ONLY when new price is provided and different
+	if req.CostPerUnit > 0 && req.CostPerUnit != item.CostPerUnit && afterQty > 0 {
+		// Weighted average: (old_qty * old_price + new_qty * new_price) / total_qty
+		oldValue := beforeQty * item.CostPerUnit
+		newValue := req.Quantity * req.CostPerUnit
+		item.CostPerUnit = (oldValue + newValue) / afterQty
+	}
+
+	err = s.ingredientRepo.Update(ctx, id, item)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create stock history record
+	// For history: only record cost if user provided a price
+	// If gifted/found (no price), record as 0 cost
+	userID, _ := primitive.ObjectIDFromHex(req.UserID)
+	reason := req.Reason
+	if reason == "" {
+		reason = "Nhập kho"
+	}
+	
+	history := &ingredient.StockHistory{
+		IngredientID: id,
+		Type:         ingredient.TransactionPurchase,
+		Quantity:     req.Quantity,
+		BeforeQty:    beforeQty,
+		AfterQty:     afterQty,
+		Reason:       reason,
+		UserID:       userID,
+		Username:     req.Username,
+		CostPerUnit:  costPerUnit,  // 0 if gifted, req.CostPerUnit if purchased
+		TotalCost:    req.Quantity * costPerUnit,  // 0 if gifted
+	}
+	s.stockHistoryRepo.Create(ctx, history)
+
+	// Track expense ONLY if user provided a new price (actual purchase, not gifted)
+	if s.autoExpenseService != nil && userProvidedNewPrice {
+		tempItem := *item
+		tempItem.CostPerUnit = req.CostPerUnit // Use the price user provided
+		if err := s.autoExpenseService.TrackIngredientPurchase(ctx, &tempItem, req.Quantity, req.Username); err != nil {
+			// Log error but don't fail the operation
+		}
+	}
+
+	return item, nil
+}
+
+// StockOut - Remove stock (usage/waste)
+func (s *IngredientService) StockOut(ctx context.Context, id primitive.ObjectID, req *ingredient.StockOutRequest) (*ingredient.Ingredient, error) {
+	item, err := s.ingredientRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	beforeQty := item.Quantity
+	item.Quantity -= req.Quantity
+	if item.Quantity < 0 {
+		item.Quantity = 0
+	}
+	afterQty := item.Quantity
+
+	// Price never changes on stock out
+	err = s.ingredientRepo.Update(ctx, id, item)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create stock history record
+	userID, _ := primitive.ObjectIDFromHex(req.UserID)
+	history := &ingredient.StockHistory{
+		IngredientID: id,
+		Type:         ingredient.TransactionWaste,
+		Quantity:     -req.Quantity, // Negative for removal
+		BeforeQty:    beforeQty,
+		AfterQty:     afterQty,
+		Reason:       req.Reason,
+		UserID:       userID,
+		Username:     req.Username,
+		CostPerUnit:  item.CostPerUnit, // Current price (unchanged)
+		TotalCost:    -req.Quantity * item.CostPerUnit,
+	}
+	s.stockHistoryRepo.Create(ctx, history)
+
+	return item, nil
+}
+
+// StockAdjust - Set stock to specific quantity (inventory correction)
+func (s *IngredientService) StockAdjust(ctx context.Context, id primitive.ObjectID, req *ingredient.StockAdjustRequest) (*ingredient.Ingredient, error) {
+	item, err := s.ingredientRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	beforeQty := item.Quantity
+	quantityDiff := req.NewQuantity - beforeQty
+	item.Quantity = req.NewQuantity
+	afterQty := item.Quantity
+
+	// Determine cost per unit for this transaction
+	costPerUnit := float64(0)       // Default to 0 (no cost)
+	userProvidedNewPrice := false   // Track if user actually provided a new price
+	
+	// Only recalculate price if:
+	// 1. Quantity increased (positive diff)
+	// 2. New price provided and different from current
+	if quantityDiff > 0 && req.CostPerUnit > 0 && req.CostPerUnit != item.CostPerUnit && afterQty > 0 {
+		// Weighted average for the increase
+		oldValue := beforeQty * item.CostPerUnit
+		newValue := quantityDiff * req.CostPerUnit
+		item.CostPerUnit = (oldValue + newValue) / afterQty
+		costPerUnit = req.CostPerUnit // Use new price for history
+		userProvidedNewPrice = true   // User provided a new price
+	}
+
+	err = s.ingredientRepo.Update(ctx, id, item)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create stock history record
+	// For history: only record cost if user provided a new price
+	// If gifted/found (no price), record as 0 cost
+	userID, _ := primitive.ObjectIDFromHex(req.UserID)
+	history := &ingredient.StockHistory{
+		IngredientID: id,
+		Type:         ingredient.TransactionAdjustment,
+		Quantity:     quantityDiff,
+		BeforeQty:    beforeQty,
+		AfterQty:     afterQty,
+		Reason:       req.Reason,
+		UserID:       userID,
+		Username:     req.Username,
+		CostPerUnit:  costPerUnit,  // 0 if gifted, req.CostPerUnit if purchased
+		TotalCost:    quantityDiff * costPerUnit,  // 0 if gifted
+	}
+	s.stockHistoryRepo.Create(ctx, history)
+
+	// Track expense ONLY if:
+	// 1. Quantity increased AND
+	// 2. User provided a new price (not gifted/found)
+	if s.autoExpenseService != nil && quantityDiff > 0 && userProvidedNewPrice {
+		tempItem := *item
+		tempItem.CostPerUnit = costPerUnit
+		if err := s.autoExpenseService.TrackIngredientPurchase(ctx, &tempItem, quantityDiff, req.Username); err != nil {
+			// Log error but don't fail the operation
+		}
+	}
+
+	return item, nil
+}
+
+// AdjustStock - Legacy method for backward compatibility
 func (s *IngredientService) AdjustStock(ctx context.Context, id primitive.ObjectID, req *ingredient.StockAdjustmentRequest) (*ingredient.Ingredient, error) {
 	item, err := s.ingredientRepo.FindByID(ctx, id)
 	if err != nil {
@@ -130,12 +345,34 @@ func (s *IngredientService) AdjustStock(ctx context.Context, id primitive.Object
 	}
 	afterQty := item.Quantity
 
+	// Determine cost per unit for this transaction
+	costPerUnit := req.CostPerUnit
+	if costPerUnit <= 0 {
+		// If no cost provided, use current cost
+		costPerUnit = item.CostPerUnit
+	}
+
+	// Calculate weighted average cost ONLY for stock IN with NEW price
+	// Only recalculate if:
+	// 1. Quantity is positive (adding stock)
+	// 2. A new cost per unit is provided (req.CostPerUnit > 0)
+	// 3. The new price is different from current price
+	// 4. After quantity is positive
+	if req.Quantity > 0 && req.CostPerUnit > 0 && req.CostPerUnit != item.CostPerUnit && afterQty > 0 {
+		// Weighted average: (old_qty * old_price + new_qty * new_price) / total_qty
+		oldValue := beforeQty * item.CostPerUnit
+		newValue := req.Quantity * req.CostPerUnit
+		item.CostPerUnit = (oldValue + newValue) / afterQty
+	}
+	// If no new price provided (req.CostPerUnit = 0), keep current price
+	// This handles: stock OUT, stock SET without price, stock IN without price
+
 	err = s.ingredientRepo.Update(ctx, id, item)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create stock history record
+	// Create stock history record with price information
 	userID, _ := primitive.ObjectIDFromHex(req.UserID)
 	history := &ingredient.StockHistory{
 		IngredientID: id,
@@ -146,13 +383,18 @@ func (s *IngredientService) AdjustStock(ctx context.Context, id primitive.Object
 		Reason:       req.Reason,
 		UserID:       userID,
 		Username:     req.Username,
+		CostPerUnit:  costPerUnit,                    // Price at time of transaction
+		TotalCost:    req.Quantity * costPerUnit,     // Total cost for this transaction
 	}
 	s.stockHistoryRepo.Create(ctx, history)
 
 	// Track expense for stock IN (positive quantity adjustment)
-	// Only track if AutoExpenseService is configured and quantity is positive
-	if s.autoExpenseService != nil && req.Quantity > 0 {
-		if err := s.autoExpenseService.TrackIngredientPurchase(ctx, item, req.Quantity, req.Username); err != nil {
+	// Use the actual cost per unit for this transaction
+	if s.autoExpenseService != nil && req.Quantity > 0 && costPerUnit > 0 {
+		// Create a temporary ingredient with the transaction price for expense tracking
+		tempItem := *item
+		tempItem.CostPerUnit = costPerUnit
+		if err := s.autoExpenseService.TrackIngredientPurchase(ctx, &tempItem, req.Quantity, req.Username); err != nil {
 			// Log error but don't fail the operation
 			// The stock adjustment was successful, expense tracking is secondary
 		}

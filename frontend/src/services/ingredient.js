@@ -35,6 +35,26 @@ export const ingredientService = {
     return response.data
   },
 
+  // New stock operation methods
+  async stockIn(id, data) {
+    // data: { quantity, cost_per_unit, reason }
+    const response = await api.post(`/manager/ingredients/${id}/stock-in`, data)
+    return response.data
+  },
+
+  async stockOut(id, data) {
+    // data: { quantity, reason }
+    const response = await api.post(`/manager/ingredients/${id}/stock-out`, data)
+    return response.data
+  },
+
+  async stockAdjust(id, data) {
+    // data: { new_quantity, cost_per_unit, reason }
+    const response = await api.post(`/manager/ingredients/${id}/stock-adjust`, data)
+    return response.data
+  },
+
+  // Legacy method for backward compatibility
   async adjustStock(id, adjustment) {
     const response = await api.post(`/manager/ingredients/${id}/adjust`, adjustment)
     return response.data

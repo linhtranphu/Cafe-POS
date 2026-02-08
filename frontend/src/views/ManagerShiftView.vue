@@ -23,13 +23,13 @@
             class="px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap">
             Tất cả
           </button>
-          <button @click="filterStatus = 'OPEN'" 
-            :class="filterStatus === 'OPEN' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700'"
+          <button @click="filterStatus = SHIFT_STATUS.OPEN" 
+            :class="filterStatus === SHIFT_STATUS.OPEN ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700'"
             class="px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap">
             Đang mở
           </button>
-          <button @click="filterStatus = 'CLOSED'" 
-            :class="filterStatus === 'CLOSED' ? 'bg-gray-500 text-white' : 'bg-gray-200 text-gray-700'"
+          <button @click="filterStatus = SHIFT_STATUS.CLOSED" 
+            :class="filterStatus === SHIFT_STATUS.CLOSED ? 'bg-gray-500 text-white' : 'bg-gray-200 text-gray-700'"
             class="px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap">
             Đã đóng
           </button>
@@ -108,7 +108,7 @@
             </div>
 
             <!-- Shift Stats -->
-            <div v-if="shift.status === 'CLOSED'" class="grid grid-cols-3 gap-2 pt-3 border-t">
+            <div v-if="shift.status === SHIFT_STATUS.CLOSED" class="grid grid-cols-3 gap-2 pt-3 border-t">
               <div class="text-center">
                 <p class="text-xs text-gray-500">Tiền đầu</p>
                 <p class="font-bold text-sm">{{ formatPrice(shift.start_cash) }}</p>
@@ -172,7 +172,7 @@
             </div>
 
             <!-- Shift Stats -->
-            <div v-if="shift.status === 'CLOSED'" class="grid grid-cols-3 gap-2 pt-3 border-t">
+            <div v-if="shift.status === SHIFT_STATUS.CLOSED" class="grid grid-cols-3 gap-2 pt-3 border-t">
               <div class="text-center">
                 <p class="text-xs text-gray-500">Tiền đầu</p>
                 <p class="font-bold text-sm">{{ formatPrice(shift.start_cash) }}</p>
@@ -235,7 +235,7 @@
             </div>
 
             <!-- Cashier Shift Stats -->
-            <div v-if="shift.status === 'CLOSED'" class="grid grid-cols-3 gap-2 pt-3 border-t">
+            <div v-if="shift.status === CASHIER_SHIFT_STATUS.CLOSED" class="grid grid-cols-3 gap-2 pt-3 border-t">
               <div class="text-center">
                 <p class="text-xs text-gray-500">Tiền mặt</p>
                 <p class="font-bold text-sm">{{ formatPrice(shift.actual_cash) }}</p>
@@ -295,7 +295,7 @@
                   <p class="font-medium">{{ formatDateTime(selectedShift.ended_at) }}</p>
                 </div>
 
-                <div v-if="selectedShift.status === 'CLOSED'" class="grid grid-cols-2 gap-3">
+                <div v-if="selectedShift.status === SHIFT_STATUS.CLOSED" class="grid grid-cols-2 gap-3">
                   <div class="bg-blue-50 rounded-lg p-3">
                     <p class="text-xs text-blue-600 mb-1">Tiền đầu ca</p>
                     <p class="font-bold text-lg">{{ formatPrice(selectedShift.start_cash) }}</p>
@@ -337,7 +337,7 @@
                   <p class="font-medium">{{ formatDateTime(selectedShift.closed_at) }}</p>
                 </div>
 
-                <div v-if="selectedShift.status === 'CLOSED'" class="space-y-3">
+                <div v-if="selectedShift.status === CASHIER_SHIFT_STATUS.CLOSED" class="space-y-3">
                   <div class="grid grid-cols-2 gap-3">
                     <div class="bg-blue-50 rounded-lg p-3">
                       <p class="text-xs text-blue-600 mb-1">Tiền mặt thực tế</p>
@@ -380,6 +380,7 @@ import BottomNav from '../components/BottomNav.vue'
 import PullToRefresh from '../components/PullToRefresh.vue'
 import { usePullToRefresh } from '../composables/usePullToRefresh'
 import { formatDate, formatDateTime, formatPrice } from '../utils/formatters'
+import { SHIFT_STATUS, CASHIER_SHIFT_STATUS } from '../constants/shift'
 
 const shiftStore = useShiftStore()
 const cashierShiftStore = useCashierShiftStore()
@@ -401,17 +402,17 @@ const allShifts = computed(() => {
 
 const openWaiterShifts = computed(() => {
   const shifts = waiterShifts.value || []
-  return shifts.filter(s => s && s.status === 'OPEN' && s.role_type === 'waiter')
+  return shifts.filter(s => s && s.status === SHIFT_STATUS.OPEN && s.role_type === 'waiter')
 })
 
 const openBaristaShifts = computed(() => {
   const shifts = waiterShifts.value || []
-  return shifts.filter(s => s && s.status === 'OPEN' && s.role_type === 'barista')
+  return shifts.filter(s => s && s.status === SHIFT_STATUS.OPEN && s.role_type === 'barista')
 })
 
 const openCashierShifts = computed(() => {
   const shifts = cashierShifts.value || []
-  return shifts.filter(s => s && s.status === 'OPEN')
+  return shifts.filter(s => s && s.status === CASHIER_SHIFT_STATUS.OPEN)
 })
 
 const todayShifts = computed(() => {
@@ -474,29 +475,29 @@ const getShiftTypeText = (type) => {
 }
 
 const getStatusClass = (status) => {
-  return status === 'OPEN' 
+  return status === SHIFT_STATUS.OPEN 
     ? 'bg-green-100 text-green-800' 
     : 'bg-gray-100 text-gray-800'
 }
 
 const getStatusText = (status) => {
-  return status === 'OPEN' ? 'Đang mở' : 'Đã đóng'
+  return status === SHIFT_STATUS.OPEN ? 'Đang mở' : 'Đã đóng'
 }
 
 const getCashierStatusClass = (status) => {
   const classes = {
-    OPEN: 'bg-green-100 text-green-800',
-    CLOSURE_INITIATED: 'bg-yellow-100 text-yellow-800',
-    CLOSED: 'bg-gray-100 text-gray-800'
+    [CASHIER_SHIFT_STATUS.OPEN]: 'bg-green-100 text-green-800',
+    [CASHIER_SHIFT_STATUS.CLOSURE_INITIATED]: 'bg-yellow-100 text-yellow-800',
+    [CASHIER_SHIFT_STATUS.CLOSED]: 'bg-gray-100 text-gray-800'
   }
   return classes[status] || 'bg-gray-100 text-gray-800'
 }
 
 const getCashierStatusText = (status) => {
   const texts = {
-    OPEN: 'Đang mở',
-    CLOSURE_INITIATED: 'Đang đóng',
-    CLOSED: 'Đã đóng'
+    [CASHIER_SHIFT_STATUS.OPEN]: 'Đang mở',
+    [CASHIER_SHIFT_STATUS.CLOSURE_INITIATED]: 'Đang đóng',
+    [CASHIER_SHIFT_STATUS.CLOSED]: 'Đã đóng'
   }
   return texts[status] || status
 }

@@ -201,6 +201,7 @@ import { useUserStore } from '../stores/user'
 import BottomNav from '../components/BottomNav.vue'
 import PullToRefresh from '../components/PullToRefresh.vue'
 import { usePullToRefresh } from '../composables/usePullToRefresh'
+import { USER_ROLES, USER_ROLE_OPTIONS, getUserRoleBadge } from '../constants/user'
 
 const userStore = useUserStore()
 const searchQuery = ref('')
@@ -228,8 +229,8 @@ const filteredUsers = computed(() => {
 })
 
 const activeCount = computed(() => users.value.filter(u => u.active).length)
-const managerCount = computed(() => users.value.filter(u => u.role === 'manager').length)
-const cashierCount = computed(() => users.value.filter(u => u.role === 'cashier').length)
+const managerCount = computed(() => users.value.filter(u => u.role === USER_ROLES.MANAGER).length)
+const cashierCount = computed(() => users.value.filter(u => u.role === USER_ROLES.CASHIER).length)
 
 const getRoleColor = (role) => {
   const colors = { manager: 'bg-purple-100 text-purple-800', cashier: 'bg-blue-100 text-blue-800', waiter: 'bg-green-100 text-green-800' }

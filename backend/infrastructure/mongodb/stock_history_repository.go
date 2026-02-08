@@ -27,7 +27,7 @@ func (r *StockHistoryRepository) Create(ctx context.Context, history *ingredient
 }
 
 func (r *StockHistoryRepository) FindByIngredientID(ctx context.Context, ingredientID primitive.ObjectID) ([]*ingredient.StockHistory, error) {
-	opts := options.Find().SetSort(bson.D{{"created_at", -1}}).SetLimit(50)
+	opts := options.Find().SetSort(bson.D{{"created_at", -1}}).SetLimit(20)
 	cursor, err := r.collection.Find(ctx, bson.M{"ingredient_id": ingredientID}, opts)
 	if err != nil {
 		return nil, err

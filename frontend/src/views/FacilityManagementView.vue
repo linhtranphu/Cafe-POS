@@ -411,7 +411,7 @@ const newCategoryName = ref('')
 
 const formData = ref({
   name: '',
-  type: '',
+  type: 'Khác',
   area: 'Mặc định',
   quantity: 1,
   status: FACILITY_STATUS.IN_USE,
@@ -433,13 +433,24 @@ const facilityCategories = computed(() => {
 })
 
 const filteredFacilities = computed(() => {
-  if (!searchQuery.value) return facilities.value
-  const query = searchQuery.value.toLowerCase()
-  return facilities.value.filter(f => 
-    f.name?.toLowerCase().includes(query) ||
-    f.type?.toLowerCase().includes(query) ||
-    f.area?.toLowerCase().includes(query)
-  )
+  let filtered = facilities.value
+  
+  // Filter by search query
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase()
+    filtered = filtered.filter(f => 
+      f.name?.toLowerCase().includes(query) ||
+      f.type?.toLowerCase().includes(query) ||
+      f.area?.toLowerCase().includes(query)
+    )
+  }
+  
+  // Sort by created_at (newest first)
+  return [...filtered].sort((a, b) => {
+    const dateA = new Date(a.created_at || 0)
+    const dateB = new Date(b.created_at || 0)
+    return dateB - dateA // Newest first
+  })
 })
 
 const operationalCount = computed(() => 
@@ -533,7 +544,7 @@ const openCreateModal = () => {
   
   formData.value = {
     name: '',
-    type: '',
+    type: 'Khác',
     area: 'Mặc định',
     quantity: 1,
     status: FACILITY_STATUS.IN_USE,
@@ -601,7 +612,7 @@ const saveFacility = async () => {
     // Reset form and close modal
     formData.value = {
       name: '',
-      type: '',
+      type: 'Khác',
       area: 'Mặc định',
       quantity: 1,
       status: FACILITY_STATUS.IN_USE,

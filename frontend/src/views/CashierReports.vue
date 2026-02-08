@@ -8,11 +8,31 @@
     
     <!-- Mobile Header - Fixed -->
     <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
-      <div class="px-4 py-4" style="padding-top: max(1rem, env(safe-area-inset-top))">
-        <div class="flex items-center justify-between">
+      <div class="px-4 py-3" style="padding-top: max(0.75rem, env(safe-area-inset-top))">
+        <div class="flex items-center justify-between mb-2">
           <div>
-            <h1 class="text-2xl font-bold text-gray-800">📊 Báo cáo</h1>
-            <p class="text-sm text-gray-600">Thu ngân & doanh thu</p>
+            <h1 class="text-xl font-bold text-gray-800">📊 Báo cáo</h1>
+            <p class="text-xs text-gray-600">Thu ngân & doanh thu</p>
+          </div>
+          <button v-if="currentReport" @click="clearCurrentReport"
+            class="text-blue-500 text-sm font-medium">
+            ← Quay lại
+          </button>
+        </div>
+        
+        <!-- Quick Stats (when no report shown) -->
+        <div v-if="!currentReport && quickStats" class="grid grid-cols-3 gap-2 mt-2">
+          <div class="bg-blue-50 rounded-lg p-2 text-center">
+            <div class="text-sm font-bold text-blue-600">{{ quickStats.totalShifts }}</div>
+            <div class="text-[10px] text-gray-600">Ca làm</div>
+          </div>
+          <div class="bg-green-50 rounded-lg p-2 text-center">
+            <div class="text-xs font-bold text-green-600">{{ formatCompactPrice(quickStats.totalRevenue) }}</div>
+            <div class="text-[10px] text-gray-600">Doanh thu</div>
+          </div>
+          <div class="bg-purple-50 rounded-lg p-2 text-center">
+            <div class="text-sm font-bold text-purple-600">{{ quickStats.totalOrders }}</div>
+            <div class="text-[10px] text-gray-600">Đơn hàng</div>
           </div>
         </div>
       </div>
@@ -34,8 +54,8 @@
         </div>
       </div>
 
-      <!-- Report Generation Cards -->
-      <div class="space-y-3 mb-4">
+      <!-- Report Generation Cards (only show when no current report) -->
+      <div v-if="!currentReport" class="space-y-3 mb-4">
         <!-- Shift Report -->
         <div class="bg-white rounded-2xl p-4 shadow-sm">
           <h3 class="font-bold text-gray-800 mb-3">📋 Báo cáo ca</h3>
@@ -78,40 +98,40 @@
       <!-- Current Report Display -->
       <div v-if="currentReport" class="bg-white rounded-2xl p-4 shadow-sm mb-4">
         <div class="flex justify-between items-center mb-4">
-          <h2 class="text-lg font-bold text-gray-800">{{ currentReport.title }}</h2>
+          <h2 class="text-base font-bold text-gray-800">{{ currentReport.title }}</h2>
           <button
             @click="printReport"
-            class="p-2 bg-gray-100 text-gray-700 rounded-lg active:scale-95 transition-transform"
+            class="px-3 py-2 bg-blue-500 text-white text-sm rounded-lg active:scale-95 transition-transform"
           >
-            🖨️
+            🖨️ In
           </button>
         </div>
 
         <!-- Report Content -->
         <div id="report-content" class="space-y-4">
           <!-- Header -->
-          <div class="text-center border-b-2 border-gray-200 pb-4">
-            <h1 class="text-xl font-bold text-gray-800">QUÁN CAFÉ</h1>
-            <h2 class="text-base font-medium text-gray-700">{{ currentReport.title }}</h2>
+          <div class="text-center border-b-2 border-gray-200 pb-3">
+            <h1 class="text-lg font-bold text-gray-800">QUÁN CAFÉ</h1>
+            <h2 class="text-sm font-medium text-gray-700">{{ currentReport.title }}</h2>
             <p class="text-xs text-gray-500 mt-1">{{ formatDateTime(currentReport.generated_at) }}</p>
           </div>
 
           <!-- Summary Stats -->
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid grid-cols-2 gap-2">
             <div class="bg-blue-50 rounded-xl p-3 text-center">
-              <div class="text-2xl font-bold text-blue-600">{{ currentReport.total_orders }}</div>
+              <div class="text-xl font-bold text-blue-600">{{ currentReport.total_orders }}</div>
               <div class="text-xs text-gray-600">Tổng đơn</div>
             </div>
             <div class="bg-green-50 rounded-xl p-3 text-center">
-              <div class="text-lg font-bold text-green-600">{{ formatPrice(currentReport.total_revenue) }}</div>
+              <div class="text-sm font-bold text-green-600">{{ formatCompactPrice(currentReport.total_revenue) }}</div>
               <div class="text-xs text-gray-600">Doanh thu</div>
             </div>
             <div class="bg-yellow-50 rounded-xl p-3 text-center">
-              <div class="text-lg font-bold text-yellow-600">{{ formatPrice(currentReport.cash_revenue) }}</div>
+              <div class="text-sm font-bold text-yellow-600">{{ formatCompactPrice(currentReport.cash_revenue) }}</div>
               <div class="text-xs text-gray-600">💵 Tiền mặt</div>
             </div>
             <div class="bg-purple-50 rounded-xl p-3 text-center">
-              <div class="text-lg font-bold text-purple-600">{{ formatPrice(currentReport.transfer_revenue + currentReport.qr_revenue) }}</div>
+              <div class="text-sm font-bold text-purple-600">{{ formatCompactPrice(currentReport.transfer_revenue + currentReport.qr_revenue) }}</div>
               <div class="text-xs text-gray-600">💳 Chuyển khoản</div>
             </div>
           </div>
@@ -123,21 +143,21 @@
               <div class="flex justify-between items-center bg-gray-50 rounded-lg p-3">
                 <span class="text-sm text-gray-700">💵 Tiền mặt</span>
                 <div class="text-right">
-                  <div class="font-bold text-gray-800">{{ formatPrice(currentReport.cash_revenue) }}</div>
+                  <div class="font-bold text-gray-800 text-sm">{{ formatCompactPrice(currentReport.cash_revenue) }}</div>
                   <div class="text-xs text-gray-500">{{ getPercentage(currentReport.cash_revenue, currentReport.total_revenue) }}%</div>
                 </div>
               </div>
               <div class="flex justify-between items-center bg-gray-50 rounded-lg p-3">
                 <span class="text-sm text-gray-700">💳 Chuyển khoản</span>
                 <div class="text-right">
-                  <div class="font-bold text-gray-800">{{ formatPrice(currentReport.transfer_revenue) }}</div>
+                  <div class="font-bold text-gray-800 text-sm">{{ formatCompactPrice(currentReport.transfer_revenue) }}</div>
                   <div class="text-xs text-gray-500">{{ getPercentage(currentReport.transfer_revenue, currentReport.total_revenue) }}%</div>
                 </div>
               </div>
               <div class="flex justify-between items-center bg-gray-50 rounded-lg p-3">
                 <span class="text-sm text-gray-700">📱 QR Code</span>
                 <div class="text-right">
-                  <div class="font-bold text-gray-800">{{ formatPrice(currentReport.qr_revenue) }}</div>
+                  <div class="font-bold text-gray-800 text-sm">{{ formatCompactPrice(currentReport.qr_revenue) }}</div>
                   <div class="text-xs text-gray-500">{{ getPercentage(currentReport.qr_revenue, currentReport.total_revenue) }}%</div>
                 </div>
               </div>
@@ -150,16 +170,16 @@
             <div class="space-y-2">
               <div class="flex justify-between items-center">
                 <span class="text-sm text-gray-600">Dự kiến:</span>
-                <span class="font-medium text-gray-800">{{ formatPrice(currentReport.reconciliation.expected_cash) }}</span>
+                <span class="font-medium text-gray-800 text-sm">{{ formatCompactPrice(currentReport.reconciliation.expected_cash) }}</span>
               </div>
               <div class="flex justify-between items-center">
                 <span class="text-sm text-gray-600">Thực tế:</span>
-                <span class="font-medium text-gray-800">{{ formatPrice(currentReport.reconciliation.actual_cash) }}</span>
+                <span class="font-medium text-gray-800 text-sm">{{ formatCompactPrice(currentReport.reconciliation.actual_cash) }}</span>
               </div>
               <div class="flex justify-between items-center pt-2 border-t border-green-200">
                 <span class="text-sm font-medium text-gray-700">Chênh lệch:</span>
-                <span :class="getDifferenceClass(currentReport.reconciliation.difference)" class="font-bold">
-                  {{ formatPrice(currentReport.reconciliation.difference) }}
+                <span :class="getDifferenceClass(currentReport.reconciliation.difference)" class="font-bold text-sm">
+                  {{ formatCompactPrice(currentReport.reconciliation.difference) }}
                 </span>
               </div>
             </div>
@@ -181,7 +201,7 @@
                   <span :class="getAuditActionBadge(audit.action)">
                     {{ getAuditActionText(audit.action) }}
                   </span>
-                  <span class="font-bold text-gray-800">{{ formatPrice(audit.amount) }}</span>
+                  <span class="font-bold text-gray-800 text-sm">{{ formatCompactPrice(audit.amount) }}</span>
                 </div>
                 <div class="text-xs text-gray-600">
                   <div>Order: #{{ audit.order_id?.slice(-6) }}</div>
@@ -194,9 +214,9 @@
         </div>
       </div>
 
-      <!-- Report History -->
-      <div class="mb-4">
-        <h2 class="text-lg font-bold text-gray-800 mb-3">📚 Lịch sử báo cáo</h2>
+      <!-- Report History (only show when no current report) -->
+      <div v-if="!currentReport" class="mb-4">
+        <h2 class="text-base font-bold text-gray-800 mb-3">📚 Lịch sử báo cáo</h2>
         
         <div v-if="reports.length === 0" class="text-center py-12 bg-white rounded-2xl">
           <div class="text-5xl mb-3">📭</div>
@@ -213,14 +233,14 @@
           >
             <div class="flex justify-between items-start mb-2">
               <div>
-                <h3 class="font-bold text-gray-800">{{ getReportTitle(report) }}</h3>
+                <h3 class="font-bold text-gray-800 text-sm">{{ getReportTitle(report) }}</h3>
                 <p class="text-xs text-gray-500">{{ formatDateTime(report.generated_at) }}</p>
               </div>
               <span class="text-sm text-blue-500 font-medium">Xem →</span>
             </div>
             <div class="flex justify-between items-center">
               <span class="text-sm text-gray-600">{{ report.total_orders }} đơn hàng</span>
-              <span class="font-bold text-green-600">{{ formatPrice(report.total_revenue) }}</span>
+              <span class="font-bold text-green-600 text-sm">{{ formatCompactPrice(report.total_revenue) }}</span>
             </div>
           </div>
         </div>
@@ -253,6 +273,21 @@ const error = computed(() => cashierStore.error)
 const reports = computed(() => cashierStore.reports)
 const availableShifts = computed(() => shiftStore.shifts)
 
+// Quick stats for header (when no report shown)
+const quickStats = computed(() => {
+  if (reports.value.length === 0) return null
+  
+  const totalShifts = reports.value.filter(r => r.shift).length
+  const totalRevenue = reports.value.reduce((sum, r) => sum + (r.total_revenue || 0), 0)
+  const totalOrders = reports.value.reduce((sum, r) => sum + (r.total_orders || 0), 0)
+  
+  return {
+    totalShifts,
+    totalRevenue,
+    totalOrders
+  }
+})
+
 // Methods
 const generateShiftReport = async () => {
   try {
@@ -283,8 +318,15 @@ const viewReport = (report) => {
     ...report,
     title: getReportTitle(report)
   }
-  // Scroll to top
-  window.scrollTo({ top: 0, behavior: 'smooth' })
+  // Scroll to top of container
+  const container = document.querySelector('.overflow-y-auto')
+  if (container) {
+    container.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
+
+const clearCurrentReport = () => {
+  currentReport.value = null
 }
 
 const printReport = () => {
@@ -333,6 +375,37 @@ const clearError = () => {
 }
 
 // Utility functions
+const formatCompactPrice = (value) => {
+  if (value === undefined || value === null || isNaN(value)) {
+    return '0đ'
+  }
+  
+  // For millions (triệu)
+  if (value >= 1000000) {
+    const millions = value / 1000000
+    // If it's a whole number of millions
+    if (millions % 1 === 0) {
+      return `${millions}tr`
+    }
+    // If it has decimals, show 1 decimal place
+    return `${millions.toFixed(1)}tr`
+  }
+  
+  // For thousands (nghìn)
+  if (value >= 1000) {
+    const thousands = value / 1000
+    // If it's a whole number of thousands
+    if (thousands % 1 === 0) {
+      return `${thousands}k`
+    }
+    // If it has decimals, show 1 decimal place
+    return `${thousands.toFixed(1)}k`
+  }
+  
+  // For small numbers, show as is
+  return `${value}đ`
+}
+
 const formatPrice = (amount) => {
   if (!amount && amount !== 0) return '0₫'
   return new Intl.NumberFormat('vi-VN', {

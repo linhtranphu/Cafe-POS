@@ -27,7 +27,22 @@ export const INGREDIENT_UNIT_OPTIONS = [
   { value: INGREDIENT_UNITS.PACK, label: 'Gói' }
 ]
 
-// Stock Adjustment Types
+// Stock Operation Types - Must match backend StockOperationType
+export const STOCK_OPERATIONS = {
+  IN: 'in',         // Stock IN (purchase/receive)
+  OUT: 'out',       // Stock OUT (usage/waste)
+  ADJUST: 'adjust'  // Stock ADJUST (inventory correction - set to specific quantity)
+}
+
+// Transaction Types - Must match backend TransactionType
+export const TRANSACTION_TYPES = {
+  ADJUSTMENT: 'adjustment',
+  ORDER: 'order',
+  PURCHASE: 'purchase',
+  WASTE: 'waste'
+}
+
+// Legacy adjustment types (for backward compatibility)
 export const ADJUSTMENT_TYPES = {
   ADD: 'add',
   REMOVE: 'remove',
@@ -43,7 +58,12 @@ export const ADJUSTMENT_TYPE_OPTIONS = [
 export const ADJUSTMENT_TYPE_CLASSES = {
   [ADJUSTMENT_TYPES.ADD]: 'bg-green-100 text-green-800',
   [ADJUSTMENT_TYPES.REMOVE]: 'bg-red-100 text-red-800',
-  [ADJUSTMENT_TYPES.ADJUST]: 'bg-blue-100 text-blue-800'
+  [ADJUSTMENT_TYPES.ADJUST]: 'bg-blue-100 text-blue-800',
+  // Transaction type classes
+  [TRANSACTION_TYPES.PURCHASE]: 'bg-green-100 text-green-800',
+  [TRANSACTION_TYPES.WASTE]: 'bg-red-100 text-red-800',
+  [TRANSACTION_TYPES.ADJUSTMENT]: 'bg-blue-100 text-blue-800',
+  [TRANSACTION_TYPES.ORDER]: 'bg-purple-100 text-purple-800'
 }
 
 // Stock Status
@@ -91,6 +111,19 @@ export function getAdjustmentTypeClass(type) {
 }
 
 export function getAdjustmentTypeText(type) {
+  // Handle transaction types
+  const transactionTexts = {
+    [TRANSACTION_TYPES.PURCHASE]: 'Nhập Hàng',
+    [TRANSACTION_TYPES.WASTE]: 'Xuất Hàng',
+    [TRANSACTION_TYPES.ADJUSTMENT]: 'Điều Chỉnh',
+    [TRANSACTION_TYPES.ORDER]: 'Sử Dụng'
+  }
+  
+  if (transactionTexts[type]) {
+    return transactionTexts[type]
+  }
+  
+  // Handle legacy adjustment types
   const option = ADJUSTMENT_TYPE_OPTIONS.find(opt => opt.value === type)
   return option ? option.label : type
 }

@@ -23,14 +23,21 @@ func (h *IngredientHandler) CreateIngredient(c *gin.Context) {
 		return
 	}
 
-	// Get username from context
+	// Get user info from context
+	userID, _ := c.Get("user_id")
 	username, _ := c.Get("username")
+	
+	userIDStr := ""
+	if uid, ok := userID.(string); ok {
+		userIDStr = uid
+	}
+	
 	createdBy := ""
 	if u, ok := username.(string); ok {
 		createdBy = u
 	}
 
-	item, err := h.ingredientService.CreateIngredient(c.Request.Context(), &req, createdBy)
+	item, err := h.ingredientService.CreateIngredient(c.Request.Context(), &req, userIDStr, createdBy)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -127,6 +134,96 @@ func (h *IngredientHandler) AdjustStock(c *gin.Context) {
 	req.Username = username.(string)
 
 	item, err := h.ingredientService.AdjustStock(c.Request.Context(), id, &req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, item)
+}
+
+// StockIn - Add stock (purchase/receive)
+func (h *IngredientHandler) StockIn(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	var req ingredient.StockInRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user info from context
+	userID, _ := c.Get("user_id")
+	username, _ := c.Get("username")
+	req.UserID = userID.(string)
+	req.Username = username.(string)
+
+	item, err := h.ingredientService.StockIn(c.Request.Context(), id, &req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, item)
+}
+
+// StockOut - Remove stock (usage/waste)
+func (h *IngredientHandler) StockOut(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	var req ingredient.StockOutRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user info from context
+	userID, _ := c.Get("user_id")
+	username, _ := c.Get("username")
+	req.UserID = userID.(string)
+	req.Username = username.(string)
+
+	item, err := h.ingredientService.StockOut(c.Request.Context(), id, &req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, item)
+}
+
+// StockAdjust - Set stock to specific quantity (inventory correction)
+func (h *IngredientHandler) StockAdjust(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	var req ingredient.StockAdjustRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user info from context
+	userID, _ := c.Get("user_id")
+	username, _ := c.Get("username")
+	req.UserID = userID.(string)
+	req.Username = username.(string)
+
+	item, err := h.ingredientService.StockAdjust(c.Request.Context(), id, &req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

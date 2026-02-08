@@ -348,10 +348,7 @@ const hasReconciliation = computed(() => cashierStore.hasReconciliation)
 const loading = computed(() => cashierStore.loading)
 const error = computed(() => cashierStore.error)
 
-// Pull to refresh
-const { pullDistance, isRefreshing } = usePullToRefresh(refreshData)
-
-// Methods
+// Methods - Define refreshData BEFORE using it in usePullToRefresh
 const refreshData = async () => {
   if (selectedShift.value) {
     await Promise.all([
@@ -362,6 +359,9 @@ const refreshData = async () => {
   await cashierStore.getPendingDiscrepancies()
   await cashierStore.fetchPendingHandovers()
 }
+
+// Pull to refresh - Use refreshData AFTER it's defined
+const { pullDistance, isRefreshing } = usePullToRefresh(refreshData)
 
 const loadPayments = async () => {
   if (selectedShift.value) {

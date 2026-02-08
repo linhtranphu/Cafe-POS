@@ -25,7 +25,7 @@
     <!-- Content -->
     <div class="flex-1 overflow-y-auto px-4 py-4 pb-24">
       <!-- Manager Dashboard (No Shift Concept) -->
-      <div v-if="user?.role === 'manager'">
+      <div v-if="user?.role === USER_ROLES.MANAGER">
         <!-- Welcome Card -->
         <div class="bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl p-6 text-white shadow-lg mb-4">
           <h2 class="text-2xl font-bold mb-2">🎯 Quản lý hệ thống</h2>
@@ -248,7 +248,7 @@
                 <div class="text-4xl mb-2">📋</div>
                 <div class="font-bold">Orders</div>
               </button>
-              <button v-if="user?.role === 'manager'" @click="$router.push('/users')" 
+              <button v-if="user?.role === USER_ROLES.MANAGER" @click="$router.push('/users')" 
                 class="bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
                 <div class="text-4xl mb-2">👥</div>
                 <div class="font-bold">Nhân viên</div>
@@ -327,22 +327,22 @@
                 </button>
                 
                 <!-- Manager Actions -->
-                <button v-if="user?.role === 'manager'" @click="$router.push('/menu')" 
+                <button v-if="user?.role === USER_ROLES.MANAGER" @click="$router.push('/menu')" 
                   class="bg-gradient-to-br from-orange-500 to-red-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
                   <div class="text-4xl mb-2">🍽️</div>
                   <div class="font-bold">Menu</div>
                 </button>
-                <button v-if="user?.role === 'manager'" @click="$router.push('/ingredients')" 
+                <button v-if="user?.role === USER_ROLES.MANAGER" @click="$router.push('/ingredients')" 
                   class="bg-gradient-to-br from-green-500 to-emerald-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
                   <div class="text-4xl mb-2">🥬</div>
                   <div class="font-bold">Nguyên liệu</div>
                 </button>
-                <button v-if="user?.role === 'manager'" @click="$router.push('/facilities')" 
+                <button v-if="user?.role === USER_ROLES.MANAGER" @click="$router.push('/facilities')" 
                   class="bg-gradient-to-br from-cyan-500 to-blue-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
                   <div class="text-4xl mb-2">🏢</div>
                   <div class="font-bold">Cơ sở</div>
                 </button>
-                <button v-if="user?.role === 'manager'" @click="$router.push('/expenses')" 
+                <button v-if="user?.role === USER_ROLES.MANAGER" @click="$router.push('/expenses')" 
                   class="bg-gradient-to-br from-pink-500 to-purple-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
                   <div class="text-4xl mb-2">💸</div>
                   <div class="font-bold">Chi phí</div>
@@ -408,6 +408,8 @@ import { useBaristaStore } from '../stores/barista'
 import BottomNav from '../components/BottomNav.vue'
 import PullToRefresh from '../components/PullToRefresh.vue'
 import { usePullToRefresh } from '../composables/usePullToRefresh'
+import { USER_ROLES } from '../constants/user'
+import { ORDER_STATUS } from '../constants/order'
 
 const authStore = useAuthStore()
 const shiftStore = useShiftStore()
@@ -420,7 +422,7 @@ let timeInterval = null
 
 // Computed
 const user = computed(() => authStore.user)
-const isBarista = computed(() => authStore.user?.role === 'barista')
+const isBarista = computed(() => authStore.user?.role === USER_ROLES.BARISTA)
 const hasOpenShift = computed(() => shiftStore.hasOpenShift)
 const currentShift = computed(() => shiftStore.currentShift)
 const orders = computed(() => {
@@ -434,7 +436,7 @@ const orders = computed(() => {
   }
   return orderStore.orders
 })
-const isCashier = computed(() => authStore.user?.role === 'cashier')
+const isCashier = computed(() => authStore.user?.role === USER_ROLES.CASHIER)
 
 const recentOrders = computed(() => {
   return [...orders.value].sort((a, b) => 
@@ -535,19 +537,19 @@ const todayRevenue = computed(() => {
 const completedOrders = computed(() => {
   const today = new Date().toDateString()
   return orders.value.filter(o => 
-    new Date(o.created_at).toDateString() === today && o.status === 'SERVED'
+    new Date(o.created_at).toDateString() === today && o.status === ORDER_STATUS.SERVED
   ).length
 })
 
 const pendingOrders = computed(() => {
   // For manager: show all orders that are not completed or cancelled
-  if (user.value?.role === 'manager') {
+  if (user.value?.role === USER_ROLES.MANAGER) {
     return orders.value.filter(o => 
-      o.status !== 'SERVED' && o.status !== 'CANCELLED'
+      o.status !== ORDER_STATUS.SERVED && o.status !== ORDER_STATUS.CANCELLED
     ).length
   }
   // For others: show only created orders
-  return orders.value.filter(o => o.status === 'CREATED').length
+  return orders.value.filter(o => o.status === ORDER_STATUS.CREATED).length
 })
 
 // Cashier-specific stats
@@ -559,7 +561,7 @@ const shiftRevenue = computed(() => {
   
   return orders.value
     .filter(o => {
-      if (o.status === 'CANCELLED') return false
+      if (o.status === ORDER_STATUS.CANCELLED) return false
       const orderTime = new Date(o.created_at)
       return orderTime >= shiftStart && orderTime <= shiftEnd
     })
@@ -662,7 +664,7 @@ const getStatusText = (status) => {
 // Refresh data function
 const refreshData = async () => {
   // Manager doesn't need shift data
-  if (user.value?.role === 'manager') {
+  if (user.value?.role === USER_ROLES.MANAGER) {
     await orderStore.fetchOrders()
     return
   }

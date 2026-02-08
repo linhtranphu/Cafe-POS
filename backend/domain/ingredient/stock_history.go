@@ -25,5 +25,7 @@ type StockHistory struct {
 	OrderID      *primitive.ObjectID `bson:"order_id,omitempty" json:"order_id,omitempty"`
 	UserID       primitive.ObjectID `bson:"user_id" json:"user_id"`
 	Username     string             `bson:"username" json:"username"`
+	CostPerUnit  float64            `bson:"cost_per_unit" json:"cost_per_unit"`     // Price at time of transaction
+	TotalCost    float64            `bson:"total_cost" json:"total_cost"`           // Total cost for this transaction
 	CreatedAt    time.Time          `bson:"created_at" json:"created_at"`
 }

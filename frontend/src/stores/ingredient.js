@@ -106,6 +106,55 @@ export const useIngredientStore = defineStore('ingredient', {
       }
     },
 
+    // New stock operation methods
+    async stockIn(id, data) {
+      this.error = null
+      try {
+        const updatedItem = await ingredientService.stockIn(id, data)
+        const index = this.items.findIndex(i => i.id === id)
+        if (index !== -1) {
+          this.items[index] = updatedItem
+        }
+        await this.fetchLowStock()
+        return true
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi nhập kho'
+        return false
+      }
+    },
+
+    async stockOut(id, data) {
+      this.error = null
+      try {
+        const updatedItem = await ingredientService.stockOut(id, data)
+        const index = this.items.findIndex(i => i.id === id)
+        if (index !== -1) {
+          this.items[index] = updatedItem
+        }
+        await this.fetchLowStock()
+        return true
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi xuất kho'
+        return false
+      }
+    },
+
+    async stockAdjust(id, data) {
+      this.error = null
+      try {
+        const updatedItem = await ingredientService.stockAdjust(id, data)
+        const index = this.items.findIndex(i => i.id === id)
+        if (index !== -1) {
+          this.items[index] = updatedItem
+        }
+        await this.fetchLowStock()
+        return true
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi điều chỉnh tồn kho'
+        return false
+      }
+    },
+
     // Category actions
     async fetchCategories() {
       this.error = null
