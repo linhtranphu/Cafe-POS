@@ -34,11 +34,19 @@ func (h *ExpenseHandler) CreateExpense(c *gin.Context) {
 		return
 	}
 	
-	// Parse date
-	date, err := time.Parse("2006-01-02", req.Date)
+	// Parse date - support both ISO format and YYYY-MM-DD
+	var date time.Time
+	var err error
+	
+	// Try ISO format first (YYYY-MM-DDTHH:MM:SSZ)
+	date, err = time.Parse(time.RFC3339, req.Date)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date format. Use YYYY-MM-DD"})
-		return
+		// Fallback to YYYY-MM-DD format
+		date, err = time.Parse("2006-01-02", req.Date)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date format. Use ISO format (YYYY-MM-DDTHH:MM:SSZ) or YYYY-MM-DD"})
+			return
+		}
 	}
 	
 	// Parse category ID
@@ -126,11 +134,18 @@ func (h *ExpenseHandler) UpdateExpense(c *gin.Context) {
 		return
 	}
 	
-	// Parse date
-	date, err := time.Parse("2006-01-02", req.Date)
+	// Parse date - support both ISO format and YYYY-MM-DD
+	var date time.Time
+	
+	// Try ISO format first (YYYY-MM-DDTHH:MM:SSZ)
+	date, err = time.Parse(time.RFC3339, req.Date)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date format. Use YYYY-MM-DD"})
-		return
+		// Fallback to YYYY-MM-DD format
+		date, err = time.Parse("2006-01-02", req.Date)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date format. Use ISO format (YYYY-MM-DDTHH:MM:SSZ) or YYYY-MM-DD"})
+			return
+		}
 	}
 	
 	// Parse category ID

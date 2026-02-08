@@ -94,12 +94,18 @@
 
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Danh mục *</label>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                Danh mục <span class="text-red-500">*</span>
+              </label>
               <select v-model="formData.category_id" 
+                :class="{'border-red-500': !formData.category_id}"
                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                 <option value="">Chọn danh mục</option>
                 <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
               </select>
+              <p v-if="!formData.category_id && categories.length === 0" class="text-xs text-orange-600 mt-1">
+                ⚠️ Chưa có danh mục. Tạo danh mục trước!
+              </p>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Số tiền *</label>
@@ -465,6 +471,24 @@ const cancelEdit = () => {
 
 const saveExpense = async () => {
   try {
+    // Validate required fields
+    if (!formData.value.description?.trim()) {
+      alert('Vui lòng nhập mô tả')
+      return
+    }
+    if (!formData.value.category_id) {
+      alert('Vui lòng chọn danh mục')
+      return
+    }
+    if (!formData.value.amount || formData.value.amount <= 0) {
+      alert('Vui lòng nhập số tiền hợp lệ')
+      return
+    }
+    if (!formData.value.date) {
+      alert('Vui lòng chọn ngày')
+      return
+    }
+    
     // Prepare data - convert date to ISO format
     const dataToSend = { ...formData.value }
     if (dataToSend.date) {
@@ -472,6 +496,8 @@ const saveExpense = async () => {
     } else {
       delete dataToSend.date
     }
+    
+    console.log('Sending expense data:', dataToSend)
     
     if (isEditing.value) {
       await expenseStore.updateExpense(currentExpense.value.id, dataToSend)
@@ -484,7 +510,8 @@ const saveExpense = async () => {
     cancelEdit()
   } catch (error) {
     console.error('Error saving expense:', error)
-    alert('Có lỗi xảy ra khi lưu chi phí')
+    console.error('Error response:', error.response?.data)
+    alert(`Có lỗi xảy ra: ${error.response?.data?.error || error.message}`)
   }
 }
 
