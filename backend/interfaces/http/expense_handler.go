@@ -134,6 +134,14 @@ func (h *ExpenseHandler) UpdateExpense(c *gin.Context) {
 		return
 	}
 	
+	// Get existing expense to preserve CreatedBy and CreatedAt
+	existingExpenses, err := h.service.GetExpenses(c.Request.Context(), bson.M{"_id": id})
+	if err != nil || len(existingExpenses) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Expense not found"})
+		return
+	}
+	existingExpense := existingExpenses[0]
+	
 	// Parse date - support both ISO format and YYYY-MM-DD
 	var date time.Time
 	
@@ -155,6 +163,7 @@ func (h *ExpenseHandler) UpdateExpense(c *gin.Context) {
 		return
 	}
 	
+	// Preserve CreatedBy, CreatedAt, SourceType, and SourceID from existing expense
 	e := expense.Expense{
 		ID:            id,
 		Date:          date,
@@ -164,6 +173,11 @@ func (h *ExpenseHandler) UpdateExpense(c *gin.Context) {
 		PaymentMethod: req.PaymentMethod,
 		Vendor:        req.Vendor,
 		Notes:         req.Notes,
+		CreatedBy:     existingExpense.CreatedBy,     // Preserve original creator
+		CreatedAt:     existingExpense.CreatedAt,     // Preserve creation time
+		SourceType:    existingExpense.SourceType,    // Preserve source type
+		SourceID:      existingExpense.SourceID,      // Preserve source ID
+		UpdatedAt:     time.Now(),
 	}
 	
 	if err := h.service.UpdateExpense(c.Request.Context(), id, &e); err != nil {
