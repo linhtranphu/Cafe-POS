@@ -12,6 +12,8 @@ Hệ thống quản lý cafe POS cần tính năng phân tích chi phí và lợ
 - **Current_Cost**: Giá vốn hiện tại của menu item, tính từ cost_per_unit hiện tại của ingredients (dùng cho pricing decisions)
 - **Accounting_Cost**: Giá vốn chính thức được lưu khi kết ca, dùng cho báo cáo profit/loss
 - **Cost_Status**: Trạng thái của cost data - FINAL (đã chốt ca), ESTIMATED (ca chưa đóng), INCOMPLETE (thiếu giá nguyên liệu)
+- **Gross_Profit**: Lợi nhuận gộp = Revenue - Cost of Goods Sold (COGS). Đây là lợi nhuận từ bán hàng trước khi trừ chi phí vận hành
+- **Operating_Profit**: Lợi nhuận vận hành = Gross Profit - Operating Expenses (lương nhân viên + mặt bằng + điện nước + marketing)
 - **Profit_Margin**: Tỷ lệ lợi nhuận = (price - cost) / price * 100%
 - **Absolute_Profit**: Lợi nhuận tuyệt đối = price - cost (tiền mặt thực tế)
 - **Manager**: Người dùng có quyền xem báo cáo chi phí và lợi nhuận
@@ -59,10 +61,11 @@ Hệ thống quản lý cafe POS cần tính năng phân tích chi phí và lợ
 #### Acceptance Criteria
 
 1. WHEN a menu item's cost exceeds its price, THE System SHALL mark the item with "loss" status (red warning)
-2. WHEN a menu item's profit_margin is below 20%, THE System SHALL mark the item with "low_margin" status (yellow warning)
-3. WHEN displaying menu items with loss or low_margin warnings, THE System SHALL highlight them with distinct visual indicators (red for loss, yellow for low margin)
-4. WHEN a manager views the menu cost report, THE System SHALL display the count of items with loss and low_margin warnings at the top
-5. WHEN a menu item transitions between warning states, THE System SHALL update the warning status immediately
+2. WHEN a menu item's profit_margin is below the configured low_margin_threshold (default 20%), THE System SHALL mark the item with "low_margin" status (yellow warning)
+3. THE System SHALL allow managers to configure the low_margin_threshold value (e.g., 15%, 20%, 25%) per shop
+4. WHEN displaying menu items with loss or low_margin warnings, THE System SHALL highlight them with distinct visual indicators (red for loss, yellow for low margin)
+5. WHEN a manager views the menu cost report, THE System SHALL display the count of items with loss and low_margin warnings at the top
+6. WHEN a menu item transitions between warning states, THE System SHALL update the warning status immediately
 
 ### Requirement 4: Menu Item Cost Report API
 
@@ -104,6 +107,21 @@ Hệ thống quản lý cafe POS cần tính năng phân tích chi phí và lợ
 5. WHEN a category has no orders in the selected date range, THE Profit_Analyzer SHALL return zero values for that category
 6. WHEN viewing profit for orders in an unclosed shift, THE System SHALL clearly indicate that costs are estimates (cost_status = "ESTIMATED") and not final
 
+### Requirement 6.5: Operating Profit Analysis
+
+**User Story:** As a manager, I want to see operating profit after deducting operating expenses (lương, mặt bằng, điện nước, marketing), so that I can understand the true profitability of my business.
+
+#### Acceptance Criteria
+
+1. THE System SHALL calculate gross_profit as (total_revenue - total_cost_of_goods_sold) for a given period
+2. THE System SHALL allow managers to input operating expenses for a period, including: staff_salary, rent, utilities, marketing_costs, other_expenses
+3. THE System SHALL calculate operating_profit as: gross_profit - (staff_salary + rent + utilities + marketing_costs + other_expenses)
+4. THE System SHALL calculate operating_profit_margin as (operating_profit / total_revenue) * 100
+5. WHEN displaying operating profit analysis, THE System SHALL show breakdown of all expense categories with individual amounts
+6. THE System SHALL support filtering operating profit analysis by date range (daily, weekly, monthly)
+7. WHEN operating expenses are not entered for a period, THE System SHALL display gross_profit only with a note "Chưa nhập chi phí vận hành"
+8. WHEN viewing daily reports but expenses are entered monthly, THE System SHALL allocate expenses proportionally (monthly_expense / days_in_month) with an indicator "Chi phí được phân bổ từ tháng"
+
 ### Requirement 7: Manager View Display
 
 **User Story:** As a manager, I want to view cost and profit information in an intuitive interface, so that I can quickly understand the financial performance of menu items.
@@ -129,31 +147,6 @@ Hệ thống quản lý cafe POS cần tính năng phân tích chi phí và lợ
 4. THE System SHALL provide a line chart visualization showing cost trends over time for each menu item
 5. THE System SHALL support exporting historical cost data in CSV format
 6. WHEN a menu item's recipe is modified, THE System SHALL record the change with a timestamp and SHALL NOT recalculate historical costs for closed shifts
-
-### Requirement 8: Menu Item Cost History Tracking
-
-**User Story:** As a manager, I want to track how menu item costs change over time with visual trends, so that I can understand cost trends and make informed pricing decisions.
-
-#### Acceptance Criteria
-
-1. WHEN an ingredient's cost_per_unit changes, THE System SHALL record the timestamp of the change
-2. THE System SHALL provide an API to retrieve historical cost data for a specific menu item over a date range
-3. WHEN displaying historical cost data, THE System SHALL show cost value and calculation timestamp for each data point
-4. THE System SHALL provide a line chart visualization showing cost trends over time for each menu item
-5. THE System SHALL support exporting historical cost data in CSV format
-6. WHEN a menu item's recipe is modified, THE System SHALL record the change with a timestamp and SHALL NOT recalculate historical costs for closed shifts
-
-### Requirement 9: Real-Time Cost Updates
-
-**User Story:** As a manager, I want menu item costs to update when ingredient costs change, so that I can see current cost information for pricing decisions.
-
-#### Acceptance Criteria
-
-1. WHEN an ingredient cost_per_unit is updated via the ingredient management interface, THE System SHALL queue a background job to recalculate all menu items using that ingredient
-2. WHEN multiple ingredients are updated in a batch operation, THE System SHALL recalculate affected menu items once after all updates complete
-3. THE System SHALL complete cost recalculation within 5 seconds for up to 1000 menu items using asynchronous processing
-4. WHEN cost recalculation is in progress, THE System SHALL display a "Costs are being updated..." indicator in the manager view
-5. WHEN cost recalculation completes, THE System SHALL refresh the manager view automatically or provide a "Refresh" button
 
 ### Requirement 9: Real-Time Cost Updates
 
@@ -188,6 +181,11 @@ Hệ thống quản lý cafe POS cần tính năng phân tích chi phí và lợ
   - **current_cost**: Giá vốn hiện tại, tính từ cost_per_unit hiện tại của ingredients. Dùng cho pricing decisions và real-time analysis. Được update asynchronously khi ingredient costs thay đổi.
   - **accounting_cost**: Giá vốn chính thức được lưu khi kết ca (shift closure). Dùng cho báo cáo profit/loss và accounting. Immutable sau khi shift đóng.
 
+- **Gross Profit vs Operating Profit**:
+  - **Gross Profit (Lợi nhuận gộp)**: Revenue - Cost of Goods Sold (COGS). Đây là lợi nhuận từ bán hàng trước khi trừ chi phí vận hành. Được tính tự động từ orders và accounting_cost.
+  - **Operating Profit (Lợi nhuận vận hành)**: Gross Profit - Operating Expenses (lương nhân viên + mặt bằng + điện nước + marketing + chi phí khác). Đây là lợi nhuận thực tế sau khi trừ tất cả chi phí vận hành. Manager cần nhập operating expenses thủ công.
+  - **Expense Allocation**: Khi manager nhập chi phí theo tháng nhưng xem báo cáo theo ngày, hệ thống sẽ phân bổ tự động: `daily_expense = monthly_expense / days_in_month`. Hiển thị indicator "Chi phí được phân bổ từ tháng" để manager biết đây là ước tính.
+
 - **Cost Status**:
   - **FINAL**: Cost đã được tính và lưu chính thức (shift đã đóng hoặc menu item không có ingredients)
   - **ESTIMATED**: Cost tạm tính từ current_cost (shift chưa đóng)
@@ -209,7 +207,11 @@ Hệ thống quản lý cafe POS cần tính năng phân tích chi phí và lợ
 
 - **Unit Conversion**: Hỗ trợ quy đổi đơn vị (kg → gram) và wastage factor để tính cost chính xác
 
-- **Warning Thresholds**: Loss (cost > price) = red warning, Low margin (< 20%) = yellow warning
+- **Warning Thresholds**: 
+  - Loss (cost > price) = red warning
+  - Low margin (profit_margin < low_margin_threshold) = yellow warning
+  - low_margin_threshold is configurable per shop (default: 20%)
+  - Manager có thể điều chỉnh threshold tùy theo business model (e.g., cafe cao cấp có thể set 30%, cafe bình dân có thể set 15%)
 
 - **Recipe Changes**: Khi sửa recipe, không được tính lại accounting_cost của các shifts đã đóng (immutable historical data)
 
@@ -237,6 +239,22 @@ Hệ thống quản lý cafe POS cần tính năng phân tích chi phí và lợ
 - `cost_updated_at`: timestamp - Thời điểm cập nhật cost
 - `conversion_rate`: decimal - Tỷ lệ quy đổi đơn vị (optional)
 - `wastage_percentage`: decimal - Tỷ lệ hao hụt % (optional)
+
+**OperatingExpense** (NEW):
+- `period_start`: date - Ngày bắt đầu kỳ (e.g., 2024-01-01)
+- `period_end`: date - Ngày kết thúc kỳ (e.g., 2024-01-31)
+- `staff_salary`: decimal - Tổng lương nhân viên
+- `rent`: decimal - Tiền thuê mặt bằng
+- `utilities`: decimal - Điện nước
+- `marketing_costs`: decimal - Chi phí marketing
+- `other_expenses`: decimal - Chi phí khác
+- `total_expenses`: decimal - Tổng chi phí vận hành (tự động tính)
+- `created_at`: timestamp
+- `updated_at`: timestamp
+
+**ShopSettings** (NEW):
+- `low_margin_threshold`: decimal - Ngưỡng cảnh báo lợi nhuận thấp (default: 20.0)
+- `updated_at`: timestamp
 
 ## Out of Scope (Phase 1)
 

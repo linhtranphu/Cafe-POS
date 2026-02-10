@@ -16,6 +16,9 @@ import CashierReports from '../views/CashierReports.vue'
 import CashierShiftClosure from '../views/CashierShiftClosure.vue'
 import UserManagementView from '../views/UserManagementView.vue'
 import ProfileView from '../views/ProfileView.vue'
+import MenuCostView from '../views/MenuCostView.vue'
+import ProfitAnalysisView from '../views/ProfitAnalysisView.vue'
+import SettingsView from '../views/SettingsView.vue'
 
 const routes = [
   {
@@ -129,6 +132,24 @@ const routes = [
     name: 'CashierHandovers',
     component: () => import('../views/CashierHandoverView.vue'),
     meta: { requiresAuth: true, requiresCashier: true }
+  },
+  {
+    path: '/manager/menu-costs',
+    name: 'MenuCosts',
+    component: MenuCostView,
+    meta: { requiresAuth: true, requiresManager: true }
+  },
+  {
+    path: '/manager/profit-analysis',
+    name: 'ProfitAnalysis',
+    component: ProfitAnalysisView,
+    meta: { requiresAuth: true, requiresManager: true }
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: SettingsView,
+    meta: { requiresAuth: true, requiresManager: true }
   }
 ]
 

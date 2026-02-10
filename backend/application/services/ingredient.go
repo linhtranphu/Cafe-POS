@@ -25,9 +25,10 @@ type StockHistoryRepository interface {
 }
 
 type IngredientService struct {
-	ingredientRepo   IngredientRepository
-	stockHistoryRepo StockHistoryRepository
-	autoExpenseService *AutoExpenseService
+	ingredientRepo      IngredientRepository
+	stockHistoryRepo    StockHistoryRepository
+	autoExpenseService  *AutoExpenseService
+	costCalculatorService *CostCalculatorService
 }
 
 func NewIngredientService(ingredientRepo IngredientRepository, stockHistoryRepo StockHistoryRepository) *IngredientService {
@@ -43,15 +44,59 @@ func (s *IngredientService) SetAutoExpenseService(autoExpenseService *AutoExpens
 	s.autoExpenseService = autoExpenseService
 }
 
+// SetCostCalculatorService sets the CostCalculatorService for triggering cost recalculation
+// This is called after service initialization to avoid circular dependencies
+// Requirements: 1.3, 9.1
+func (s *IngredientService) SetCostCalculatorService(costCalculatorService *CostCalculatorService) {
+	s.costCalculatorService = costCalculatorService
+}
+
+// triggerCostRecalculation queues cost recalculation for menu items using this ingredient
+// This is called when ingredient cost_per_unit changes
+// Requirements: 1.3, 9.1
+func (s *IngredientService) triggerCostRecalculation(ctx context.Context, ingredientID primitive.ObjectID) {
+	if s.costCalculatorService == nil {
+		// Service not configured, skip recalculation
+		return
+	}
+	
+	// Queue recalculation asynchronously to avoid blocking the ingredient update
+	go func() {
+		// Create a background context with timeout to avoid hanging
+		bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		
+		// Queue cost recalculation for all menu items using this ingredient
+		err := s.costCalculatorService.QueueCostRecalculation(bgCtx, ingredientID)
+		if err != nil {
+			// Log error but don't fail the ingredient update
+			// In production, this should use proper logging
+		}
+	}()
+}
+
 func (s *IngredientService) CreateIngredient(ctx context.Context, req *ingredient.CreateIngredientRequest, userIDStr string, username string) (*ingredient.Ingredient, error) {
+	// Set default values for conversion_rate and wastage_percentage
+	conversionRate := 1.0
+	if req.ConversionRate != nil {
+		conversionRate = *req.ConversionRate
+	}
+	
+	wastagePercentage := 0.0
+	if req.WastagePercentage != nil {
+		wastagePercentage = *req.WastagePercentage
+	}
+	
 	item := &ingredient.Ingredient{
-		Name:        req.Name,
-		Category:    req.Category,
-		Unit:        req.Unit,
-		Quantity:    req.Quantity,
-		MinStock:    req.MinStock,
-		CostPerUnit: req.CostPerUnit,
-		Supplier:    req.Supplier,
+		Name:              req.Name,
+		Category:          req.Category,
+		Unit:              req.Unit,
+		Quantity:          req.Quantity,
+		MinStock:          req.MinStock,
+		CostPerUnit:       req.CostPerUnit,
+		Supplier:          req.Supplier,
+		ConversionRate:    conversionRate,
+		WastagePercentage: wastagePercentage,
 	}
 	
 	// Set created_at from request if provided, otherwise use current time
@@ -130,6 +175,12 @@ func (s *IngredientService) UpdateIngredient(ctx context.Context, id primitive.O
 		return nil, err
 	}
 
+	// Track if cost_per_unit changed to trigger recalculation
+	costChanged := false
+	if req.CostPerUnit != nil && *req.CostPerUnit != item.CostPerUnit {
+		costChanged = true
+	}
+
 	if req.Name != "" {
 		item.Name = req.Name
 	}
@@ -151,10 +202,22 @@ func (s *IngredientService) UpdateIngredient(ctx context.Context, id primitive.O
 	if req.Supplier != "" {
 		item.Supplier = req.Supplier
 	}
+	if req.ConversionRate != nil {
+		item.ConversionRate = *req.ConversionRate
+	}
+	if req.WastagePercentage != nil {
+		item.WastagePercentage = *req.WastagePercentage
+	}
 
 	err = s.ingredientRepo.Update(ctx, id, item)
 	if err != nil {
 		return nil, err
+	}
+
+	// Trigger cost recalculation if cost_per_unit changed
+	// Requirements: 1.3, 9.1
+	if costChanged {
+		s.triggerCostRecalculation(ctx, id)
 	}
 
 	return item, nil
@@ -179,12 +242,16 @@ func (s *IngredientService) StockIn(ctx context.Context, id primitive.ObjectID, 
 	costPerUnit := req.CostPerUnit  // Use provided price, or 0 if not provided
 	userProvidedNewPrice := req.CostPerUnit > 0 // Track if user provided a new price
 
+	// Track if cost_per_unit changed to trigger recalculation
+	costChanged := false
+
 	// Calculate weighted average cost ONLY when new price is provided and different
 	if req.CostPerUnit > 0 && req.CostPerUnit != item.CostPerUnit && afterQty > 0 {
 		// Weighted average: (old_qty * old_price + new_qty * new_price) / total_qty
 		oldValue := beforeQty * item.CostPerUnit
 		newValue := req.Quantity * req.CostPerUnit
 		item.CostPerUnit = (oldValue + newValue) / afterQty
+		costChanged = true
 	}
 
 	err = s.ingredientRepo.Update(ctx, id, item)
@@ -222,6 +289,12 @@ func (s *IngredientService) StockIn(ctx context.Context, id primitive.ObjectID, 
 		if err := s.autoExpenseService.TrackIngredientPurchase(ctx, &tempItem, req.Quantity, req.Username); err != nil {
 			// Log error but don't fail the operation
 		}
+	}
+
+	// Trigger cost recalculation if cost_per_unit changed
+	// Requirements: 1.3, 9.1
+	if costChanged {
+		s.triggerCostRecalculation(ctx, id)
 	}
 
 	return item, nil
@@ -281,6 +354,7 @@ func (s *IngredientService) StockAdjust(ctx context.Context, id primitive.Object
 	// Determine cost per unit for this transaction
 	costPerUnit := float64(0)       // Default to 0 (no cost)
 	userProvidedNewPrice := false   // Track if user actually provided a new price
+	costChanged := false            // Track if cost_per_unit changed
 	
 	// Only recalculate price if:
 	// 1. Quantity increased (positive diff)
@@ -292,6 +366,7 @@ func (s *IngredientService) StockAdjust(ctx context.Context, id primitive.Object
 		item.CostPerUnit = (oldValue + newValue) / afterQty
 		costPerUnit = req.CostPerUnit // Use new price for history
 		userProvidedNewPrice = true   // User provided a new price
+		costChanged = true
 	}
 
 	err = s.ingredientRepo.Update(ctx, id, item)
@@ -328,6 +403,12 @@ func (s *IngredientService) StockAdjust(ctx context.Context, id primitive.Object
 		}
 	}
 
+	// Trigger cost recalculation if cost_per_unit changed
+	// Requirements: 1.3, 9.1
+	if costChanged {
+		s.triggerCostRecalculation(ctx, id)
+	}
+
 	return item, nil
 }
 
@@ -352,6 +433,9 @@ func (s *IngredientService) AdjustStock(ctx context.Context, id primitive.Object
 		costPerUnit = item.CostPerUnit
 	}
 
+	// Track if cost_per_unit changed to trigger recalculation
+	costChanged := false
+
 	// Calculate weighted average cost ONLY for stock IN with NEW price
 	// Only recalculate if:
 	// 1. Quantity is positive (adding stock)
@@ -363,6 +447,7 @@ func (s *IngredientService) AdjustStock(ctx context.Context, id primitive.Object
 		oldValue := beforeQty * item.CostPerUnit
 		newValue := req.Quantity * req.CostPerUnit
 		item.CostPerUnit = (oldValue + newValue) / afterQty
+		costChanged = true
 	}
 	// If no new price provided (req.CostPerUnit = 0), keep current price
 	// This handles: stock OUT, stock SET without price, stock IN without price
@@ -398,6 +483,12 @@ func (s *IngredientService) AdjustStock(ctx context.Context, id primitive.Object
 			// Log error but don't fail the operation
 			// The stock adjustment was successful, expense tracking is secondary
 		}
+	}
+
+	// Trigger cost recalculation if cost_per_unit changed
+	// Requirements: 1.3, 9.1
+	if costChanged {
+		s.triggerCostRecalculation(ctx, id)
 	}
 
 	return item, nil

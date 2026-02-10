@@ -11,17 +11,20 @@ import (
 )
 
 type ShiftHandler struct {
-	shiftService        *services.ShiftService
-	stateMachineManager *domain.StateMachineManager
+	shiftService          *services.ShiftService
+	stateMachineManager   *domain.StateMachineManager
+	costCalculatorService *services.CostCalculatorService
 }
 
 func NewShiftHandler(
 	shiftService *services.ShiftService,
 	stateMachineManager *domain.StateMachineManager,
+	costCalculatorService *services.CostCalculatorService,
 ) *ShiftHandler {
 	return &ShiftHandler{
-		shiftService:        shiftService,
-		stateMachineManager: stateMachineManager,
+		shiftService:          shiftService,
+		stateMachineManager:   stateMachineManager,
+		costCalculatorService: costCalculatorService,
 	}
 }
 
@@ -136,7 +139,24 @@ func (h *ShiftHandler) CloseShift(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, shift)
+	// Calculate shift order costs after closing shift
+	costSummary, costErr := h.costCalculatorService.CalculateShiftOrderCosts(c.Request.Context(), id)
+	
+	// Prepare response
+	response := gin.H{
+		"shift": shift,
+	}
+	
+	// Add cost calculation summary if successful
+	if costErr == nil && costSummary != nil {
+		response["cost_calculation"] = costSummary
+	} else if costErr != nil {
+		// Log error but don't fail the shift closure
+		// Cost calculation can be retried later
+		response["cost_calculation_error"] = costErr.Error()
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 func (h *ShiftHandler) GetCurrentShift(c *gin.Context) {

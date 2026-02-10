@@ -74,11 +74,45 @@ func main() {
 	// Handover service
 	cashHandoverService := services.NewCashHandoverService(cashHandoverRepo, cashDiscrepancyRepo, shiftRepo, cashierShiftRepo, orderRepo)
 
+	// Menu cost and profit analysis repositories and services (needed by shift handler)
+	menuRepo := mongodb.NewMenuRepository(db)
+	ingredientRepo := mongodb.NewIngredientRepository(db)
+	orderItemRepo := mongodb.NewOrderItemRepository(db)
+	shopSettingsRepo := mongodb.NewShopSettingsRepository(db)
+	operatingExpenseRepo := mongodb.NewOperatingExpenseRepository(db)
+	
+	// Create monitoring service for metrics and alerts
+	monitoringService := services.NewMonitoringService()
+	
+	costCalculatorService := services.NewCostCalculatorService(menuRepo, ingredientRepo, orderRepo, orderItemRepo)
+	profitAnalyzerService := services.NewProfitAnalyzerService(menuRepo, orderItemRepo, shopSettingsRepo, operatingExpenseRepo)
+	costRecalculationService := services.NewCostRecalculationService(costCalculatorService, menuRepo, 4, 1000) // 4 workers, queue size 1000
+	operatingExpenseService := services.NewOperatingExpenseService(operatingExpenseRepo)
+	shopSettingsService := services.NewShopSettingsService(shopSettingsRepo)
+
+	// Wire up cost calculator with recalculation service and monitoring
+	costCalculatorService.SetCostRecalculationService(costRecalculationService)
+	costCalculatorService.SetMonitoringService(monitoringService)
+	costRecalculationService.SetMonitoringService(monitoringService)
+
+	// Start cost recalculation worker pool
+	// Requirements: 9.1, 9.2, 9.3
+	log.Println("Starting cost recalculation worker pool...")
+	costRecalculationService.Start()
+	log.Println("✅ Cost recalculation worker pool started")
+
+	// Setup graceful shutdown for worker pool
+	defer func() {
+		log.Println("Stopping cost recalculation worker pool...")
+		costRecalculationService.Stop()
+		log.Println("✅ Cost recalculation worker pool stopped")
+	}()
+
 	// Handlers
 	authHandler := http.NewAuthHandler(authService)
 	userManagementHandler := http.NewUserManagementHandler(userManagementService)
 	orderHandler := http.NewOrderHandler(orderService, smManager)
-	shiftHandler := http.NewShiftHandler(shiftService, smManager)
+	shiftHandler := http.NewShiftHandler(shiftService, smManager, costCalculatorService)
 	// Cashier handlers
 	cashierShiftHandler := http.NewCashierShiftHandler(cashierShiftService)
 	cashierShiftClosureHandler := http.NewCashierShiftClosureHandler(cashierShiftService, smManager)
@@ -87,10 +121,14 @@ func main() {
 	cashHandoverHandler := http.NewCashHandoverHandler(cashHandoverService)
 	// State machine handler
 	stateMachineHandler := http.NewStateMachineHandler(smManager)
-	menuRepo := mongodb.NewMenuRepository(db)
 	menuService := services.NewMenuService(menuRepo)
 	menuHandler := http.NewMenuHandler(menuService)
-	ingredientRepo := mongodb.NewIngredientRepository(db)
+	
+	// Menu category service and handler
+	menuCategoryRepo := mongodb.NewMenuCategoryRepository(db)
+	menuCategoryService := services.NewMenuCategoryService(menuCategoryRepo, menuRepo)
+	menuCategoryHandler := http.NewMenuCategoryHandler(menuCategoryService)
+	
 	stockHistoryRepo := mongodb.NewStockHistoryRepository(db)
 	ingredientService := services.NewIngredientService(ingredientRepo, stockHistoryRepo)
 	ingredientHandler := http.NewIngredientHandler(ingredientService)
@@ -101,10 +139,21 @@ func main() {
 	expenseService := services.NewExpenseService(expenseRepo)
 	expenseHandler := http.NewExpenseHandler(expenseService)
 
+	// Menu cost and profit analysis handlers
+	menuCostHandler := http.NewMenuCostHandler(profitAnalyzerService, costCalculatorService, costRecalculationService)
+	profitAnalysisHandler := http.NewProfitAnalysisHandler(profitAnalyzerService)
+	operatingExpenseHandler := http.NewOperatingExpenseHandler(operatingExpenseService)
+	settingsHandler := http.NewSettingsHandler(shopSettingsService)
+	monitoringHandler := http.NewMonitoringHandler(monitoringService)
+
 	// Auto Expense Service - wire up with other services
 	autoExpenseService := services.NewAutoExpenseService(expenseService)
 	ingredientService.SetAutoExpenseService(autoExpenseService)
 	facilityService.SetAutoExpenseService(autoExpenseService)
+
+	// Wire up ingredient service with cost calculator for recalculation triggers
+	// Requirements: 1.3, 9.1
+	ingredientService.SetCostCalculatorService(costCalculatorService)
 
 	// Router
 	r := gin.Default()
@@ -288,6 +337,36 @@ func main() {
 				manager.GET("/menu/:id", menuHandler.GetMenuItem)
 				manager.PUT("/menu/:id", menuHandler.UpdateMenuItem)
 				manager.DELETE("/menu/:id", menuHandler.DeleteMenuItem)
+				
+				// Menu category routes
+				manager.POST("/menu-categories", menuCategoryHandler.CreateCategory)
+				manager.GET("/menu-categories", menuCategoryHandler.GetAllCategories)
+				manager.GET("/menu-categories/:id", menuCategoryHandler.GetCategory)
+				manager.PUT("/menu-categories/:id", menuCategoryHandler.UpdateCategory)
+				manager.DELETE("/menu-categories/:id", menuCategoryHandler.DeleteCategory)
+				
+				// Menu cost and profit analysis routes
+				manager.GET("/menu/costs", menuCostHandler.GetMenuCosts)
+				manager.GET("/menu/costs/:id", menuCostHandler.GetMenuCostDetail)
+				manager.GET("/menu/warnings", menuCostHandler.GetMenuWarnings)
+				
+				// Profit analysis routes
+				manager.GET("/reports/category-profit", profitAnalysisHandler.GetCategoryProfit)
+				manager.GET("/reports/operating-profit", profitAnalysisHandler.GetOperatingProfit)
+				
+				// Operating expense routes
+				manager.POST("/operating-expenses", operatingExpenseHandler.CreateOperatingExpense)
+				manager.GET("/operating-expenses", operatingExpenseHandler.GetOperatingExpenses)
+				
+				// Settings routes
+				manager.GET("/settings", settingsHandler.GetSettings)
+				manager.PATCH("/settings", settingsHandler.UpdateSettings)
+				
+				// Monitoring and metrics routes
+				manager.GET("/monitoring/metrics", monitoringHandler.GetMetrics)
+				manager.GET("/monitoring/alerts", monitoringHandler.GetAlerts)
+				manager.GET("/monitoring/metrics/aggregated", monitoringHandler.GetAggregatedMetrics)
+				manager.GET("/monitoring/health", monitoringHandler.GetHealthStatus)
 				
 				// Ingredient management routes
 				manager.POST("/ingredients", ingredientHandler.CreateIngredient)

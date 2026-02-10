@@ -27,13 +27,13 @@
       <!-- Manager Dashboard (No Shift Concept) -->
       <div v-if="user?.role === USER_ROLES.MANAGER">
         <!-- Welcome Card -->
-        <div class="bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl p-6 text-white shadow-lg mb-4">
+        <div class="bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl p-6 text-white shadow-lg mb-6">
           <h2 class="text-2xl font-bold mb-2">🎯 Quản lý hệ thống</h2>
           <p class="text-sm opacity-90">Truy cập nhanh các chức năng quản lý</p>
         </div>
 
         <!-- Quick Stats for Manager -->
-        <div class="grid grid-cols-2 gap-3 mb-4">
+        <div class="grid grid-cols-2 gap-3 mb-6">
           <div class="bg-white rounded-2xl p-4 shadow-sm">
             <div class="text-3xl mb-2">📋</div>
             <div class="text-2xl font-bold text-gray-800">{{ todayOrders }}</div>
@@ -46,24 +46,96 @@
           </div>
         </div>
 
-        <!-- Management Quick Actions -->
-        <div class="mb-4">
-          <h2 class="text-lg font-bold text-gray-800 mb-3">⚡ Thao tác nhanh</h2>
+        <!-- 📊 Báo cáo & Phân tích -->
+        <div class="mb-6">
+          <h2 class="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <span>📊</span>
+            <span>Báo cáo & Phân tích</span>
+          </h2>
           <div class="grid grid-cols-2 gap-3">
-            <button @click="$router.push('/facilities')" 
-              class="bg-gradient-to-br from-cyan-500 to-blue-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
-              <div class="text-4xl mb-2">🏢</div>
-              <div class="font-bold">Cơ sở vật chất</div>
+            <button @click="$router.push('/manager/profit-analysis')" 
+              class="bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+              <div class="text-4xl mb-2">📈</div>
+              <div class="font-bold text-base">Phân tích lợi nhuận</div>
+              <div class="text-xs opacity-80 mt-1">Theo category & vận hành</div>
+            </button>
+            <button @click="$router.push('/manager/menu-costs')" 
+              class="bg-gradient-to-br from-orange-500 to-red-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+              <div class="text-4xl mb-2">💰</div>
+              <div class="font-bold text-base">Chi phí món</div>
+              <div class="text-xs opacity-80 mt-1">Giá vốn & lợi nhuận</div>
+            </button>
+            <button @click="$router.push('/cashier/reports')" 
+              class="bg-gradient-to-br from-blue-500 to-cyan-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+              <div class="text-4xl mb-2">📊</div>
+              <div class="font-bold text-base">Báo cáo thu ngân</div>
+              <div class="text-xs opacity-80 mt-1">Doanh thu & thanh toán</div>
+            </button>
+            <button @click="$router.push('/manager/shifts')" 
+              class="bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+              <div class="text-4xl mb-2">⏰</div>
+              <div class="font-bold text-base">Quản lý ca</div>
+              <div class="text-xs opacity-80 mt-1">Theo dõi ca làm việc</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- 🍽️ Menu & Nguyên liệu -->
+        <div class="mb-6">
+          <h2 class="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <span>🍽️</span>
+            <span>Menu & Nguyên liệu</span>
+          </h2>
+          <div class="grid grid-cols-2 gap-3">
+            <button @click="$router.push('/menu')" 
+              class="bg-gradient-to-br from-amber-500 to-orange-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+              <div class="text-4xl mb-2">🍽️</div>
+              <div class="font-bold text-base">Menu</div>
+              <div class="text-xs opacity-80 mt-1">Quản lý thực đơn</div>
             </button>
             <button @click="$router.push('/ingredients')" 
               class="bg-gradient-to-br from-green-500 to-emerald-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
               <div class="text-4xl mb-2">🥬</div>
-              <div class="font-bold">Nguyên liệu</div>
+              <div class="font-bold text-base">Nguyên liệu</div>
+              <div class="text-xs opacity-80 mt-1">Kho & giá vốn</div>
             </button>
+          </div>
+        </div>
+
+        <!-- 💸 Chi phí & Tài sản -->
+        <div class="mb-6">
+          <h2 class="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <span>💸</span>
+            <span>Chi phí & Tài sản</span>
+          </h2>
+          <div class="grid grid-cols-2 gap-3">
             <button @click="$router.push('/expenses')" 
-              class="bg-gradient-to-br from-pink-500 to-purple-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+              class="bg-gradient-to-br from-pink-500 to-rose-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
               <div class="text-4xl mb-2">💸</div>
-              <div class="font-bold">Chi phí</div>
+              <div class="font-bold text-base">Chi phí</div>
+              <div class="text-xs opacity-80 mt-1">Theo dõi chi tiêu</div>
+            </button>
+            <button @click="$router.push('/facilities')" 
+              class="bg-gradient-to-br from-cyan-500 to-blue-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+              <div class="text-4xl mb-2">🏢</div>
+              <div class="font-bold text-base">Cơ sở vật chất</div>
+              <div class="text-xs opacity-80 mt-1">Tài sản & bảo trì</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- 👥 Nhân sự -->
+        <div class="mb-6">
+          <h2 class="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <span>👥</span>
+            <span>Nhân sự</span>
+          </h2>
+          <div class="grid grid-cols-2 gap-3">
+            <button @click="$router.push('/users')" 
+              class="bg-gradient-to-br from-violet-500 to-purple-600 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+              <div class="text-4xl mb-2">👥</div>
+              <div class="font-bold text-base">Nhân viên</div>
+              <div class="text-xs opacity-80 mt-1">Quản lý tài khoản</div>
             </button>
           </div>
         </div>

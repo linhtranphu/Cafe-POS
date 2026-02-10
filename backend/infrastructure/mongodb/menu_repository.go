@@ -51,6 +51,22 @@ func (r *MenuRepository) FindByID(ctx context.Context, id primitive.ObjectID) (*
 	return &item, nil
 }
 
+// FindByCategory finds all menu items in a specific category
+func (r *MenuRepository) FindByCategory(ctx context.Context, category string) ([]*menu.MenuItem, error) {
+	opts := options.Find().SetSort(bson.D{{"name", 1}})
+	cursor, err := r.collection.Find(ctx, bson.M{"category": category}, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var items []*menu.MenuItem
+	if err = cursor.All(ctx, &items); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 func (r *MenuRepository) Update(ctx context.Context, id primitive.ObjectID, item *menu.MenuItem) error {
 	item.UpdatedAt = time.Now()
 	_, err := r.collection.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": item})
@@ -59,5 +75,45 @@ func (r *MenuRepository) Update(ctx context.Context, id primitive.ObjectID, item
 
 func (r *MenuRepository) Delete(ctx context.Context, id primitive.ObjectID) error {
 	_, err := r.collection.DeleteOne(ctx, bson.M{"_id": id})
+	return err
+}
+
+// FindByIngredientName finds all menu items that use a specific ingredient
+func (r *MenuRepository) FindByIngredientName(ctx context.Context, ingredientName string) ([]*menu.MenuItem, error) {
+	filter := bson.M{
+		"ingredients.name": ingredientName,
+	}
+	
+	cursor, err := r.collection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var items []*menu.MenuItem
+	if err = cursor.All(ctx, &items); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+// CreateIndexes creates necessary indexes for the menu_items collection
+func (r *MenuRepository) CreateIndexes(ctx context.Context) error {
+	indexes := []mongo.IndexModel{
+		{
+			Keys: bson.D{{Key: "category", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "cost_status", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "current_cost", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "ingredients.name", Value: 1}},
+		},
+	}
+
+	_, err := r.collection.Indexes().CreateMany(ctx, indexes)
 	return err
 }

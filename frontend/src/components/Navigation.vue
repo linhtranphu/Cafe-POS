@@ -17,8 +17,8 @@
 
     <!-- Card-based navigation -->
     <div class="p-4">
-      <!-- Manager Navigation (5-menu layout) -->
-      <div v-if="userRole === 'manager'" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 max-w-6xl mx-auto">
+      <!-- Manager Navigation (8-menu layout with settings) -->
+      <div v-if="userRole === 'manager'" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 max-w-7xl mx-auto">
         <!-- Dashboard -->
         <router-link to="/dashboard" @click="handleNavClick" 
           class="bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl p-6 flex flex-col items-center justify-center min-h-[120px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
@@ -40,11 +40,32 @@
           <span class="text-base font-medium text-center">Báo cáo</span>
         </router-link>
 
+        <!-- Menu Costs -->
+        <router-link to="/manager/menu-costs" @click="handleNavClick"
+          class="bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl p-6 flex flex-col items-center justify-center min-h-[120px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+          <div class="text-3xl mb-2">💰</div>
+          <span class="text-base font-medium text-center">Chi phí món</span>
+        </router-link>
+
+        <!-- Profit Analysis -->
+        <router-link to="/manager/profit-analysis" @click="handleNavClick"
+          class="bg-gradient-to-br from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white rounded-xl p-6 flex flex-col items-center justify-center min-h-[120px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+          <div class="text-3xl mb-2">📈</div>
+          <span class="text-base font-medium text-center">Phân tích lợi nhuận</span>
+        </router-link>
+
         <!-- Users Management -->
         <router-link to="/users" @click="handleNavClick"
           class="bg-gradient-to-br from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white rounded-xl p-6 flex flex-col items-center justify-center min-h-[120px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
           <div class="text-3xl mb-2">👥</div>
           <span class="text-base font-medium text-center">Nhân viên</span>
+        </router-link>
+
+        <!-- Settings -->
+        <router-link to="/settings" @click="handleNavClick"
+          class="bg-gradient-to-br from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white rounded-xl p-6 flex flex-col items-center justify-center min-h-[120px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+          <div class="text-3xl mb-2">⚙️</div>
+          <span class="text-base font-medium text-center">Cài đặt</span>
         </router-link>
 
         <!-- Profile -->

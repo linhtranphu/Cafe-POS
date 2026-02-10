@@ -68,96 +68,68 @@
       <div class="mb-4">
         <h2 class="text-sm font-bold text-gray-800 mb-2">⚡ Thao tác nhanh</h2>
         <div class="grid grid-cols-2 gap-2">
-          <button @click="toggleCreateForm"
+          <button @click="openCreateModal"
             class="bg-gradient-to-br from-blue-500 to-cyan-500 text-white rounded-xl p-4 shadow-md active:scale-95 transition-transform">
             <div class="text-2xl mb-1">➕</div>
-            <div class="text-sm font-bold">{{ showCreateForm ? 'Đóng' : 'Tạo chi phí' }}</div>
+            <div class="text-sm font-bold">Tạo chi phí</div>
           </button>
-          <button @click="toggleCategoryForm"
+          <button @click="showCategoryModal = true"
             class="bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-xl p-4 shadow-md active:scale-95 transition-transform">
             <div class="text-2xl mb-1">📁</div>
-            <div class="text-sm font-bold">{{ showCategoryForm ? 'Đóng' : 'Danh mục' }}</div>
+            <div class="text-sm font-bold">Danh mục</div>
           </button>
         </div>
       </div>
 
-      <!-- Create Expense Form -->
-      <div v-if="showCreateForm" class="bg-white rounded-2xl p-4 mb-4 shadow-md border-2 border-blue-200">
-        <h3 class="text-lg font-bold mb-4">{{ isEditing ? '✏️ Cập nhật chi phí' : '➕ Thêm chi phí mới' }}</h3>
-        
-        <div class="space-y-3">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Mô tả *</label>
-            <input v-model="formData.description" type="text" 
-              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Danh mục <span class="text-red-500">*</span>
-              </label>
-              <select v-model="formData.category_id" 
-                :class="{'border-red-500': !formData.category_id}"
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                <option value="">Chọn danh mục</option>
-                <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
-              </select>
-              <p v-if="!formData.category_id && categories.length === 0" class="text-xs text-orange-600 mt-1">
-                ⚠️ Chưa có danh mục. Tạo danh mục trước!
-              </p>
+      <!-- Category Management Modal -->
+      <transition name="slide-up">
+        <div v-if="showCategoryModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
+          <div class="bg-white rounded-t-3xl w-full h-[85vh] flex flex-col">
+            <!-- Fixed Header -->
+            <div class="flex-shrink-0 bg-white px-4 py-4 border-b flex justify-between items-center rounded-t-3xl">
+              <h3 class="text-lg font-bold">📁 Quản lý Danh mục</h3>
+              <button @click="showCategoryModal = false" class="text-2xl text-gray-400">×</button>
             </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Số tiền *</label>
-              <input v-model.number="formData.amount" type="number" 
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+            
+            <!-- Scrollable Content -->
+            <div class="flex-1 overflow-y-auto px-4 py-4">
+              <!-- Add New Category -->
+              <div class="bg-gray-50 rounded-xl p-4 mb-4 flex-shrink-0">
+                <h4 class="font-semibold text-gray-800 mb-3">Thêm danh mục mới</h4>
+                <form @submit.prevent="addCategory" class="flex flex-col sm:flex-row gap-2">
+                  <input v-model="newCategoryName" type="text" required placeholder="VD: Tiền điện, Tiền nước..." 
+                    class="flex-1 px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" />
+                  <button type="submit" class="bg-purple-500 text-white px-6 py-3 rounded-lg font-medium text-base active:bg-purple-600 whitespace-nowrap">
+                    Thêm
+                  </button>
+                </form>
+              </div>
+
+              <!-- Category List -->
+              <div class="space-y-3 pb-4">
+                <div v-for="cat in categories" :key="cat.id" 
+                  class="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
+                  <div class="flex items-center gap-3 flex-1 min-w-0">
+                    <div class="w-12 h-12 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center text-2xl flex-shrink-0">
+                      💰
+                    </div>
+                    <div class="min-w-0">
+                      <div class="font-medium text-gray-800 truncate">{{ cat.name }}</div>
+                      <div class="text-xs text-gray-500">{{ getCategoryCount(cat.id) }} chi phí</div>
+                    </div>
+                  </div>
+                  <button @click="deleteCategory(cat.id)" class="text-red-500 hover:text-red-700 p-2 flex-shrink-0 ml-2">
+                    🗑️
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Ngày *</label>
-              <input v-model="formData.date" type="date" 
-                class="w-full px-3 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 appearance-none" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Thanh toán *</label>
-              <select v-model="formData.payment_method" 
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                <option v-for="option in PAYMENT_METHOD_OPTIONS" :key="option.value" :value="option.value">
-                  {{ option.label }}
-                </option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Nhà cung cấp</label>
-            <input v-model="formData.vendor" type="text" 
-              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
-            <textarea v-model="formData.notes" rows="2" 
-              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
-          </div>
-
-          <div class="flex gap-3 pt-4">
-            <button @click="cancelEdit" 
-              class="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-medium active:bg-gray-300">
-              Hủy
-            </button>
-            <button @click="saveExpense" 
-              class="flex-1 bg-blue-500 text-white py-3 rounded-xl font-medium active:bg-blue-600">
-              {{ isEditing ? 'Cập nhật' : 'Thêm mới' }}
-            </button>
           </div>
         </div>
-      </div>
+      </transition>
 
-      <!-- Category Management Form -->
-      <div v-if="showCategoryForm" class="bg-white rounded-2xl p-4 mb-4 shadow-md border-2 border-purple-200">
+      <!-- Category Management Form (old inline version - removed) -->
+      <div v-if="false" class="bg-white rounded-2xl p-4 mb-4 shadow-md border-2 border-purple-200">
         <h3 class="text-lg font-bold mb-4">📁 Quản lý danh mục</h3>
         
         <!-- Add New Category -->
@@ -275,6 +247,104 @@
 
     <!-- Bottom Navigation -->
     <BottomNav />
+
+    <!-- Create/Edit Expense Form Modal - Slide from Right -->
+    <transition name="slide-right">
+      <div v-if="showCreateForm" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
+        <div class="bg-gray-50 w-full h-screen flex flex-col">
+          <!-- Mobile Header - Fixed -->
+          <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
+            <div class="px-4 py-3">
+              <div class="flex items-center justify-between">
+                <button @click="cancelEdit" class="text-2xl text-gray-600">←</button>
+                <h1 class="text-xl font-bold text-gray-800">{{ isEditing ? '✏️ Cập nhật chi phí' : '➕ Thêm chi phí mới' }}</h1>
+                <div class="w-8"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Scrollable Content -->
+          <div class="flex-1 overflow-y-auto px-4 py-6 space-y-5">
+            <!-- Mô tả -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-3">Mô tả *</label>
+              <input v-model="formData.description" type="text" required placeholder="VD: Tiền điện tháng 1"
+                class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            </div>
+
+            <!-- Danh mục & Số tiền -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-3">
+                  Danh mục <span class="text-red-500">*</span>
+                </label>
+                <select v-model="formData.category_id" required
+                  :class="{'border-red-500': !formData.category_id}"
+                  class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                  <option value="">Chọn danh mục</option>
+                  <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+                </select>
+                <p v-if="!formData.category_id && categories.length === 0" class="text-xs text-orange-600 mt-1">
+                  ⚠️ Chưa có danh mục. Tạo danh mục trước!
+                </p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-3">Số tiền (VNĐ) *</label>
+                <input v-model.number="formData.amount" type="number" min="0" step="1000" required placeholder="0"
+                  class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              </div>
+            </div>
+
+            <!-- Ngày & Thanh toán -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-3">Ngày *</label>
+                <input v-model="formData.date" type="date" required
+                  class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-3">Thanh toán *</label>
+                <select v-model="formData.payment_method" required
+                  class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                  <option v-for="option in PAYMENT_METHOD_OPTIONS" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Nhà cung cấp -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-3">Nhà cung cấp</label>
+              <input v-model="formData.vendor" type="text" placeholder="VD: Công ty điện lực"
+                class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            </div>
+
+            <!-- Ghi chú -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-3">Ghi chú</label>
+              <textarea v-model="formData.notes" rows="3" placeholder="Ghi chú thêm..."
+                class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"></textarea>
+            </div>
+
+            <!-- Spacer for bottom buttons -->
+            <div class="h-24"></div>
+          </div>
+
+          <!-- Fixed Footer -->
+          <div class="flex-shrink-0 bg-white px-4 py-4 border-t flex gap-3 pb-safe">
+            <button @click="cancelEdit" 
+              class="flex-1 bg-gray-200 text-gray-700 py-4 rounded-xl font-medium text-base active:bg-gray-300 transition-colors">
+              Hủy
+            </button>
+            <button @click="saveExpense" :disabled="!formData.description || !formData.category_id || formData.amount <= 0"
+              class="flex-1 bg-green-500 text-white py-4 rounded-xl font-medium text-base active:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              {{ isEditing ? 'Cập nhật' : 'Thêm chi phí' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -292,7 +362,7 @@ const expenseStore = useExpenseStore()
 const searchQuery = ref('')
 const creatorFilter = ref('')
 const showCreateForm = ref(false)
-const showCategoryForm = ref(false)
+const showCategoryModal = ref(false)
 const isEditing = ref(false)
 const currentExpense = ref(null)
 const newCategoryName = ref('')
@@ -434,15 +504,13 @@ const getSourceTypeBadgeClass = (sourceType) => {
   return classes[sourceType] || 'bg-gray-100 text-gray-700'
 }
 
-const toggleCreateForm = () => {
-  showCreateForm.value = !showCreateForm.value
-  if (showCreateForm.value) {
-    cancelEdit()
-  }
+const openCreateModal = () => {
+  cancelEdit()
+  showCreateForm.value = true
 }
 
 const toggleCategoryForm = () => {
-  showCategoryForm.value = !showCategoryForm.value
+  showCategoryModal.value = !showCategoryModal.value
 }
 
 const openEditModal = (expense) => {
@@ -456,6 +524,7 @@ const openEditModal = (expense) => {
 }
 
 const cancelEdit = () => {
+  showCreateForm.value = false
   isEditing.value = false
   currentExpense.value = null
   formData.value = {
@@ -577,5 +646,40 @@ onMounted(async () => {
 
 .active\:scale-98:active {
   transform: scale(0.98);
+}
+
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.slide-up-enter-from {
+  transform: translateY(100%);
+}
+
+.slide-up-leave-to {
+  transform: translateY(100%);
+}
+
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.slide-right-enter-from {
+  transform: translateX(100%);
+}
+
+.slide-right-leave-to {
+  transform: translateX(100%);
+}
+
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

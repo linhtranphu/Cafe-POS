@@ -6,14 +6,14 @@
         :key="item.path"
         @click="navigate(item.path)"
         :class="[
-          'flex flex-col items-center py-2 px-4 rounded-lg transition-colors relative',
+          'flex flex-col items-center py-2 px-3 rounded-lg transition-colors relative',
           isActive(item.path) ? 'text-blue-500' : 'text-gray-600'
         ]">
         <span class="text-2xl mb-1">{{ item.icon }}</span>
-        <span class="text-xs font-medium">{{ item.label }}</span>
+        <span class="text-xs font-medium whitespace-nowrap">{{ item.label }}</span>
         <!-- Badge for pending items -->
         <span v-if="item.badge && item.badge > 0" 
-          class="absolute top-1 right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+          class="absolute top-1 right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
           {{ item.badge > 9 ? '9+' : item.badge }}
         </span>
       </button>
@@ -35,13 +35,13 @@ const cashierStore = useCashierStore()
 const navItems = computed(() => {
   const role = authStore.user?.role
   
-  // Manager navigation (5 items)
+  // Manager navigation (5 items - essential only, rest in dashboard)
   if (role === 'manager') {
     return [
       { path: '/dashboard', icon: '🏠', label: 'Dashboard' },
-      { path: '/manager/shifts', icon: '⏰', label: 'Quản lý ca' },
       { path: '/cashier/reports', icon: '📊', label: 'Báo cáo' },
-      { path: '/users', icon: '👥', label: 'Nhân viên' },
+      { path: '/manager/profit-analysis', icon: '📈', label: 'Lợi nhuận' },
+      { path: '/settings', icon: '⚙️', label: 'Cài đặt' },
       { path: '/profile', icon: '👤', label: 'Cá nhân' }
     ]
   }

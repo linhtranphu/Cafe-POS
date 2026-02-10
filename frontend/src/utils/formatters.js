@@ -168,6 +168,27 @@ export function formatNumber(num) {
 }
 
 /**
+ * Format percentage with 2 decimal places
+ * 
+ * @param {number|null} value - Percentage value to format
+ * @param {number} decimals - Number of decimal places (default: 2)
+ * @returns {string} Formatted percentage string
+ */
+export function formatPercentage(value, decimals = 2) {
+  if (value === null || value === undefined || isNaN(value)) return 'N/A'
+  
+  try {
+    return new Intl.NumberFormat('vi-VN', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    }).format(value) + '%'
+  } catch (error) {
+    console.error('Error formatting percentage:', error)
+    return 'N/A'
+  }
+}
+
+/**
  * Sanitize form data before sending to backend
  * - Converts dates to ISO format
  * - Ensures numbers are valid

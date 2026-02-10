@@ -156,6 +156,12 @@
 
             <!-- Category List -->
             <div class="space-y-3 pb-4">
+              <!-- Debug info -->
+              <div v-if="menuCategories.length === 0" class="text-center py-8 text-gray-500">
+                <p>Chưa có danh mục nào</p>
+                <p class="text-xs mt-2">Loading: {{ categoriesLoading }}</p>
+              </div>
+              
               <div v-for="cat in menuCategories" :key="cat.id" 
                 class="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
                 <div class="flex items-center gap-3 flex-1 min-w-0">
@@ -208,7 +214,7 @@
                 <select v-model="form.category" required
                   class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                   <option value="">Chọn danh mục</option>
-                  <option v-for="cat in menuCategories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
+                  <option v-for="cat in suggestedCategories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
                 </select>
               </div>
               <div>
@@ -236,25 +242,27 @@
                 <div v-else class="space-y-3 mb-3">
                   <div v-for="(ingredient, index) in form.ingredients" :key="index" 
                     class="bg-gray-50 rounded-lg p-3">
-                    <div class="flex gap-2 mb-2">
-                      <input v-model="ingredient.name" placeholder="Tên nguyên liệu" required
-                        class="flex-1 px-3 py-2 text-base border border-gray-300 rounded-lg" />
+                    <div class="flex justify-between items-start mb-2">
+                      <div class="flex-1">
+                        <div class="font-medium text-gray-800">{{ ingredient.name }}</div>
+                        <div class="text-xs text-gray-500">{{ ingredient.unit }}</div>
+                      </div>
                       <button type="button" @click="removeIngredient(index)" 
-                        class="bg-red-500 text-white px-4 rounded-lg hover:bg-red-600 flex-shrink-0">
+                        class="bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600 flex-shrink-0 text-sm">
                         ×
                       </button>
                     </div>
-                    <div class="flex gap-2">
-                      <input v-model.number="ingredient.quantity" type="number" min="0" step="0.1" placeholder="Số lượng" required
+                    <div class="flex gap-2 items-center">
+                      <label class="text-sm text-gray-600">Số lượng:</label>
+                      <input v-model.number="ingredient.quantity" type="number" min="0" step="0.1" placeholder="0" required
                         class="flex-1 px-3 py-2 text-base border border-gray-300 rounded-lg" />
-                      <input v-model="ingredient.unit" placeholder="Đơn vị" required
-                        class="flex-1 px-3 py-2 text-base border border-gray-300 rounded-lg" />
+                      <span class="text-sm text-gray-600">{{ ingredient.unit }}</span>
                     </div>
                   </div>
                 </div>
-                <button type="button" @click="addIngredient" 
+                <button type="button" @click="showIngredientSelector = true" 
                   class="w-full bg-blue-500 text-white py-3 rounded-lg font-medium text-base active:bg-blue-600">
-                  + Thêm nguyên liệu
+                  + Chọn nguyên liệu
                 </button>
               </div>
             </div>
@@ -277,21 +285,84 @@
         </div>
       </div>
     </transition>
+
+    <!-- Ingredient Selector Modal -->
+    <transition name="slide-up">
+      <div v-if="showIngredientSelector" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
+        <div class="bg-white rounded-t-3xl w-full h-[85vh] flex flex-col">
+          <!-- Fixed Header -->
+          <div class="flex-shrink-0 bg-white px-4 py-4 border-b flex justify-between items-center rounded-t-3xl">
+            <h3 class="text-lg font-bold">🥬 Chọn nguyên liệu</h3>
+            <button @click="showIngredientSelector = false" class="text-2xl text-gray-400">×</button>
+          </div>
+          
+          <!-- Search -->
+          <div class="flex-shrink-0 px-4 py-3 border-b">
+            <input
+              v-model="ingredientSearchQuery"
+              type="text"
+              placeholder="Tìm kiếm nguyên liệu..."
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          
+          <!-- Scrollable Content -->
+          <div class="flex-1 overflow-y-auto px-4 py-4">
+            <div v-if="ingredientsLoading" class="text-center py-8">
+              <div class="text-4xl mb-2">⏳</div>
+              <p class="text-gray-500">Đang tải...</p>
+            </div>
+            
+            <div v-else-if="filteredAvailableIngredients.length === 0" class="text-center py-8">
+              <div class="text-4xl mb-2">📭</div>
+              <p class="text-gray-500">Không có nguyên liệu nào</p>
+            </div>
+            
+            <div v-else class="space-y-2">
+              <button
+                v-for="ingredient in filteredAvailableIngredients"
+                :key="ingredient.id"
+                @click="selectIngredient(ingredient)"
+                :disabled="isIngredientSelected(ingredient.id)"
+                class="w-full bg-white border border-gray-200 rounded-xl p-4 text-left hover:border-blue-500 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div class="flex items-center justify-between">
+                  <div class="flex-1">
+                    <div class="font-medium text-gray-800">{{ ingredient.name }}</div>
+                    <div class="text-sm text-gray-500">{{ ingredient.category }}</div>
+                    <div class="text-xs text-gray-400 mt-1">
+                      Tồn kho: {{ ingredient.current_stock }} {{ ingredient.unit }}
+                    </div>
+                  </div>
+                  <div v-if="isIngredientSelected(ingredient.id)" class="text-green-500 text-xl">✓</div>
+                  <div v-else class="text-blue-500 text-xl">+</div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useMenuStore } from '../stores/menu'
+import { useIngredientStore } from '../stores/ingredient'
+import { menuCategoryService } from '../services/menuCategory'
 import BottomNav from '../components/BottomNav.vue'
 import PullToRefresh from '../components/PullToRefresh.vue'
 import { usePullToRefresh } from '../composables/usePullToRefresh'
 
 const menuStore = useMenuStore()
+const ingredientStore = useIngredientStore()
 
 const searchQuery = ref('')
 const showMenuForm = ref(false)
 const showCategoryModal = ref(false)
+const showIngredientSelector = ref(false)
+const ingredientSearchQuery = ref('')
 const editingItem = ref(null)
 const form = ref({
   name: '',
@@ -305,20 +376,43 @@ const categoryForm = ref({
   name: ''
 })
 
-const menuCategories = ref([
-  { id: '1', name: 'Cà phê' },
-  { id: '2', name: 'Trà' },
-  { id: '3', name: 'Nước ép' },
-  { id: '4', name: 'Bánh ngọt' },
-  { id: '5', name: 'Món nhẹ' }
-])
-
 const items = computed(() => menuStore.items)
 const loading = computed(() => menuStore.loading)
 const error = computed(() => menuStore.error)
 
+// Ingredients
+const availableIngredients = computed(() => ingredientStore.items)
+const ingredientsLoading = computed(() => ingredientStore.loading)
+
+// Menu categories from API
+const menuCategories = ref([])
+const categoriesLoading = ref(false)
+
+// Suggested categories for dropdown (uses API categories)
+const suggestedCategories = computed(() => {
+  return menuCategories.value
+})
+
+// Filter available ingredients based on search and already selected
+const filteredAvailableIngredients = computed(() => {
+  let filtered = availableIngredients.value || []
+  
+  if (ingredientSearchQuery.value) {
+    const query = ingredientSearchQuery.value.toLowerCase()
+    filtered = filtered.filter(ing => 
+      ing.name?.toLowerCase().includes(query) ||
+      ing.category?.toLowerCase().includes(query)
+    )
+  }
+  
+  return filtered
+})
+
 const groupedItems = computed(() => {
   const groups = {}
+  if (!items.value || !Array.isArray(items.value)) {
+    return []
+  }
   items.value.forEach(item => {
     if (!groups[item.category]) {
       groups[item.category] = {
@@ -332,13 +426,14 @@ const groupedItems = computed(() => {
 })
 
 const filteredGroupedItems = computed(() => {
-  if (!searchQuery.value) return groupedItems.value
+  if (!searchQuery.value) return groupedItems.value || []
   
   const query = searchQuery.value.toLowerCase()
-  return groupedItems.value
+  const grouped = groupedItems.value || []
+  return grouped
     .map(category => ({
       ...category,
-      items: category.items.filter(item => 
+      items: (category.items || []).filter(item => 
         item.name?.toLowerCase().includes(query) ||
         item.description?.toLowerCase().includes(query) ||
         item.category?.toLowerCase().includes(query)
@@ -347,9 +442,38 @@ const filteredGroupedItems = computed(() => {
     .filter(category => category.items.length > 0)
 })
 
+// Fetch categories from API
+const fetchCategories = async () => {
+  try {
+    categoriesLoading.value = true
+    const response = await menuCategoryService.getCategories()
+    console.log('Raw API response:', response)
+    
+    // Handle both cases: direct array or wrapped in { data: [...] }
+    if (Array.isArray(response)) {
+      menuCategories.value = response
+    } else if (response && Array.isArray(response.data)) {
+      menuCategories.value = response.data
+    } else {
+      menuCategories.value = []
+    }
+    
+    console.log('Parsed categories:', menuCategories.value)
+  } catch (err) {
+    console.error('Failed to fetch categories:', err)
+    menuCategories.value = []
+  } finally {
+    categoriesLoading.value = false
+  }
+}
+
 // Refresh data function
 const refreshData = async () => {
-  await menuStore.fetchMenuItems()
+  await Promise.all([
+    menuStore.fetchMenuItems(),
+    fetchCategories(),
+    ingredientStore.fetchIngredients()
+  ])
 }
 
 // Pull to refresh
@@ -400,8 +524,31 @@ const cancelEdit = () => {
   form.value = { name: '', category: '', price: 0, description: '', ingredients: [] }
 }
 
+const selectIngredient = (ingredient) => {
+  // Check if already selected
+  if (isIngredientSelected(ingredient.id)) {
+    return
+  }
+  
+  // Add ingredient with default quantity
+  form.value.ingredients.push({
+    id: ingredient.id,
+    name: ingredient.name,
+    quantity: 1,
+    unit: ingredient.unit
+  })
+  
+  // Close modal
+  showIngredientSelector.value = false
+  ingredientSearchQuery.value = ''
+}
+
+const isIngredientSelected = (ingredientId) => {
+  return form.value.ingredients.some(ing => ing.id === ingredientId)
+}
+
 const addIngredient = () => {
-  form.value.ingredients.push({ name: '', quantity: 0, unit: '' })
+  showIngredientSelector.value = true
 }
 
 const removeIngredient = (index) => {
@@ -443,7 +590,7 @@ const deleteItem = async (id) => {
   }
 }
 
-const addCategory = () => {
+const addCategory = async () => {
   if (!categoryForm.value.name) return
   
   // Check if category already exists
@@ -452,30 +599,48 @@ const addCategory = () => {
     return
   }
   
-  menuCategories.value.push({
-    id: Date.now().toString(),
-    name: categoryForm.value.name
-  })
-  
-  categoryForm.value = { name: '' }
-  alert('Thêm danh mục thành công')
+  try {
+    await menuCategoryService.createCategory({ name: categoryForm.value.name })
+    const categoryName = categoryForm.value.name
+    categoryForm.value = { name: '' }
+    // Refresh categories first
+    await fetchCategories()
+    // Then show success message
+    alert(`Danh mục "${categoryName}" đã được tạo thành công`)
+  } catch (err) {
+    console.error('Failed to create category:', err)
+    alert('Lỗi: Không thể tạo danh mục. ' + (err.response?.data?.error || err.message))
+  }
 }
 
-const deleteCategory = (id, name) => {
+const deleteCategory = async (id, name) => {
   const hasMenuItems = items.value.some(item => item.category === name)
   
   if (hasMenuItems) {
-    alert('Không thể xóa danh mục đã có món!')
+    alert('Không thể xóa danh mục đã có món! Vui lòng xóa tất cả món trong danh mục trước.')
     return
   }
   
-  if (confirm(`Bạn có chắc muốn xóa danh mục "${name}"?`)) {
-    menuCategories.value = menuCategories.value.filter(c => c.id !== id)
-    alert('Xóa danh mục thành công')
+  if (!confirm(`Bạn có chắc muốn xóa danh mục "${name}"?`)) {
+    return
+  }
+  
+  try {
+    await menuCategoryService.deleteCategory(id)
+    // Refresh categories first
+    await fetchCategories()
+    // Then show success message
+    alert(`Danh mục "${name}" đã được xóa`)
+  } catch (err) {
+    console.error('Failed to delete category:', err)
+    alert('Lỗi: Không thể xóa danh mục. ' + (err.response?.data?.error || err.message))
   }
 }
 
 const getMenuCountByCategory = (categoryName) => {
+  if (!items.value || !Array.isArray(items.value)) {
+    return 0
+  }
   return items.value.filter(item => item.category === categoryName).length
 }
 
