@@ -97,12 +97,12 @@ func TestShiftClosureWorkflow_Integration(t *testing.T) {
 			{
 				Name:     espressoIngredient.Name,
 				Quantity: 30, // 30 grams
-				Unit:     string(espressoIngredient.Unit),
+				Unit:     espressoIngredient.Unit,
 			},
 			{
 				Name:     milkIngredient.Name,
 				Quantity: 150, // 150 ml
-				Unit:     string(milkIngredient.Unit),
+				Unit:     milkIngredient.Unit,
 			},
 		},
 		Available: true,
@@ -121,17 +121,17 @@ func TestShiftClosureWorkflow_Integration(t *testing.T) {
 			{
 				Name:     espressoIngredient.Name,
 				Quantity: 30, // 30 grams
-				Unit:     string(espressoIngredient.Unit),
+				Unit:     espressoIngredient.Unit,
 			},
 			{
 				Name:     milkIngredient.Name,
 				Quantity: 200, // 200 ml
-				Unit:     string(milkIngredient.Unit),
+				Unit:     milkIngredient.Unit,
 			},
 			{
 				Name:     sugarIngredient.Name,
 				Quantity: 10, // 10 grams
-				Unit:     string(sugarIngredient.Unit),
+				Unit:     sugarIngredient.Unit,
 			},
 		},
 		Available: true,
@@ -318,8 +318,8 @@ func TestShiftClosureWorkflow_WithIncompleteData(t *testing.T) {
 		Name:  "Mocha",
 		Price: 50000,
 		Ingredients: []menu.Ingredient{
-			{Name: espressoIngredient.Name, Quantity: 30, Unit: "g"},
-			{Name: chocolateIngredient.Name, Quantity: 20, Unit: "g"}, // Missing cost
+			{Name: espressoIngredient.Name, Quantity: 30, Unit: ingredient.UnitGram},
+			{Name: chocolateIngredient.Name, Quantity: 20, Unit: ingredient.UnitGram}, // Missing cost
 		},
 	}
 	menuRepo.menuItems[mochaItem.ID] = mochaItem

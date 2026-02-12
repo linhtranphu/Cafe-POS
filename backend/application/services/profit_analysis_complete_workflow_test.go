@@ -87,8 +87,8 @@ func TestCompleteProfitAnalysisWorkflow(t *testing.T) {
 		Price:    45000,
 		Category: "Coffee",
 		Ingredients: []menu.Ingredient{
-			{Name: espressoIngredient.Name, Quantity: 30, Unit: "g"},
-			{Name: milkIngredient.Name, Quantity: 150, Unit: "ml"},
+			{Name: espressoIngredient.Name, Quantity: 30, Unit: ingredient.UnitGram},
+			{Name: milkIngredient.Name, Quantity: 150, Unit: ingredient.UnitMilliliter},
 		},
 		Available: true,
 	}
@@ -100,8 +100,8 @@ func TestCompleteProfitAnalysisWorkflow(t *testing.T) {
 		Price:    50000,
 		Category: "Coffee",
 		Ingredients: []menu.Ingredient{
-			{Name: espressoIngredient.Name, Quantity: 30, Unit: "g"},
-			{Name: milkIngredient.Name, Quantity: 200, Unit: "ml"},
+			{Name: espressoIngredient.Name, Quantity: 30, Unit: ingredient.UnitGram},
+			{Name: milkIngredient.Name, Quantity: 200, Unit: ingredient.UnitMilliliter},
 		},
 		Available: true,
 	}
@@ -113,7 +113,7 @@ func TestCompleteProfitAnalysisWorkflow(t *testing.T) {
 		Price:    30000,
 		Category: "Tea",
 		Ingredients: []menu.Ingredient{
-			{Name: teaLeavesIngredient.Name, Quantity: 10, Unit: "g"},
+			{Name: teaLeavesIngredient.Name, Quantity: 10, Unit: ingredient.UnitGram},
 		},
 		Available: true,
 	}
@@ -125,8 +125,8 @@ func TestCompleteProfitAnalysisWorkflow(t *testing.T) {
 		Price:    35000,
 		Category: "Tea",
 		Ingredients: []menu.Ingredient{
-			{Name: teaLeavesIngredient.Name, Quantity: 10, Unit: "g"},
-			{Name: milkIngredient.Name, Quantity: 100, Unit: "ml"},
+			{Name: teaLeavesIngredient.Name, Quantity: 10, Unit: ingredient.UnitGram},
+			{Name: milkIngredient.Name, Quantity: 100, Unit: ingredient.UnitMilliliter},
 		},
 		Available: true,
 	}

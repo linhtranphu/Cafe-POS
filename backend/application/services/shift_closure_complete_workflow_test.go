@@ -97,12 +97,12 @@ func TestCompleteShiftClosureWorkflow(t *testing.T) {
 			{
 				Name:     espressoIngredient.Name,
 				Quantity: 30, // 30 grams
-				Unit:     string(espressoIngredient.Unit),
+				Unit:     espressoIngredient.Unit,
 			},
 			{
 				Name:     milkIngredient.Name,
 				Quantity: 150, // 150 ml
-				Unit:     string(milkIngredient.Unit),
+				Unit:     milkIngredient.Unit,
 			},
 		},
 		Available: true,
@@ -121,17 +121,17 @@ func TestCompleteShiftClosureWorkflow(t *testing.T) {
 			{
 				Name:     espressoIngredient.Name,
 				Quantity: 30, // 30 grams
-				Unit:     string(espressoIngredient.Unit),
+				Unit:     espressoIngredient.Unit,
 			},
 			{
 				Name:     milkIngredient.Name,
 				Quantity: 200, // 200 ml
-				Unit:     string(milkIngredient.Unit),
+				Unit:     milkIngredient.Unit,
 			},
 			{
 				Name:     sugarIngredient.Name,
 				Quantity: 10, // 10 grams
-				Unit:     string(sugarIngredient.Unit),
+				Unit:     sugarIngredient.Unit,
 			},
 		},
 		Available: true,

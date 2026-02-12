@@ -69,7 +69,7 @@ func TestWarningDetectionWorkflow(t *testing.T) {
 		Price:    45000,
 		Category: "Coffee",
 		Ingredients: []menu.Ingredient{
-			{Name: espressoIngredient.Name, Quantity: 30, Unit: "g"},
+			{Name: espressoIngredient.Name, Quantity: 30, Unit: ingredient.UnitGram},
 		},
 		Available: true,
 	}
@@ -83,8 +83,8 @@ func TestWarningDetectionWorkflow(t *testing.T) {
 		Price:    15000,
 		Category: "Coffee",
 		Ingredients: []menu.Ingredient{
-			{Name: espressoIngredient.Name, Quantity: 30, Unit: "g"},
-			{Name: milkIngredient.Name, Quantity: 150, Unit: "ml"},
+			{Name: espressoIngredient.Name, Quantity: 30, Unit: ingredient.UnitGram},
+			{Name: milkIngredient.Name, Quantity: 150, Unit: ingredient.UnitMilliliter},
 		},
 		Available: true,
 	}
@@ -98,8 +98,8 @@ func TestWarningDetectionWorkflow(t *testing.T) {
 		Price:    12000,
 		Category: "Coffee",
 		Ingredients: []menu.Ingredient{
-			{Name: espressoIngredient.Name, Quantity: 30, Unit: "g"},
-			{Name: milkIngredient.Name, Quantity: 200, Unit: "ml"},
+			{Name: espressoIngredient.Name, Quantity: 30, Unit: ingredient.UnitGram},
+			{Name: milkIngredient.Name, Quantity: 200, Unit: ingredient.UnitMilliliter},
 		},
 		Available: true,
 	}
@@ -113,7 +113,7 @@ func TestWarningDetectionWorkflow(t *testing.T) {
 		Price:    6000,
 		Category: "Coffee",
 		Ingredients: []menu.Ingredient{
-			{Name: espressoIngredient.Name, Quantity: 30, Unit: "g"},
+			{Name: espressoIngredient.Name, Quantity: 30, Unit: ingredient.UnitGram},
 		},
 		Available: true,
 	}

@@ -221,8 +221,8 @@ func TestBatchRecalculationOptimization_Deduplication(t *testing.T) {
 		Name:  "Latte",
 		Price: 500.0,
 		Ingredients: []menu.Ingredient{
-			{Name: "Coffee", Quantity: 30, Unit: "ml"},
-			{Name: "Milk", Quantity: 150, Unit: "ml"},
+			{Name: "Coffee", Quantity: 30, Unit: ingredient.UnitMilliliter},
+			{Name: "Milk", Quantity: 150, Unit: ingredient.UnitMilliliter},
 		},
 		CurrentCost: 0.0,
 		CostStatus:  menu.CostStatusFinal,

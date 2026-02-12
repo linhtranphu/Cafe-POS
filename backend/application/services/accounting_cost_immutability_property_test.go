@@ -78,7 +78,7 @@ func TestProperty_AccountingCostImmutability(t *testing.T) {
 					{
 						Name:     testIngredient.Name,
 						Quantity: 100,
-						Unit:     string(testIngredient.Unit),
+						Unit:     testIngredient.Unit,
 					},
 				},
 				Available: true,
@@ -244,7 +244,7 @@ func TestAccountingCostImmutability_UnitTest(t *testing.T) {
 			{
 				Name:     testIngredient.Name,
 				Quantity: 30, // 30 grams
-				Unit:     string(testIngredient.Unit),
+				Unit:     testIngredient.Unit,
 			},
 		},
 		Available: true,

@@ -47,7 +47,7 @@ func TestBackgroundJobProcessing_Integration(t *testing.T) {
 		Name:  "Espresso",
 		Price: 50000,
 		Ingredients: []menu.Ingredient{
-			{Name: "Coffee Beans", Quantity: 0.02, Unit: "kg"},
+			{Name: "Coffee Beans", Quantity: 0.02, Unit: ingredient.UnitKilogram},
 		},
 		CurrentCost: 0, // Not yet calculated
 	}
@@ -56,7 +56,7 @@ func TestBackgroundJobProcessing_Integration(t *testing.T) {
 		Name:  "Cappuccino",
 		Price: 60000,
 		Ingredients: []menu.Ingredient{
-			{Name: "Coffee Beans", Quantity: 0.03, Unit: "kg"},
+			{Name: "Coffee Beans", Quantity: 0.03, Unit: ingredient.UnitKilogram},
 		},
 		CurrentCost: 0, // Not yet calculated
 	}
@@ -220,8 +220,8 @@ func TestBackgroundJobProcessing_MultipleUpdates(t *testing.T) {
 		Name:  "Latte",
 		Price: 70000,
 		Ingredients: []menu.Ingredient{
-			{Name: "Coffee", Quantity: 0.02, Unit: "kg"},
-			{Name: "Milk", Quantity: 0.2, Unit: "liter"},
+			{Name: "Coffee", Quantity: 0.02, Unit: ingredient.UnitKilogram},
+			{Name: "Milk", Quantity: 0.2, Unit: ingredient.UnitLiter},
 		},
 		CurrentCost: 0,
 	}

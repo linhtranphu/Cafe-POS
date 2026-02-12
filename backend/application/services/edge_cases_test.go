@@ -30,8 +30,8 @@ func TestCalculateMenuItemCost_IncompleteIngredientData(t *testing.T) {
 				ID:   primitive.NewObjectID(),
 				Name: "Latte",
 				Ingredients: []menu.Ingredient{
-					{Name: "Espresso", Quantity: 30, Unit: "ml"},
-					{Name: "Milk", Quantity: 150, Unit: "ml"},
+					{Name: "Espresso", Quantity: 30, Unit: ingredient.UnitMilliliter},
+					{Name: "Milk", Quantity: 150, Unit: ingredient.UnitMilliliter},
 				},
 			},
 			ingredients: []*ingredient.Ingredient{
@@ -56,7 +56,7 @@ func TestCalculateMenuItemCost_IncompleteIngredientData(t *testing.T) {
 				ID:   primitive.NewObjectID(),
 				Name: "Special Coffee",
 				Ingredients: []menu.Ingredient{
-					{Name: "RareBean", Quantity: 20, Unit: "g"},
+					{Name: "RareBean", Quantity: 20, Unit: ingredient.UnitGram},
 				},
 			},
 			ingredients:    []*ingredient.Ingredient{}, // Empty - ingredient not found
@@ -70,8 +70,8 @@ func TestCalculateMenuItemCost_IncompleteIngredientData(t *testing.T) {
 				ID:   primitive.NewObjectID(),
 				Name: "Mystery Drink",
 				Ingredients: []menu.Ingredient{
-					{Name: "Ingredient1", Quantity: 10, Unit: "ml"},
-					{Name: "Ingredient2", Quantity: 20, Unit: "ml"},
+					{Name: "Ingredient1", Quantity: 10, Unit: ingredient.UnitMilliliter},
+					{Name: "Ingredient2", Quantity: 20, Unit: ingredient.UnitMilliliter},
 				},
 			},
 			ingredients: []*ingredient.Ingredient{
@@ -96,8 +96,8 @@ func TestCalculateMenuItemCost_IncompleteIngredientData(t *testing.T) {
 				ID:   primitive.NewObjectID(),
 				Name: "Mixed Drink",
 				Ingredients: []menu.Ingredient{
-					{Name: "ValidIngredient", Quantity: 10, Unit: "ml"},
-					{Name: "InvalidIngredient", Quantity: 20, Unit: "ml"},
+					{Name: "ValidIngredient", Quantity: 10, Unit: ingredient.UnitMilliliter},
+					{Name: "InvalidIngredient", Quantity: 20, Unit: ingredient.UnitMilliliter},
 				},
 			},
 			ingredients: []*ingredient.Ingredient{
@@ -358,7 +358,7 @@ func TestCalculateShiftOrderCosts_IncompleteData(t *testing.T) {
 				ID:   menuItemID,
 				Name: "Incomplete Item",
 				Ingredients: []menu.Ingredient{
-					{Name: "MissingIngredient", Quantity: 10, Unit: "ml"},
+					{Name: "MissingIngredient", Quantity: 10, Unit: ingredient.UnitMilliliter},
 				},
 			},
 		},

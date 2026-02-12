@@ -174,11 +174,10 @@ func (s *CostCalculatorService) CalculateMenuItemCost(ctx context.Context, menuI
 			continue
 		}
 
-		// Get conversion rate (default 1.0 if not set)
-		conversionRate := ing.ConversionRate
-		if conversionRate <= 0 {
-			conversionRate = 1.0
-		}
+		// Calculate conversion rate dynamically based on stock unit and recipe unit
+		// stockUnit = ing.Unit (e.g., "L")
+		// recipeUnit = menuIngredient.Unit (e.g., "ml")
+		conversionRate := ingredient.GetConversionRate(ing.Unit, menuIngredient.Unit)
 
 		// Get wastage percentage (default 0.0 if not set)
 		wastagePercentage := ing.WastagePercentage
@@ -333,11 +332,8 @@ func (s *CostCalculatorService) calculateCostForMenuItem(menuItem *menu.MenuItem
 			continue
 		}
 
-		// Get conversion rate (default 1.0 if not set)
-		conversionRate := ing.ConversionRate
-		if conversionRate <= 0 {
-			conversionRate = 1.0
-		}
+		// Calculate conversion rate dynamically based on stock unit and recipe unit
+		conversionRate := ingredient.GetConversionRate(ing.Unit, menuIngredient.Unit)
 
 		// Get wastage percentage (default 0.0 if not set)
 		wastagePercentage := ing.WastagePercentage
@@ -729,10 +725,8 @@ func (s *CostCalculatorService) CalculateMenuItemCostDetail(ctx context.Context,
 			result.MissingCosts = append(result.MissingCosts, menuIngredient.Name)
 			hasIncompleteCost = true
 			detail.CostPerUnit = 0
-			detail.ConversionRate = ing.ConversionRate
-			if detail.ConversionRate <= 0 {
-				detail.ConversionRate = 1.0
-			}
+			// Calculate conversion rate even if cost is missing (for display purposes)
+			detail.ConversionRate = ingredient.GetConversionRate(ing.Unit, menuIngredient.Unit)
 			detail.WastagePercentage = ing.WastagePercentage
 			if detail.WastagePercentage < 0 {
 				detail.WastagePercentage = 0.0
@@ -742,11 +736,8 @@ func (s *CostCalculatorService) CalculateMenuItemCostDetail(ctx context.Context,
 			continue
 		}
 
-		// Get conversion rate (default 1.0 if not set)
-		conversionRate := ing.ConversionRate
-		if conversionRate <= 0 {
-			conversionRate = 1.0
-		}
+		// Calculate conversion rate dynamically based on stock unit and recipe unit
+		conversionRate := ingredient.GetConversionRate(ing.Unit, menuIngredient.Unit)
 
 		// Get wastage percentage (default 0.0 if not set)
 		wastagePercentage := ing.WastagePercentage

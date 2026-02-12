@@ -277,7 +277,7 @@ func TestProperty_ShiftClosureCostCalculation_MultipleOrders(t *testing.T) {
 				Name:  "Test Item",
 				Price: 50000,
 				Ingredients: []menu.Ingredient{
-					{Name: firstIng.Name, Quantity: 10, Unit: "unit"},
+					{Name: firstIng.Name, Quantity: 10, Unit: ingredient.UnitPiece},
 				},
 			}
 			menuRepo.menuItems[menuItem.ID] = menuItem
@@ -389,7 +389,7 @@ func TestProperty_ShiftClosureCostCalculation_Rounding(t *testing.T) {
 				Name:  "Test Item",
 				Price: 50000,
 				Ingredients: []menu.Ingredient{
-					{Name: "TestIngredient", Quantity: quantity, Unit: "unit"},
+					{Name: "TestIngredient", Quantity: quantity, Unit: ingredient.UnitPiece},
 				},
 			}
 			menuRepo.menuItems[menuItem.ID] = menuItem

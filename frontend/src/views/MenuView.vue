@@ -242,21 +242,70 @@
                 <div v-else class="space-y-3 mb-3">
                   <div v-for="(ingredient, index) in form.ingredients" :key="index" 
                     class="bg-gray-50 rounded-lg p-3">
+                    
+                    <!-- Header -->
                     <div class="flex justify-between items-start mb-2">
                       <div class="flex-1">
                         <div class="font-medium text-gray-800">{{ ingredient.name }}</div>
-                        <div class="text-xs text-gray-500">{{ ingredient.unit }}</div>
+                        <div class="text-xs text-gray-500">
+                          Kho: {{ ingredient.stockUnit }} @ {{ formatPrice(ingredient.costPerUnit) }}/{{ ingredient.stockUnit }}
+                        </div>
                       </div>
                       <button type="button" @click="removeIngredient(index)" 
                         class="bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600 flex-shrink-0 text-sm">
                         ×
                       </button>
                     </div>
-                    <div class="flex gap-2 items-center">
-                      <label class="text-sm text-gray-600">Số lượng:</label>
-                      <input v-model.number="ingredient.quantity" type="number" min="0" step="0.1" placeholder="0" required
-                        class="flex-1 px-3 py-2 text-base border border-gray-300 rounded-lg" />
-                      <span class="text-sm text-gray-600">{{ ingredient.unit }}</span>
+
+                    <!-- Recipe Unit Selector -->
+                    <div class="mb-2">
+                      <label class="text-xs text-gray-600">Đơn vị công thức:</label>
+                      <select v-model="ingredient.unit" @change="updateRecipeUnit(index)"
+                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg">
+                        <option v-for="unit in ingredient.compatibleUnits" :key="unit" :value="unit">
+                          {{ unit }}
+                        </option>
+                      </select>
+                    </div>
+                    
+                    <!-- Quantity Input -->
+                    <div class="mb-2">
+                      <label class="text-xs text-gray-600">Số lượng:</label>
+                      <div class="flex gap-2 items-center">
+                        <input v-model.number="ingredient.quantity" 
+                          @input="updateIngredientCost(index)"
+                          type="number" min="0" step="0.1" placeholder="0" required
+                          class="flex-1 px-3 py-2 text-base border border-gray-300 rounded-lg" />
+                        <span class="text-sm text-gray-600">{{ ingredient.unit }}</span>
+                      </div>
+                    </div>
+                    
+                    <!-- Conversion Info (if not 1.0) -->
+                    <div v-if="ingredient.conversionRate !== 1" 
+                      class="mb-2 p-2 bg-blue-50 rounded text-xs text-blue-700">
+                      <span class="font-medium">ℹ️ Quy đổi:</span>
+                      {{ getConversionExplanation(ingredient.stockUnit, ingredient.unit) }}
+                    </div>
+                    
+                    <!-- Cost Preview -->
+                    <div v-if="ingredient.costPerUnit > 0" class="p-2 bg-green-50 rounded">
+                      <div class="flex justify-between items-center">
+                        <span class="text-xs text-green-700">Chi phí ước tính:</span>
+                        <span class="text-sm font-bold text-green-700">
+                          {{ formatPrice(ingredient.estimatedCost) }}
+                        </span>
+                      </div>
+                      <div v-if="ingredient.wastage > 0" class="text-xs text-green-600 mt-1">
+                        (Bao gồm {{ ingredient.wastage }}% hao hụt)
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Total Cost Summary -->
+                  <div v-if="totalIngredientCost > 0" class="bg-blue-50 border-2 border-blue-300 rounded-lg p-3">
+                    <div class="flex justify-between items-center">
+                      <span class="text-sm font-semibold text-blue-800">💰 Tổng chi phí nguyên liệu:</span>
+                      <span class="text-lg font-bold text-blue-900">{{ formatPrice(totalIngredientCost) }}</span>
                     </div>
                   </div>
                 </div>
@@ -350,6 +399,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useMenuStore } from '../stores/menu'
 import { useIngredientStore } from '../stores/ingredient'
+import { useUnitConversion } from '../composables/useUnitConversion'
 import { menuCategoryService } from '../services/menuCategory'
 import BottomNav from '../components/BottomNav.vue'
 import PullToRefresh from '../components/PullToRefresh.vue'
@@ -357,6 +407,15 @@ import { usePullToRefresh } from '../composables/usePullToRefresh'
 
 const menuStore = useMenuStore()
 const ingredientStore = useIngredientStore()
+
+// Unit conversion composable
+const { 
+  getConversionRate, 
+  isValidConversion, 
+  getCompatibleUnits,
+  calculateCostBreakdown,
+  getConversionExplanation 
+} = useUnitConversion()
 
 const searchQuery = ref('')
 const showMenuForm = ref(false)
@@ -413,7 +472,15 @@ const groupedItems = computed(() => {
   if (!items.value || !Array.isArray(items.value)) {
     return []
   }
-  items.value.forEach(item => {
+  
+  // Sort items by created_at (newest first)
+  const sortedItems = [...items.value].sort((a, b) => {
+    const dateA = new Date(a.created_at || 0)
+    const dateB = new Date(b.created_at || 0)
+    return dateB - dateA // Newest first
+  })
+  
+  sortedItems.forEach(item => {
     if (!groups[item.category]) {
       groups[item.category] = {
         name: item.category,
@@ -530,13 +597,29 @@ const selectIngredient = (ingredient) => {
     return
   }
   
-  // Add ingredient with default quantity
+  // Get compatible units for this ingredient
+  const compatibleUnits = getCompatibleUnits(ingredient.unit)
+  
+  // Default recipe unit = stock unit (no conversion initially)
+  const recipeUnit = ingredient.unit
+  const conversionRate = getConversionRate(ingredient.unit, recipeUnit)
+  
+  // Add ingredient with conversion info
   form.value.ingredients.push({
     id: ingredient.id,
     name: ingredient.name,
     quantity: 1,
-    unit: ingredient.unit
+    unit: recipeUnit,                    // Recipe unit (can be changed by user)
+    stockUnit: ingredient.unit,          // Stock unit (fixed, from ingredient)
+    compatibleUnits: compatibleUnits,    // Available units for dropdown
+    costPerUnit: ingredient.cost_per_unit || 0,
+    wastage: ingredient.wastage_percentage || 0,
+    conversionRate: conversionRate,      // Initially 1.0 (same unit)
+    estimatedCost: 0                     // Will be calculated
   })
+  
+  // Calculate initial cost
+  updateIngredientCost(form.value.ingredients.length - 1)
   
   // Close modal
   showIngredientSelector.value = false
@@ -546,6 +629,50 @@ const selectIngredient = (ingredient) => {
 const isIngredientSelected = (ingredientId) => {
   return form.value.ingredients.some(ing => ing.id === ingredientId)
 }
+
+// Update conversion rate when recipe unit changes
+const updateRecipeUnit = (index) => {
+  const ing = form.value.ingredients[index]
+  
+  // Validate conversion
+  if (!isValidConversion(ing.stockUnit, ing.unit)) {
+    alert(`Không thể quy đổi từ ${ing.stockUnit} sang ${ing.unit}!`)
+    ing.unit = ing.stockUnit // Reset to stock unit
+    return
+  }
+  
+  // Recalculate conversion rate
+  ing.conversionRate = getConversionRate(ing.stockUnit, ing.unit)
+  
+  // Recalculate cost
+  updateIngredientCost(index)
+}
+
+// Update cost when quantity changes
+const updateIngredientCost = (index) => {
+  const ing = form.value.ingredients[index]
+  
+  if (!ing.costPerUnit || ing.costPerUnit <= 0) {
+    ing.estimatedCost = 0
+    return
+  }
+  
+  // Calculate cost breakdown
+  const breakdown = calculateCostBreakdown(
+    ing.quantity,
+    ing.unit,
+    ing.costPerUnit,
+    ing.stockUnit,
+    ing.wastage
+  )
+  
+  ing.estimatedCost = breakdown.totalCost
+}
+
+// Calculate total ingredient cost
+const totalIngredientCost = computed(() => {
+  return form.value.ingredients.reduce((sum, ing) => sum + (ing.estimatedCost || 0), 0)
+})
 
 const addIngredient = () => {
   showIngredientSelector.value = true

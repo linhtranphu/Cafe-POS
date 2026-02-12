@@ -185,8 +185,8 @@ func TestCalculateMenuItemCost_BasicCalculation(t *testing.T) {
 		ID:   primitive.NewObjectID(),
 		Name: "Cappuccino",
 		Ingredients: []menu.Ingredient{
-			{Name: "Espresso", Quantity: 30, Unit: "ml"},  // 30 * 200 * 1.0 * 1.05 = 6300
-			{Name: "Milk", Quantity: 150, Unit: "ml"},     // 150 * 50 * 1.0 * 1.10 = 8250
+			{Name: "Espresso", Quantity: 30, Unit: ingredient.UnitMilliliter},  // 30 * 200 * 1.0 * 1.05 = 6300
+			{Name: "Milk", Quantity: 150, Unit: ingredient.UnitMilliliter},     // 150 * 50 * 1.0 * 1.10 = 8250
 		},
 	}
 	menuRepo.menuItems[menuItem.ID] = menuItem
@@ -223,8 +223,8 @@ func TestCalculateMenuItemCost_WithMissingCost(t *testing.T) {
 		ID:   primitive.NewObjectID(),
 		Name: "Mocha",
 		Ingredients: []menu.Ingredient{
-			{Name: "Espresso", Quantity: 30, Unit: "ml"},
-			{Name: "Chocolate", Quantity: 20, Unit: "g"}, // Missing cost
+			{Name: "Espresso", Quantity: 30, Unit: ingredient.UnitMilliliter},
+			{Name: "Chocolate", Quantity: 20, Unit: ingredient.UnitGram}, // Missing cost
 		},
 	}
 	menuRepo.menuItems[menuItem.ID] = menuItem
@@ -299,7 +299,7 @@ func TestCalculateMenuItemCost_RoundingTo2Decimals(t *testing.T) {
 		ID:   primitive.NewObjectID(),
 		Name: "Americano",
 		Ingredients: []menu.Ingredient{
-			{Name: "Coffee Bean", Quantity: 10, Unit: "g"}, // 10 * 33.333 = 333.33
+			{Name: "Coffee Bean", Quantity: 10, Unit: ingredient.UnitGram}, // 10 * 33.333 = 333.33
 		},
 	}
 	menuRepo.menuItems[menuItem.ID] = menuItem
@@ -322,21 +322,25 @@ func TestCalculateMenuItemCost_WithConversionAndWastage(t *testing.T) {
 	orderItemRepo := &mockOrderItemRepository{orderItems: make([]*order.OrderItemWithCost, 0)}
 	service := NewCostCalculatorService(menuRepo, ingredientRepo, orderRepo, orderItemRepo)
 
-	// Add ingredient with conversion rate and wastage
+	// Add ingredient with stock unit in kg
 	flourID := primitive.NewObjectID()
 	ingredientRepo.ingredients[flourID] = &ingredient.Ingredient{
 		ID:                flourID,
 		Name:              "Flour",
-		CostPerUnit:       100.0,
-		ConversionRate:    2.0,  // 2x conversion
-		WastagePercentage: 15.0, // 15% wastage
+		Unit:              ingredient.UnitKilogram,  // Stock unit: kg
+		CostPerUnit:       100000.0,                 // 100,000 VND per kg
+		WastagePercentage: 15.0,                     // 15% wastage
 	}
 
+	// Menu uses grams (recipe unit different from stock unit)
 	menuItem := &menu.MenuItem{
 		ID:   primitive.NewObjectID(),
 		Name: "Cake",
 		Ingredients: []menu.Ingredient{
-			{Name: "Flour", Quantity: 50, Unit: "g"}, // 50 * 100 * 2.0 * 1.15 = 11500
+			// 50g flour
+			// Conversion: g → kg = 0.001
+			// Cost = 50 * 100,000 * 0.001 * 1.15 = 5,750
+			{Name: "Flour", Quantity: 50, Unit: ingredient.UnitGram},
 		},
 	}
 	menuRepo.menuItems[menuItem.ID] = menuItem
@@ -346,7 +350,8 @@ func TestCalculateMenuItemCost_WithConversionAndWastage(t *testing.T) {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	expectedCost := 11500.0
+	// Expected: 50g * 100,000 VND/kg * 0.001 (g→kg) * 1.15 (wastage) = 5,750
+	expectedCost := 5750.0
 	if result.CurrentCost != expectedCost {
 		t.Errorf("Expected cost %v, got %v", expectedCost, result.CurrentCost)
 	}
@@ -372,7 +377,7 @@ func TestCalculateMenuItemCost_DefaultConversionAndWastage(t *testing.T) {
 		ID:   primitive.NewObjectID(),
 		Name: "Tea",
 		Ingredients: []menu.Ingredient{
-			{Name: "Water", Quantity: 200, Unit: "ml"}, // 200 * 10 * 1.0 * 1.0 = 2000
+			{Name: "Water", Quantity: 200, Unit: ingredient.UnitMilliliter}, // 200 * 10 * 1.0 * 1.0 = 2000
 		},
 	}
 	menuRepo.menuItems[menuItem.ID] = menuItem
@@ -398,7 +403,7 @@ func TestCalculateMenuItemCost_IngredientNotInDatabase(t *testing.T) {
 		ID:   primitive.NewObjectID(),
 		Name: "Mystery Drink",
 		Ingredients: []menu.Ingredient{
-			{Name: "Unknown Ingredient", Quantity: 10, Unit: "g"},
+			{Name: "Unknown Ingredient", Quantity: 10, Unit: ingredient.UnitGram},
 		},
 	}
 	menuRepo.menuItems[menuItem.ID] = menuItem
@@ -796,8 +801,8 @@ func TestQueueCostRecalculation(t *testing.T) {
 		ID:   primitive.NewObjectID(),
 		Name: "Cappuccino",
 		Ingredients: []menu.Ingredient{
-			{Name: "Espresso", Quantity: 30, Unit: "ml"},
-			{Name: "Milk", Quantity: 150, Unit: "ml"},
+			{Name: "Espresso", Quantity: 30, Unit: ingredient.UnitMilliliter},
+			{Name: "Milk", Quantity: 150, Unit: ingredient.UnitMilliliter},
 		},
 	}
 	menuRepo.menuItems[cappuccino.ID] = cappuccino
@@ -806,8 +811,8 @@ func TestQueueCostRecalculation(t *testing.T) {
 		ID:   primitive.NewObjectID(),
 		Name: "Latte",
 		Ingredients: []menu.Ingredient{
-			{Name: "Espresso", Quantity: 30, Unit: "ml"},
-			{Name: "Milk", Quantity: 200, Unit: "ml"},
+			{Name: "Espresso", Quantity: 30, Unit: ingredient.UnitMilliliter},
+			{Name: "Milk", Quantity: 200, Unit: ingredient.UnitMilliliter},
 		},
 	}
 	menuRepo.menuItems[latte.ID] = latte
@@ -816,7 +821,7 @@ func TestQueueCostRecalculation(t *testing.T) {
 		ID:   primitive.NewObjectID(),
 		Name: "Americano",
 		Ingredients: []menu.Ingredient{
-			{Name: "Espresso", Quantity: 60, Unit: "ml"},
+			{Name: "Espresso", Quantity: 60, Unit: ingredient.UnitMilliliter},
 		},
 	}
 	menuRepo.menuItems[americano.ID] = americano
@@ -826,8 +831,8 @@ func TestQueueCostRecalculation(t *testing.T) {
 		ID:   primitive.NewObjectID(),
 		Name: "Milkshake",
 		Ingredients: []menu.Ingredient{
-			{Name: "Milk", Quantity: 300, Unit: "ml"},
-			{Name: "Sugar", Quantity: 20, Unit: "g"},
+			{Name: "Milk", Quantity: 300, Unit: ingredient.UnitMilliliter},
+			{Name: "Sugar", Quantity: 20, Unit: ingredient.UnitGram},
 		},
 	}
 	menuRepo.menuItems[milkshake.ID] = milkshake
@@ -892,8 +897,8 @@ func TestQueueCostRecalculation_NoMenuItems(t *testing.T) {
 		ID:   primitive.NewObjectID(),
 		Name: "Cappuccino",
 		Ingredients: []menu.Ingredient{
-			{Name: "Espresso", Quantity: 30, Unit: "ml"},
-			{Name: "Milk", Quantity: 150, Unit: "ml"},
+			{Name: "Espresso", Quantity: 30, Unit: ingredient.UnitMilliliter},
+			{Name: "Milk", Quantity: 150, Unit: ingredient.UnitMilliliter},
 		},
 	}
 	menuRepo.menuItems[cappuccino.ID] = cappuccino

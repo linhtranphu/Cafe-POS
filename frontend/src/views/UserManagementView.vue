@@ -16,7 +16,7 @@
     <div class="flex-1 overflow-y-auto px-4 py-4 pb-24">
       <div class="bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl p-4 mb-4 text-white shadow-lg">
         <div class="text-xs opacity-90 mb-2">Tổng quan nhân viên</div>
-        <div class="grid grid-cols-4 gap-1.5">
+        <div class="grid grid-cols-5 gap-1.5">
           <div class="text-center">
             <div class="text-lg font-bold">{{ users.length }}</div>
             <div class="text-[10px] opacity-90">Tổng</div>
@@ -32,6 +32,10 @@
           <div class="text-center">
             <div class="text-lg font-bold">{{ cashierCount }}</div>
             <div class="text-[10px] opacity-90">Cashier</div>
+          </div>
+          <div class="text-center">
+            <div class="text-lg font-bold">{{ baristaCount }}</div>
+            <div class="text-[10px] opacity-90">Barista</div>
           </div>
         </div>
       </div>
@@ -108,9 +112,9 @@
               <label class="block text-sm font-medium mb-2">Vai trò *</label>
               <select v-model="createForm.role" required class="w-full px-4 py-3 border rounded-lg">
                 <option value="">Chọn vai trò</option>
-                <option value="manager">Manager</option>
-                <option value="cashier">Cashier</option>
-                <option value="waiter">Waiter</option>
+                <option v-for="roleOption in USER_ROLE_OPTIONS" :key="roleOption.value" :value="roleOption.value">
+                  {{ roleOption.icon }} {{ roleOption.label }}
+                </option>
               </select>
             </div>
             <div class="h-20"></div>
@@ -139,9 +143,9 @@
             <div>
               <label class="block text-sm font-medium mb-2">Vai trò *</label>
               <select v-model="editForm.role" required class="w-full px-4 py-3 border rounded-lg">
-                <option value="manager">Manager</option>
-                <option value="cashier">Cashier</option>
-                <option value="waiter">Waiter</option>
+                <option v-for="roleOption in USER_ROLE_OPTIONS" :key="roleOption.value" :value="roleOption.value">
+                  {{ roleOption.icon }} {{ roleOption.label }}
+                </option>
               </select>
             </div>
             <div class="h-20"></div>
@@ -201,7 +205,7 @@ import { useUserStore } from '../stores/user'
 import BottomNav from '../components/BottomNav.vue'
 import PullToRefresh from '../components/PullToRefresh.vue'
 import { usePullToRefresh } from '../composables/usePullToRefresh'
-import { USER_ROLES, USER_ROLE_OPTIONS, getUserRoleBadge } from '../constants/user'
+import { USER_ROLES, USER_ROLE_OPTIONS, getUserRoleBadge, getUserRoleLabel } from '../constants/user'
 
 const userStore = useUserStore()
 const searchQuery = ref('')
@@ -231,15 +235,15 @@ const filteredUsers = computed(() => {
 const activeCount = computed(() => users.value.filter(u => u.active).length)
 const managerCount = computed(() => users.value.filter(u => u.role === USER_ROLES.MANAGER).length)
 const cashierCount = computed(() => users.value.filter(u => u.role === USER_ROLES.CASHIER).length)
+const baristaCount = computed(() => users.value.filter(u => u.role === USER_ROLES.BARISTA).length)
 
 const getRoleColor = (role) => {
-  const colors = { manager: 'bg-purple-100 text-purple-800', cashier: 'bg-blue-100 text-blue-800', waiter: 'bg-green-100 text-green-800' }
-  return colors[role] || 'bg-gray-100 text-gray-800'
+  return getUserRoleBadge(role)
 }
 
 const getRoleText = (role) => {
-  const texts = { manager: 'Manager', cashier: 'Cashier', waiter: 'Waiter' }
-  return texts[role] || role
+  const roleOption = USER_ROLE_OPTIONS.find(opt => opt.value === role)
+  return roleOption ? `${roleOption.icon} ${roleOption.label}` : role
 }
 
 const formatDate = (date) => new Date(date).toLocaleString('vi-VN')

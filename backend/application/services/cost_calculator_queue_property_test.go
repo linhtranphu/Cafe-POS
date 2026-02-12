@@ -221,7 +221,7 @@ func TestProperty_BackgroundJobQueueing_MultipleMenuItems(t *testing.T) {
 					Name:  menuItemName.(string),
 					Price: 50000,
 					Ingredients: []menu.Ingredient{
-						{Name: ingredientName, Quantity: 10, Unit: "unit"},
+						{Name: ingredientName, Quantity: 10, Unit: ingredient.UnitPiece},
 					},
 				}
 				menuRepo.menuItems[menuItem.ID] = menuItem
@@ -451,7 +451,7 @@ func TestProperty_BackgroundJobQueueing_SelectiveQueuing(t *testing.T) {
 					Name:  menuItemName.(string) + "_with_target",
 					Price: 50000,
 					Ingredients: []menu.Ingredient{
-						{Name: targetIngName, Quantity: 10, Unit: "unit"},
+						{Name: targetIngName, Quantity: 10, Unit: ingredient.UnitPiece},
 					},
 				}
 				menuRepo.menuItems[menuItem.ID] = menuItem
@@ -465,7 +465,7 @@ func TestProperty_BackgroundJobQueueing_SelectiveQueuing(t *testing.T) {
 					Name:  menuItemName.(string) + "_without_target",
 					Price: 50000,
 					Ingredients: []menu.Ingredient{
-						{Name: otherIngName, Quantity: 10, Unit: "unit"},
+						{Name: otherIngName, Quantity: 10, Unit: ingredient.UnitPiece},
 					},
 				}
 				menuRepo.menuItems[menuItem.ID] = menuItem

@@ -2,6 +2,7 @@ package menu
 
 import (
 	"time"
+	"cafe-pos/backend/domain/ingredient"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -15,9 +16,9 @@ const (
 )
 
 type Ingredient struct {
-	Name     string  `bson:"name" json:"name"`
-	Quantity float64 `bson:"quantity" json:"quantity"`
-	Unit     string  `bson:"unit" json:"unit"`
+	Name     string               `bson:"name" json:"name"`
+	Quantity float64              `bson:"quantity" json:"quantity"`
+	Unit     ingredient.UnitType  `bson:"unit" json:"unit"`
 }
 
 type MenuItem struct {

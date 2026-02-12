@@ -21,8 +21,14 @@ func NewMenuRepository(db *mongo.Database) *MenuRepository {
 }
 
 func (r *MenuRepository) Create(ctx context.Context, item *menu.MenuItem) error {
+	// Generate new ObjectID if not set
+	if item.ID.IsZero() {
+		item.ID = primitive.NewObjectID()
+	}
+	
 	item.CreatedAt = time.Now()
 	item.UpdatedAt = time.Now()
+	
 	_, err := r.collection.InsertOne(ctx, item)
 	return err
 }
