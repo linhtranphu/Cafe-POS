@@ -152,6 +152,51 @@ So that I can prepare the correct size
 - [ ] AC-9.2: Can see size clearly (M/L/XL)
 - [ ] AC-9.3: Ingredients list matches variant
 
+### 2.5 As a Manager - Cost Analysis
+
+**US-10: View Cost per Variant**
+```
+As a manager
+I want to see the cost calculation for each variant
+So that I can understand profitability per size
+```
+
+**Acceptance Criteria**:
+- [ ] AC-10.1: Each variant displays current_cost
+- [ ] AC-10.2: Each variant displays cost_status (FINAL/ESTIMATED/INCOMPLETE)
+- [ ] AC-10.3: Each variant displays cost_last_calculated_at
+- [ ] AC-10.4: Can see cost breakdown by ingredient per variant
+- [ ] AC-10.5: Can see profit margin per variant (price - cost)
+
+**US-11: Calculate Cost per Variant**
+```
+As a manager
+I want the system to automatically calculate cost for each variant
+So that I have accurate cost data for pricing decisions
+```
+
+**Acceptance Criteria**:
+- [ ] AC-11.1: Cost is calculated based on variant's ingredients
+- [ ] AC-11.2: Cost uses ingredient cost_per_unit from database
+- [ ] AC-11.3: Cost includes conversion rate (stock unit → recipe unit)
+- [ ] AC-11.4: Cost includes wastage percentage
+- [ ] AC-11.5: Formula: `cost = Σ(quantity × cost_per_unit × conversion_rate × (1 + wastage/100))`
+- [ ] AC-11.6: Cost is recalculated when ingredient prices change
+- [ ] AC-11.7: Cost status is INCOMPLETE if any ingredient missing cost data
+
+**US-12: Compare Costs Across Variants**
+```
+As a manager
+I want to compare costs across different sizes
+So that I can optimize pricing strategy
+```
+
+**Acceptance Criteria**:
+- [ ] AC-12.1: Can view all variants with their costs in one view
+- [ ] AC-12.2: Can see cost difference between sizes
+- [ ] AC-12.3: Can see profit margin difference between sizes
+- [ ] AC-12.4: Can identify which size is most profitable
+
 ## 3. Functional Requirements
 
 ### 3.1 Data Model
@@ -199,23 +244,36 @@ So that I can prepare the correct size
 **FR-6: Cost Calculation**
 - [ ] FR-6.1: For single-size items, calculate cost from item.ingredients
 - [ ] FR-6.2: For multi-size items, calculate cost per variant
-- [ ] FR-6.3: Store cost per variant separately
+- [ ] FR-6.3: Store cost per variant separately (current_cost, cost_status, cost_last_calculated_at)
 - [ ] FR-6.4: Update costs when ingredient prices change
+- [ ] FR-6.5: Cost formula: `Σ(ingredient.quantity × ingredient.cost_per_unit × conversion_rate × (1 + wastage/100))`
+- [ ] FR-6.6: Conversion rate calculated dynamically based on stock_unit and recipe_unit
+- [ ] FR-6.7: Cost status = FINAL when all ingredients have cost data
+- [ ] FR-6.8: Cost status = INCOMPLETE when any ingredient missing cost data
+- [ ] FR-6.9: Cost status = ESTIMATED during shift (before finalization)
+- [ ] FR-6.10: Each variant tracks its own cost independently
 
 ### 3.3 API Requirements
 
 **FR-7: Menu API**
 - [ ] FR-7.1: POST /api/menu - Create item with/without variants
-- [ ] FR-7.2: GET /api/menu - List all items with variants
-- [ ] FR-7.3: GET /api/menu/:id - Get item with variants
+- [ ] FR-7.2: GET /api/menu - List all items with variants and costs
+- [ ] FR-7.3: GET /api/menu/:id - Get item with variants and costs
 - [ ] FR-7.4: PUT /api/menu/:id - Update item and variants
 - [ ] FR-7.5: DELETE /api/menu/:id - Delete item and variants
+- [ ] FR-7.6: POST /api/menu/:id/calculate-cost - Trigger cost calculation for item
 
 **FR-8: Order API**
 - [ ] FR-8.1: POST /api/orders - Create order with variant_id
 - [ ] FR-8.2: Validate variant_id if provided
 - [ ] FR-8.3: Return error if variant_id invalid
 - [ ] FR-8.4: Return error if variant_id missing for multi-size item
+
+**FR-9: Cost Analysis API**
+- [ ] FR-9.1: GET /api/menu/:id/cost-breakdown - Get detailed cost breakdown per variant
+- [ ] FR-9.2: Response includes: ingredient costs, conversion rates, wastage, total cost
+- [ ] FR-9.3: GET /api/menu/:id/profit-analysis - Get profit analysis per variant
+- [ ] FR-9.4: Response includes: price, cost, profit, profit margin % per variant
 
 ## 4. Non-Functional Requirements
 
@@ -226,11 +284,14 @@ So that I can prepare the correct size
 - [ ] NFR-1.2: Create menu item < 1s
 - [ ] NFR-1.3: Order creation < 1s
 - [ ] NFR-1.4: Cost calculation per variant < 2s
+- [ ] NFR-1.5: Cost breakdown API < 500ms
+- [ ] NFR-1.6: Profit analysis API < 500ms
 
 **NFR-2: Scalability**
 - [ ] NFR-2.1: Support up to 10 variants per item
 - [ ] NFR-2.2: Support up to 1000 menu items
 - [ ] NFR-2.3: Efficient queries with indexes
+- [ ] NFR-2.4: Cost calculation can handle 100+ ingredients per variant
 
 ### 4.2 Usability
 
@@ -253,7 +314,10 @@ So that I can prepare the correct size
 - [ ] NFR-5.1: Validation prevents invalid states
 - [ ] NFR-5.2: Transactions are atomic
 - [ ] NFR-5.3: No orphaned variants
-- [ ] NFR-5.4: Cost calculations are accurate
+- [ ] NFR-5.4: Cost calculations are accurate to 2 decimal places
+- [ ] NFR-5.5: Cost data is consistent across variants
+- [ ] NFR-5.6: Conversion rates are calculated correctly
+- [ ] NFR-5.7: Wastage percentages are applied correctly
 
 **NFR-6: Error Handling**
 - [ ] NFR-6.1: Graceful error messages
@@ -309,6 +373,10 @@ So that I can prepare the correct size
 - [ ] Can order items with variant selection
 - [ ] Variants display correctly in all views
 - [ ] Cost calculation works per variant
+- [ ] Cost breakdown shows accurate data
+- [ ] Profit analysis shows correct margins
+- [ ] Conversion rates calculated correctly
+- [ ] Wastage applied correctly in cost calculation
 - [ ] All acceptance criteria met
 
 ### 8.2 Quality Metrics
@@ -316,12 +384,21 @@ So that I can prepare the correct size
 - [ ] Unit test coverage > 80%
 - [ ] All integration tests passing
 - [ ] Performance requirements met
+- [ ] Cost calculation accuracy: 100% (no rounding errors beyond 2 decimals)
 
 ### 8.3 User Satisfaction
 - [ ] Manager can create menu items in < 3 minutes
+- [ ] Manager can view cost analysis easily
+- [ ] Manager understands profit margins per variant
 - [ ] Waiter can order items in < 5 seconds per item
 - [ ] No user confusion reported
 - [ ] Positive feedback from users
+
+### 8.4 Business Metrics
+- [ ] Cost data available for 100% of menu items
+- [ ] Profit margins visible for all variants
+- [ ] Pricing decisions informed by accurate cost data
+- [ ] Inventory forecasting improved with variant-level data
 
 ## 9. Out of Scope
 
@@ -336,6 +413,9 @@ The following are explicitly out of scope for this feature:
 - Migration of existing data (no data exists)
 - Bulk import/export of variants
 - Variant templates/presets (future enhancement)
+- Historical cost tracking per variant (only current cost)
+- Cost forecasting or predictions
+- Automated pricing recommendations based on cost
 
 ## 10. Future Enhancements
 
@@ -349,3 +429,8 @@ Potential future additions (not in current scope):
 - Time-based variant availability
 - Variant-specific promotions
 - Multi-dimensional variants (size + temperature + sweetness)
+- Historical cost tracking and trends
+- Cost alerts when ingredient prices change significantly
+- Automated pricing suggestions based on target profit margin
+- Cost comparison reports across menu categories
+- Ingredient usage forecasting per variant

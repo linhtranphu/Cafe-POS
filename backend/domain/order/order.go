@@ -29,7 +29,9 @@ const (
 
 type OrderItem struct {
 	MenuItemID  primitive.ObjectID `bson:"menu_item_id" json:"menu_item_id"`
+	VariantID   string             `bson:"variant_id,omitempty" json:"variant_id,omitempty"`
 	Name        string             `bson:"name" json:"name"`
+	VariantName string             `bson:"variant_name,omitempty" json:"variant_name,omitempty"`
 	Price       float64            `bson:"price" json:"price"`
 	Quantity    int                `bson:"quantity" json:"quantity"`
 	Note        string             `bson:"note,omitempty" json:"note,omitempty"`

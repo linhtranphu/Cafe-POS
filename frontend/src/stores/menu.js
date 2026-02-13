@@ -8,6 +8,28 @@ export const useMenuStore = defineStore('menu', {
     error: null
   }),
 
+  getters: {
+    // Get variant by ID from a menu item
+    getVariantById: (state) => (menuItemId, variantId) => {
+      const item = state.items.find(i => i.id === menuItemId)
+      if (!item || !item.has_variants || !item.variants) {
+        return null
+      }
+      return item.variants.find(v => v.id === variantId) || null
+    },
+
+    // Get default variant from a menu item
+    getDefaultVariant: (state) => (menuItemId) => {
+      const item = state.items.find(i => i.id === menuItemId)
+      if (!item || !item.has_variants || !item.variants) {
+        return null
+      }
+      const defaultVariant = item.variants.find(v => v.is_default)
+      // Fallback to first variant if no default found
+      return defaultVariant || (item.variants.length > 0 ? item.variants[0] : null)
+    }
+  },
+
   actions: {
     async fetchMenuItems() {
       this.loading = true

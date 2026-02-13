@@ -324,9 +324,90 @@ Response: 201 Created
 }
 ```
 
-## 4. Business Logic Design
+## 4. Backward Compatibility Strategy
 
-### 4.1 MenuItem Helper Methods
+### 4.1 Principles
+
+**1. Additive Changes Only**
+- ✅ Add new fields (has_variants, variants)
+- ✅ Keep existing fields (price, ingredients, current_cost)
+- ❌ Never remove or rename existing fields
+- ❌ Never change field types
+
+**2. Safe Defaults**
+- New field `has_variants` defaults to `false`
+- Empty `variants` array is valid when `has_variants = false`
+- Existing single-size items work without changes
+
+**3. Dual-Mode Support**
+- System supports both single-size and multi-size items
+- All existing code paths continue to work
+- New code paths are additive
+
+### 4.2 Migration Path (Even Though No Data Exists)
+
+**Current State**:
+```go
+type MenuItem struct {
+    ID          primitive.ObjectID
+    Name        string
+    Price       float64              // ✅ Keep
+    Ingredients []Ingredient         // ✅ Keep
+    CurrentCost float64              // ✅ Keep
+    // ... other fields
+}
+```
+
+**New State**:
+```go
+type MenuItem struct {
+    ID          primitive.ObjectID
+    Name        string
+    
+    // ✅ NEW: Variants support
+    HasVariants bool               `bson:"has_variants" json:"has_variants"` // Default: false
+    Variants    []MenuItemVariant  `bson:"variants,omitempty" json:"variants,omitempty"`
+    
+    // ✅ KEEP: Backward compatibility (single-size)
+    Price       float64      `bson:"price,omitempty" json:"price,omitempty"`
+    Ingredients []Ingredient `bson:"ingredients,omitempty" json:"ingredients,omitempty"`
+    CurrentCost float64      `bson:"current_cost,omitempty" json:"current_cost,omitempty"`
+    // ... other fields
+}
+```
+
+**Compatibility Rules**:
+1. If `has_variants = false` → Use `price`, `ingredients`, `current_cost`
+2. If `has_variants = true` → Use `variants[].price`, `variants[].ingredients`, `variants[].current_cost`
+3. Never access both at the same time
+
+### 4.3 Testing Strategy for Backward Compatibility
+
+**Test Matrix**:
+```
+┌─────────────────────┬──────────────┬──────────────┐
+│ Operation           │ Single-Size  │ Multi-Size   │
+├─────────────────────┼──────────────┼──────────────┤
+│ Create              │ ✅ Test      │ ✅ Test      │
+│ Read                │ ✅ Test      │ ✅ Test      │
+│ Update              │ ✅ Test      │ ✅ Test      │
+│ Delete              │ ✅ Test      │ ✅ Test      │
+│ Order               │ ✅ Test      │ ✅ Test      │
+│ Cost Calculation    │ ✅ Test      │ ✅ Test      │
+│ Display in UI       │ ✅ Test      │ ✅ Test      │
+└─────────────────────┴──────────────┴──────────────┘
+```
+
+**Critical Test Cases**:
+1. Create single-size item → Order → Cost calculation → Display
+2. Create multi-size item → Order with variant → Cost calculation → Display
+3. Edit single-size → Toggle to multi-size → Verify data integrity
+4. Edit multi-size → Toggle to single-size → Verify data integrity
+5. Mix of single and multi-size items in same order
+
+## 5. Business Logic Design
+
+### 5.1 MenuItem Helper Methods
 
 ```go
 // Get default variant
@@ -391,7 +472,7 @@ func (m *MenuItem) GetIngredients(variantID string) []Ingredient {
 }
 ```
 
-### 4.2 Validation Logic
+### 5.2 Validation Logic
 
 ```go
 func (m *MenuItem) Validate() error {
@@ -404,7 +485,7 @@ func (m *MenuItem) Validate() error {
     }
     
     if m.HasVariants {
-        // Variants validation
+        // ✅ Multi-size validation
         if len(m.Variants) == 0 {
             return errors.New("variants required when has_variants=true")
         }
@@ -439,10 +520,24 @@ func (m *MenuItem) Validate() error {
                 return fmt.Errorf("variant %s price must be > 0", v.ID)
             }
         }
+        
+        // ⚠️ IMPORTANT: When has_variants=true, old fields should be empty
+        // This prevents data inconsistency
+        if m.Price > 0 {
+            return errors.New("price should not be set when has_variants=true (use variants instead)")
+        }
+        if len(m.Ingredients) > 0 {
+            return errors.New("ingredients should not be set when has_variants=true (use variants instead)")
+        }
     } else {
-        // Single-size validation
+        // ✅ Single-size validation (backward compatible)
         if m.Price <= 0 {
             return errors.New("price must be > 0 for single-size item")
+        }
+        
+        // ⚠️ IMPORTANT: When has_variants=false, variants should be empty
+        if len(m.Variants) > 0 {
+            return errors.New("variants should not be set when has_variants=false")
         }
     }
     
@@ -450,7 +545,13 @@ func (m *MenuItem) Validate() error {
 }
 ```
 
-### 4.3 Order Creation Logic
+**Validation Ensures**:
+- ✅ No ambiguous state (both price and variants set)
+- ✅ Clear separation between single-size and multi-size
+- ✅ Data integrity maintained
+- ✅ Backward compatibility preserved
+
+### 5.3 Order Creation Logic (Backward Compatible)
 
 ```go
 func (s *OrderService) CreateOrder(ctx context.Context, req *order.CreateOrderRequest) (*order.Order, error) {
@@ -467,19 +568,19 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *order.CreateOrderRe
             return nil, fmt.Errorf("menu item %s is not available", menuItem.Name)
         }
         
-        // Get price and validate variant
+        // ✅ BACKWARD COMPATIBLE: Handle both single-size and multi-size
         var price float64
         var variantName string
         
         if menuItem.HasVariants {
-            // Multi-size item - variant_id required
+            // ✅ NEW: Multi-size item - variant_id required
             if item.VariantID == "" {
-                return nil, fmt.Errorf("variant_id required for %s", menuItem.Name)
+                return nil, fmt.Errorf("variant_id required for multi-size item: %s", menuItem.Name)
             }
             
             variant := menuItem.GetVariantByID(item.VariantID)
             if variant == nil {
-                return nil, fmt.Errorf("invalid variant_id %s for %s", item.VariantID, menuItem.Name)
+                return nil, fmt.Errorf("invalid variant_id '%s' for item: %s", item.VariantID, menuItem.Name)
             }
             
             if !variant.Available {
@@ -489,8 +590,10 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *order.CreateOrderRe
             price = variant.Price
             variantName = variant.Name
         } else {
-            // Single-size item
+            // ✅ OLD: Single-size item (backward compatible)
+            // No variant_id needed, use item.price directly
             price = menuItem.Price
+            variantName = "" // No variant for single-size
         }
         
         // Populate order item
@@ -500,7 +603,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *order.CreateOrderRe
         req.Items[i].Subtotal = price * float64(item.Quantity)
     }
     
-    // Create order
+    // Create order (existing logic unchanged)
     newOrder := &order.Order{
         Items: req.Items,
         // ... rest of order creation
@@ -516,7 +619,14 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *order.CreateOrderRe
 }
 ```
 
-### 4.4 Cost Calculation Logic
+**Key Points**:
+- ✅ Checks `menuItem.HasVariants` to determine flow
+- ✅ Single-size items work exactly as before
+- ✅ Multi-size items require variant_id
+- ✅ Clear error messages for missing/invalid variant_id
+- ✅ No breaking changes to existing order flow
+
+### 5.4 Cost Calculation Logic (Backward Compatible)
 
 ```go
 func (s *CostCalculatorService) CalculateMenuItemCost(ctx context.Context, menuItemID primitive.ObjectID) error {
@@ -526,15 +636,20 @@ func (s *CostCalculatorService) CalculateMenuItemCost(ctx context.Context, menuI
     }
     
     if menuItem.HasVariants {
-        // Calculate cost for each variant
+        // ✅ NEW: Calculate cost for each variant
         for i := range menuItem.Variants {
             cost, status := s.calculateIngredientsCost(ctx, menuItem.Variants[i].Ingredients)
             menuItem.Variants[i].CurrentCost = cost
             menuItem.Variants[i].CostStatus = status
             menuItem.Variants[i].CostLastCalculatedAt = time.Now()
         }
+        
+        // ⚠️ IMPORTANT: Clear old cost fields to avoid confusion
+        menuItem.CurrentCost = 0
+        menuItem.CostStatus = ""
+        menuItem.CostLastCalculatedAt = time.Time{}
     } else {
-        // Single-size item
+        // ✅ OLD: Single-size item (backward compatible)
         cost, status := s.calculateIngredientsCost(ctx, menuItem.Ingredients)
         menuItem.CurrentCost = cost
         menuItem.CostStatus = status
@@ -556,10 +671,11 @@ func (s *CostCalculatorService) calculateIngredientsCost(ctx context.Context, in
             continue
         }
         
-        // Calculate cost with conversion rate
+        // ✅ Use existing conversion rate logic (already implemented)
         conversionRate := ingredient.GetConversionRate(dbIng.Unit, ing.Unit)
         wastageMultiplier := 1.0 + (dbIng.WastagePercentage / 100.0)
         
+        // Formula: quantity × cost_per_unit × conversion_rate × (1 + wastage/100)
         cost := ing.Quantity * dbIng.CostPerUnit * conversionRate * wastageMultiplier
         totalCost += cost
     }
@@ -567,6 +683,13 @@ func (s *CostCalculatorService) calculateIngredientsCost(ctx context.Context, in
     return totalCost, status
 }
 ```
+
+**Key Points**:
+- ✅ Reuses existing `calculateIngredientsCost` logic
+- ✅ Single-size items use existing flow
+- ✅ Multi-size items loop through variants
+- ✅ Clears old cost fields when has_variants=true (prevents confusion)
+- ✅ No changes to cost calculation formula
 
 ## 5. Frontend Design
 

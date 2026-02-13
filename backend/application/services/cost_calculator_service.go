@@ -73,6 +73,8 @@ type CostCalculationSummary struct {
 }
 
 // CalculateMenuItemCost calculates the current cost for a single menu item
+// For single-size items: calculates cost from item.Ingredients (backward compatible)
+// For multi-size items: calculates cost per variant independently
 // Formula: sum(quantity * cost_per_unit * conversion_rate * (1 + wastage_percentage/100))
 // Returns INCOMPLETE status if any ingredient has missing cost_per_unit
 func (s *CostCalculatorService) CalculateMenuItemCost(ctx context.Context, menuItemID primitive.ObjectID) (*MenuItemCostResult, error) {
@@ -98,35 +100,7 @@ func (s *CostCalculatorService) CalculateMenuItemCost(ctx context.Context, menuI
 		return nil, fmt.Errorf("failed to fetch menu item: %w", err)
 	}
 
-	// If menu item has no ingredients, return zero cost with FINAL status
-	if len(menuItem.Ingredients) == 0 {
-		result := &MenuItemCostResult{
-			MenuItemID:           menuItemID,
-			CurrentCost:          0.0,
-			CostStatus:           menu.CostStatusFinal,
-			CostLastCalculatedAt: time.Now(),
-			MissingIngredients:   []string{},
-		}
-		
-		// Record success metric
-		if s.monitoringService != nil {
-			s.monitoringService.RecordMetric(Metric{
-				Type:      MetricTypeCostCalculation,
-				Status:    MetricStatusSuccess,
-				Timestamp: time.Now(),
-				Duration:  time.Since(startTime),
-				Message:   "Cost calculation completed (no ingredients)",
-				Metadata: map[string]interface{}{
-					"menu_item_id": menuItemID.Hex(),
-					"cost":         0.0,
-				},
-			})
-		}
-		
-		return result, nil
-	}
-
-	// Fetch all ingredients to build a lookup map
+	// Fetch all ingredients once for efficiency
 	allIngredients, err := s.ingredientRepo.FindAll(ctx)
 	if err != nil {
 		// Record failure metric
@@ -152,12 +126,156 @@ func (s *CostCalculatorService) CalculateMenuItemCost(ctx context.Context, menuI
 		ingredientMap[ing.Name] = ing
 	}
 
-	// Calculate total cost
+	if menuItem.HasVariants {
+		// Multi-size item - calculate cost per variant
+		for i := range menuItem.Variants {
+			costResult := s.calculateIngredientsCost(menuItem.Variants[i].Ingredients, ingredientMap)
+			menuItem.Variants[i].CurrentCost = costResult.cost
+			menuItem.Variants[i].CostStatus = costResult.status
+			menuItem.Variants[i].CostLastCalculatedAt = time.Now()
+		}
+		
+		// Clear old cost fields to avoid confusion
+		menuItem.CurrentCost = 0
+		menuItem.CostStatus = ""
+		menuItem.CostLastCalculatedAt = time.Time{}
+		
+		// Update menu item in database
+		err = s.menuRepo.Update(ctx, menuItemID, menuItem)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update menu item: %w", err)
+		}
+		
+		// Return result for first variant (or default variant)
+		defaultVariant := menuItem.GetDefaultVariant()
+		if defaultVariant != nil {
+			result := &MenuItemCostResult{
+				MenuItemID:           menuItemID,
+				CurrentCost:          defaultVariant.CurrentCost,
+				CostStatus:           defaultVariant.CostStatus,
+				CostLastCalculatedAt: defaultVariant.CostLastCalculatedAt,
+				MissingIngredients:   []string{}, // TODO: collect from variant calculation
+			}
+			
+			// Record success metric
+			if s.monitoringService != nil {
+				s.monitoringService.RecordMetric(Metric{
+					Type:      MetricTypeCostCalculation,
+					Status:    MetricStatusSuccess,
+					Timestamp: time.Now(),
+					Duration:  time.Since(startTime),
+					Message:   "Cost calculation completed (multi-size)",
+					Metadata: map[string]interface{}{
+						"menu_item_id":   menuItemID.Hex(),
+						"variant_count":  len(menuItem.Variants),
+						"default_cost":   defaultVariant.CurrentCost,
+					},
+				})
+			}
+			
+			return result, nil
+		}
+		
+		// No default variant found (shouldn't happen after validation)
+		return &MenuItemCostResult{
+			MenuItemID:           menuItemID,
+			CurrentCost:          0,
+			CostStatus:           menu.CostStatusIncomplete,
+			CostLastCalculatedAt: time.Now(),
+			MissingIngredients:   []string{},
+		}, nil
+	} else {
+		// Single-size item (backward compatible)
+		// If menu item has no ingredients, return zero cost with FINAL status
+		if len(menuItem.Ingredients) == 0 {
+			result := &MenuItemCostResult{
+				MenuItemID:           menuItemID,
+				CurrentCost:          0.0,
+				CostStatus:           menu.CostStatusFinal,
+				CostLastCalculatedAt: time.Now(),
+				MissingIngredients:   []string{},
+			}
+			
+			// Record success metric
+			if s.monitoringService != nil {
+				s.monitoringService.RecordMetric(Metric{
+					Type:      MetricTypeCostCalculation,
+					Status:    MetricStatusSuccess,
+					Timestamp: time.Now(),
+					Duration:  time.Since(startTime),
+					Message:   "Cost calculation completed (no ingredients)",
+					Metadata: map[string]interface{}{
+						"menu_item_id": menuItemID.Hex(),
+						"cost":         0.0,
+					},
+				})
+			}
+			
+			return result, nil
+		}
+
+		// Calculate cost using existing logic
+		costResult := s.calculateIngredientsCost(menuItem.Ingredients, ingredientMap)
+		
+		// Update menu item
+		menuItem.CurrentCost = costResult.cost
+		menuItem.CostStatus = costResult.status
+		menuItem.CostLastCalculatedAt = time.Now()
+		
+		err = s.menuRepo.Update(ctx, menuItemID, menuItem)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update menu item: %w", err)
+		}
+		
+		result := &MenuItemCostResult{
+			MenuItemID:           menuItemID,
+			CurrentCost:          costResult.cost,
+			CostStatus:           costResult.status,
+			CostLastCalculatedAt: time.Now(),
+			MissingIngredients:   costResult.missingIngredients,
+		}
+		
+		// Record metric
+		metricStatus := MetricStatusSuccess
+		if costResult.status == menu.CostStatusIncomplete {
+			metricStatus = MetricStatusWarning
+		}
+		
+		if s.monitoringService != nil {
+			s.monitoringService.RecordMetric(Metric{
+				Type:      MetricTypeCostCalculation,
+				Status:    metricStatus,
+				Timestamp: time.Now(),
+				Duration:  time.Since(startTime),
+				Message:   "Cost calculation completed",
+				Metadata: map[string]interface{}{
+					"menu_item_id":        menuItemID.Hex(),
+					"cost":                costResult.cost,
+					"cost_status":         string(costResult.status),
+					"missing_ingredients": len(costResult.missingIngredients),
+				},
+			})
+		}
+
+		return result, nil
+	}
+}
+
+// ingredientCostResult holds the result of ingredient cost calculation
+type ingredientCostResult struct {
+	cost               float64
+	status             menu.CostStatus
+	missingIngredients []string
+}
+
+// calculateIngredientsCost calculates cost for a list of ingredients
+// This is a helper method used by both single-size and multi-size cost calculation
+func (s *CostCalculatorService) calculateIngredientsCost(ingredients []menu.Ingredient, ingredientMap map[string]*ingredient.Ingredient) *ingredientCostResult {
 	var totalCost float64
 	var missingIngredients []string
 	hasIncompleteCost := false
 
-	for _, menuIngredient := range menuItem.Ingredients {
+	for _, menuIngredient := range ingredients {
 		// Find the ingredient in our map
 		ing, exists := ingredientMap[menuIngredient.Name]
 		if !exists {
@@ -175,8 +293,6 @@ func (s *CostCalculatorService) CalculateMenuItemCost(ctx context.Context, menuI
 		}
 
 		// Calculate conversion rate dynamically based on stock unit and recipe unit
-		// stockUnit = ing.Unit (e.g., "L")
-		// recipeUnit = menuIngredient.Unit (e.g., "ml")
 		conversionRate := ingredient.GetConversionRate(ing.Unit, menuIngredient.Unit)
 
 		// Get wastage percentage (default 0.0 if not set)
@@ -196,38 +312,15 @@ func (s *CostCalculatorService) CalculateMenuItemCost(ctx context.Context, menuI
 
 	// Determine cost status
 	costStatus := menu.CostStatusFinal
-	metricStatus := MetricStatusSuccess
 	if hasIncompleteCost {
 		costStatus = menu.CostStatusIncomplete
-		metricStatus = MetricStatusWarning
 	}
 	
-	result := &MenuItemCostResult{
-		MenuItemID:           menuItemID,
-		CurrentCost:          totalCost,
-		CostStatus:           costStatus,
-		CostLastCalculatedAt: time.Now(),
-		MissingIngredients:   missingIngredients,
+	return &ingredientCostResult{
+		cost:               totalCost,
+		status:             costStatus,
+		missingIngredients: missingIngredients,
 	}
-	
-	// Record metric
-	if s.monitoringService != nil {
-		s.monitoringService.RecordMetric(Metric{
-			Type:      MetricTypeCostCalculation,
-			Status:    metricStatus,
-			Timestamp: time.Now(),
-			Duration:  time.Since(startTime),
-			Message:   "Cost calculation completed",
-			Metadata: map[string]interface{}{
-				"menu_item_id":        menuItemID.Hex(),
-				"cost":                totalCost,
-				"cost_status":         string(costStatus),
-				"missing_ingredients": len(missingIngredients),
-			},
-		})
-	}
-
-	return result, nil
 }
 
 // CalculateAllMenuItemCosts calculates current cost for all menu items
@@ -768,4 +861,9 @@ func (s *CostCalculatorService) CalculateMenuItemCostDetail(ctx context.Context,
 	}
 
 	return result, nil
+}
+
+// GetMenuItemByID fetches a menu item by ID (helper for handlers)
+func (s *CostCalculatorService) GetMenuItemByID(ctx context.Context, menuItemID primitive.ObjectID) (*menu.MenuItem, error) {
+	return s.menuRepo.FindByID(ctx, menuItemID)
 }

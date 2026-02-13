@@ -6,6 +6,11 @@ export const menuService = {
     return response.data
   },
 
+  async getMenuItem(id) {
+    const response = await api.get(`/manager/menu/${id}`)
+    return response.data
+  },
+
   async createMenuItem(item) {
     const response = await api.post('/manager/menu', item)
     return response.data
@@ -18,6 +23,11 @@ export const menuService = {
 
   async deleteMenuItem(id) {
     const response = await api.delete(`/manager/menu/${id}`)
+    return response.data
+  },
+
+  async getCostBreakdown(id) {
+    const response = await api.get(`/manager/menu/${id}/cost-breakdown`)
     return response.data
   }
 }

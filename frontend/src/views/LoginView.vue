@@ -15,6 +15,7 @@
             required 
             placeholder="Nhập tên đăng nhập"
             :disabled="loading"
+            data-testid="username"
             class="w-full p-3 border-2 border-gray-300 rounded-lg text-base transition-colors focus:outline-none focus:border-blue-600 disabled:bg-gray-100 disabled:cursor-not-allowed"
           />
         </div>
@@ -27,13 +28,15 @@
             required 
             placeholder="Nhập mật khẩu"
             :disabled="loading"
+            data-testid="password"
             class="w-full p-3 border-2 border-gray-300 rounded-lg text-base transition-colors focus:outline-none focus:border-blue-600 disabled:bg-gray-100 disabled:cursor-not-allowed"
           />
         </div>
 
         <button 
           type="submit" 
-          :disabled="loading" 
+          :disabled="loading"
+          data-testid="login-button"
           class="w-full p-4 bg-blue-600 text-white border-none rounded-lg text-base font-semibold cursor-pointer transition-colors hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
           {{ loading ? 'Đang đăng nhập...' : 'Đăng nhập' }}

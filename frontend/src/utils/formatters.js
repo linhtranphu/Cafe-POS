@@ -128,6 +128,7 @@ export function formatDateTime(date) {
 
 /**
  * Format price in Vietnamese currency
+ * Uses commas as thousand separators (e.g., 20,000 ₫)
  * 
  * @param {number|null} price - Price to format
  * @param {boolean} showSymbol - Whether to show currency symbol (default: true)
@@ -137,13 +138,13 @@ export function formatPrice(price, showSymbol = true) {
   if (price === null || price === undefined) return showSymbol ? '0 ₫' : '0'
   
   try {
-    const formatted = new Intl.NumberFormat('vi-VN', {
-      style: showSymbol ? 'currency' : 'decimal',
-      currency: 'VND',
+    // Use en-US locale for comma separators, then add Vietnamese currency symbol
+    const formatted = new Intl.NumberFormat('en-US', {
+      style: 'decimal',
       maximumFractionDigits: 0
     }).format(price)
     
-    return formatted
+    return showSymbol ? `${formatted} ₫` : formatted
   } catch (error) {
     console.error('Error formatting price:', error)
     return showSymbol ? '0 ₫' : '0'
@@ -152,6 +153,7 @@ export function formatPrice(price, showSymbol = true) {
 
 /**
  * Format number with thousand separators
+ * Uses commas as thousand separators (e.g., 1,000)
  * 
  * @param {number|null} num - Number to format
  * @returns {string} Formatted number string
@@ -160,7 +162,7 @@ export function formatNumber(num) {
   if (num === null || num === undefined) return '0'
   
   try {
-    return new Intl.NumberFormat('vi-VN').format(num)
+    return new Intl.NumberFormat('en-US').format(num)
   } catch (error) {
     console.error('Error formatting number:', error)
     return '0'

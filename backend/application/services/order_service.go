@@ -24,17 +24,20 @@ type OrderRepository interface {
 type OrderService struct {
 	orderRepo           OrderRepository
 	shiftRepo           ShiftRepository
+	menuRepo            MenuRepository
 	stateMachineManager *domain.StateMachineManager
 }
 
 func NewOrderService(
 	orderRepo OrderRepository,
 	shiftRepo ShiftRepository,
+	menuRepo MenuRepository,
 	stateMachineManager *domain.StateMachineManager,
 ) *OrderService {
 	return &OrderService{
 		orderRepo:           orderRepo,
 		shiftRepo:           shiftRepo,
+		menuRepo:            menuRepo,
 		stateMachineManager: stateMachineManager,
 	}
 }
@@ -57,10 +60,68 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *order.CreateOrderRe
 		WaiterID:     waiterOID,
 		WaiterName:   waiterName,
 		ShiftID:      shiftID,
-		Items:        req.Items,
+		Items:        []order.OrderItem{}, // Initialize empty, will populate below
 		Status:       order.StatusCreated,
 		Note:         req.Note,
 		AmountPaid:   0,
+	}
+
+	// Validate and populate order items with prices from menu
+	for _, item := range req.Items {
+		// Fetch menu item to get price and validate variant
+		menuItem, err := s.menuRepo.FindByID(ctx, item.MenuItemID)
+		if err != nil {
+			return nil, fmt.Errorf("menu item not found: %w", err)
+		}
+
+		// Check availability
+		if !menuItem.Available {
+			return nil, fmt.Errorf("menu item %s is not available", menuItem.Name)
+		}
+
+		// Determine price and variant name based on menu item type
+		var price float64
+		var variantName string
+		var variantID string
+
+		if menuItem.HasVariants {
+			// Multi-size item - variant_id required
+			if item.VariantID == "" {
+				return nil, fmt.Errorf("variant_id required for multi-size item: %s", menuItem.Name)
+			}
+
+			variant := menuItem.GetVariantByID(item.VariantID)
+			if variant == nil {
+				return nil, fmt.Errorf("invalid variant_id '%s' for item: %s", item.VariantID, menuItem.Name)
+			}
+
+			if !variant.Available {
+				return nil, fmt.Errorf("variant %s is not available", variant.Name)
+			}
+
+			price = variant.Price
+			variantName = variant.Name
+			variantID = variant.ID
+		} else {
+			// Single-size item (backward compatible)
+			// No variant_id needed, use item.price directly
+			price = menuItem.Price
+			variantName = "" // No variant for single-size
+			variantID = ""
+		}
+
+		// Create order item with validated data
+		orderItem := order.OrderItem{
+			MenuItemID:  item.MenuItemID,
+			VariantID:   variantID,
+			Name:        menuItem.Name,
+			VariantName: variantName,
+			Price:       price,
+			Quantity:    item.Quantity,
+			Note:        item.Note,
+		}
+
+		o.Items = append(o.Items, orderItem)
 	}
 
 	o.CalculateTotal()
@@ -148,8 +209,66 @@ func (s *OrderService) EditOrder(ctx context.Context, id primitive.ObjectID, req
 	oldTotal := o.Total
 	oldAmountPaid := o.AmountPaid
 
+	// Validate and populate new items with prices from menu
+	var validatedItems []order.OrderItem
+	for _, item := range req.Items {
+		// Fetch menu item to get price and validate variant
+		menuItem, err := s.menuRepo.FindByID(ctx, item.MenuItemID)
+		if err != nil {
+			return nil, fmt.Errorf("menu item not found: %w", err)
+		}
+
+		// Check availability
+		if !menuItem.Available {
+			return nil, fmt.Errorf("menu item %s is not available", menuItem.Name)
+		}
+
+		// Determine price and variant name based on menu item type
+		var price float64
+		var variantName string
+		var variantID string
+
+		if menuItem.HasVariants {
+			// Multi-size item - variant_id required
+			if item.VariantID == "" {
+				return nil, fmt.Errorf("variant_id required for multi-size item: %s", menuItem.Name)
+			}
+
+			variant := menuItem.GetVariantByID(item.VariantID)
+			if variant == nil {
+				return nil, fmt.Errorf("invalid variant_id '%s' for item: %s", item.VariantID, menuItem.Name)
+			}
+
+			if !variant.Available {
+				return nil, fmt.Errorf("variant %s is not available", variant.Name)
+			}
+
+			price = variant.Price
+			variantName = variant.Name
+			variantID = variant.ID
+		} else {
+			// Single-size item (backward compatible)
+			price = menuItem.Price
+			variantName = ""
+			variantID = ""
+		}
+
+		// Create order item with validated data
+		orderItem := order.OrderItem{
+			MenuItemID:  item.MenuItemID,
+			VariantID:   variantID,
+			Name:        menuItem.Name,
+			VariantName: variantName,
+			Price:       price,
+			Quantity:    item.Quantity,
+			Note:        item.Note,
+		}
+
+		validatedItems = append(validatedItems, orderItem)
+	}
+
 	// Update order details
-	o.Items = req.Items
+	o.Items = validatedItems
 	o.Discount = req.Discount
 	o.Note = req.Note
 	

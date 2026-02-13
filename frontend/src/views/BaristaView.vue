@@ -101,7 +101,10 @@
               <div v-for="(item, idx) in order.items" :key="idx" 
                 class="flex justify-between bg-gray-50 p-3 rounded-lg">
                 <div>
-                  <div class="font-medium">{{ item.name }}</div>
+                  <div class="font-medium">
+                    {{ item.name }}
+                    <span v-if="item.variant_name" class="text-blue-600 text-sm">({{ item.variant_name }})</span>
+                  </div>
                   <div class="text-sm text-gray-500">x{{ item.quantity }}</div>
                 </div>
               </div>
@@ -160,7 +163,10 @@
               <div v-for="(item, idx) in order.items" :key="idx" 
                 class="flex justify-between bg-blue-50 p-3 rounded-lg">
                 <div>
-                  <div class="font-medium">{{ item.name }}</div>
+                  <div class="font-medium">
+                    {{ item.name }}
+                    <span v-if="item.variant_name" class="text-blue-600 text-sm">({{ item.variant_name }})</span>
+                  </div>
                   <div class="text-sm text-gray-500">x{{ item.quantity }}</div>
                 </div>
               </div>
@@ -213,7 +219,10 @@
               <div v-for="(item, idx) in order.items" :key="idx" 
                 class="flex justify-between bg-green-50 p-3 rounded-lg">
                 <div>
-                  <div class="font-medium">{{ item.name }}</div>
+                  <div class="font-medium">
+                    {{ item.name }}
+                    <span v-if="item.variant_name" class="text-green-600 text-sm">({{ item.variant_name }})</span>
+                  </div>
                   <div class="text-sm text-gray-500">x{{ item.quantity }}</div>
                 </div>
               </div>

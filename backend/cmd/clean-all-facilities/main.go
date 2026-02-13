@@ -26,7 +26,7 @@ func main() {
 
 	db := client.Database("cafe_pos")
 
-	fmt.Println("=== Cleaning All Facilities and Maintenance Data ===\n")
+	fmt.Println("=== Cleaning All Facilities and Maintenance Data ===")
 
 	// Collections to clean
 	collections := []struct {

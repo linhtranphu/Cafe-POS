@@ -75,7 +75,11 @@
           <div class="mb-3 space-y-1">
             <div v-for="(item, idx) in order.items.slice(0, 2)" :key="idx" 
               class="flex justify-between text-sm">
-              <span class="text-gray-700">{{ item.name }} <span class="text-gray-400">x{{ item.quantity }}</span></span>
+              <span class="text-gray-700">
+                {{ item.name }}
+                <span v-if="item.variant_name" class="text-blue-600">({{ item.variant_name }})</span>
+                <span class="text-gray-400"> x{{ item.quantity }}</span>
+              </span>
               <span class="font-medium text-gray-900">{{ formatPrice(item.subtotal) }}</span>
             </div>
             <p v-if="order.items.length > 2" class="text-xs text-gray-400">
@@ -163,16 +167,36 @@
         <!-- Menu Items Grid -->
         <div class="flex-1 overflow-y-auto px-4 py-4">
           <div class="grid grid-cols-2 gap-3">
-            <button v-for="item in filteredMenuItems" :key="item.id"
-              @click="addToCart(item)"
-              class="bg-white rounded-xl p-4 shadow-sm active:scale-95 transition-transform text-left">
-              <div class="font-medium text-gray-900 mb-1">{{ item.name }}</div>
-              <div class="text-sm font-bold text-blue-600">{{ formatPrice(item.price) }}</div>
-              <div v-if="getCartItemQty(item.id) > 0" 
-                class="mt-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full inline-block">
-                {{ getCartItemQty(item.id) }} món
+            <div v-for="item in filteredMenuItems" :key="item.id">
+              <!-- Single-size item - direct add -->
+              <button v-if="!item.has_variants"
+                @click="addToCart(item)"
+                class="bg-white rounded-xl p-4 shadow-sm active:scale-95 transition-transform text-left">
+                <div class="font-medium text-gray-900 mb-1">{{ item.name }}</div>
+                <div class="text-sm font-bold text-blue-600">{{ formatPrice(item.price) }}</div>
+                <div v-if="getCartItemQty(item.id) > 0" 
+                  class="mt-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full inline-block">
+                  {{ getCartItemQty(item.id) }} món
+                </div>
+              </button>
+
+              <!-- Multi-size item - show variants -->
+              <div v-else class="bg-white rounded-xl p-4 shadow-sm text-left">
+                <div class="font-medium text-gray-900 mb-2">{{ item.name }}</div>
+                <div class="space-y-1">
+                  <button v-for="variant in item.variants" :key="variant.id"
+                    @click="addToCart(item, variant)"
+                    class="w-full flex justify-between items-center p-2 bg-gray-50 rounded-lg hover:bg-blue-50 active:scale-95 transition-all">
+                    <span class="text-xs font-medium text-gray-700">{{ variant.name }}</span>
+                    <span class="text-sm font-bold text-blue-600">{{ formatPrice(variant.price) }}</span>
+                  </button>
+                </div>
+                <div v-if="getCartItemQtyWithVariants(item.id) > 0" 
+                  class="mt-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full inline-block">
+                  {{ getCartItemQtyWithVariants(item.id) }} món
+                </div>
               </div>
-            </button>
+            </div>
           </div>
         </div>
 
@@ -183,7 +207,10 @@
             <div class="max-h-32 overflow-y-auto mb-3 space-y-2">
               <div v-for="(item, idx) in cart" :key="idx" 
                 class="flex items-center gap-3 bg-gray-50 rounded-lg p-2">
-                <span class="flex-1 text-sm font-medium">{{ item.name }}</span>
+                <span class="flex-1 text-sm font-medium">
+                  {{ item.name }}
+                  <span v-if="item.variant_name" class="text-gray-500">({{ item.variant_name }})</span>
+                </span>
                 <div class="flex items-center gap-2">
                   <button @click="decreaseQty(idx)" 
                     class="w-8 h-8 bg-gray-200 rounded-full text-lg font-bold active:bg-gray-300">
@@ -237,7 +264,10 @@
                 <div v-for="item in selectedOrder.items" :key="item.menu_item_id" 
                   class="flex justify-between bg-gray-50 p-3 rounded-lg">
                   <div>
-                    <div class="font-medium">{{ item.name }}</div>
+                    <div class="font-medium">
+                      {{ item.name }}
+                      <span v-if="item.variant_name" class="text-gray-500">({{ item.variant_name }})</span>
+                    </div>
                     <div class="text-sm text-gray-500">{{ formatPrice(item.price) }} x {{ item.quantity }}</div>
                   </div>
                   <div class="font-bold">{{ formatPrice(item.subtotal) }}</div>
@@ -478,23 +508,29 @@ const cancelCreateOrder = () => {
   customerName.value = ''
 }
 
-const addToCart = (item) => {
-  const existing = cart.value.find(i => i.menu_item_id === item.id)
+const addToCart = (item, variant = null) => {
+  // Use orderStore helper to create cart item
+  const cartItem = orderStore.helpers.createCartItem(item, variant)
+  
+  // Check if item already exists in cart (considering variant)
+  const existing = cart.value.find(i => orderStore.helpers.isSameCartItem(i, cartItem))
+  
   if (existing) {
     existing.quantity++
   } else {
-    cart.value.push({
-      menu_item_id: item.id,
-      name: item.name,
-      price: item.price,
-      quantity: 1
-    })
+    cart.value.push(cartItem)
   }
 }
 
 const getCartItemQty = (itemId) => {
-  const item = cart.value.find(i => i.menu_item_id === itemId)
+  const item = cart.value.find(i => i.menu_item_id === itemId && !i.variant_id)
   return item ? item.quantity : 0
+}
+
+const getCartItemQtyWithVariants = (itemId) => {
+  return cart.value
+    .filter(i => i.menu_item_id === itemId)
+    .reduce((sum, i) => sum + i.quantity, 0)
 }
 
 const increaseQty = (index) => {

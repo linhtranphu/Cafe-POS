@@ -65,6 +65,12 @@
               <div class="font-bold text-base">Chi phí món</div>
               <div class="text-xs opacity-80 mt-1">Giá vốn & lợi nhuận</div>
             </button>
+            <button @click="$router.push('/manager/cost-analysis')" 
+              class="bg-gradient-to-br from-teal-500 to-green-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+              <div class="text-4xl mb-2">📊</div>
+              <div class="font-bold text-base">Chi phí theo size</div>
+              <div class="text-xs opacity-80 mt-1">Phân tích variants</div>
+            </button>
             <button @click="$router.push('/cashier/reports')" 
               class="bg-gradient-to-br from-blue-500 to-cyan-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
               <div class="text-4xl mb-2">📊</div>

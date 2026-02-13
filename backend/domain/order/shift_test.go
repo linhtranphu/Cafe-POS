@@ -22,9 +22,9 @@ func TestParseRoleType(t *testing.T) {
 			expected: RoleBarista,
 		},
 		{
-			name:     "Parse cashier role",
+			name:     "Parse cashier role (should default to waiter)",
 			input:    "cashier",
-			expected: RoleCashier,
+			expected: RoleWaiter,
 		},
 		{
 			name:     "Parse manager role (should default to waiter)",
@@ -76,9 +76,9 @@ func TestRoleType_IsValid(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "Cashier role is valid",
-			roleType: RoleCashier,
-			expected: true,
+			name:     "Cashier role is invalid (removed)",
+			roleType: RoleType("cashier"),
+			expected: false,
 		},
 		{
 			name:     "Empty role is invalid",
@@ -125,8 +125,8 @@ func TestRoleType_String(t *testing.T) {
 			expected: "barista",
 		},
 		{
-			name:     "Cashier role to string",
-			roleType: RoleCashier,
+			name:     "Cashier role to string (removed, defaults to empty)",
+			roleType: RoleType("cashier"),
 			expected: "cashier",
 		},
 		{
@@ -174,9 +174,9 @@ func TestParseRoleType_FromUserRole(t *testing.T) {
 			expected: RoleBarista,
 		},
 		{
-			name:     "Convert user.Role cashier to order.RoleType",
+			name:     "Convert user.Role cashier to order.RoleType (defaults to waiter)",
 			userRole: UserRoleCashier,
-			expected: RoleCashier,
+			expected: RoleWaiter,
 		},
 		{
 			name:     "Convert user.Role manager to order.RoleType (defaults to waiter)",
@@ -265,7 +265,7 @@ func BenchmarkParseRoleType(b *testing.B) {
 
 // BenchmarkRoleType_IsValid benchmarks the IsValid method
 func BenchmarkRoleType_IsValid(b *testing.B) {
-	roleTypes := []RoleType{RoleWaiter, RoleBarista, RoleCashier, RoleType("invalid")}
+	roleTypes := []RoleType{RoleWaiter, RoleBarista, RoleType("cashier"), RoleType("invalid")}
 	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

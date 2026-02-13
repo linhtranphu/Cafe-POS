@@ -18,6 +18,7 @@ import UserManagementView from '../views/UserManagementView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import MenuCostView from '../views/MenuCostView.vue'
 import ProfitAnalysisView from '../views/ProfitAnalysisView.vue'
+import CostAnalysisView from '../views/CostAnalysisView.vue'
 import SettingsView from '../views/SettingsView.vue'
 
 const routes = [
@@ -143,6 +144,12 @@ const routes = [
     path: '/manager/profit-analysis',
     name: 'ProfitAnalysis',
     component: ProfitAnalysisView,
+    meta: { requiresAuth: true, requiresManager: true }
+  },
+  {
+    path: '/manager/cost-analysis',
+    name: 'CostAnalysis',
+    component: CostAnalysisView,
     meta: { requiresAuth: true, requiresManager: true }
   },
   {

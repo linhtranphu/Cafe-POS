@@ -941,3 +941,284 @@ func TestQueueCostRecalculation_InvalidIngredient(t *testing.T) {
 		t.Error("Expected error for invalid ingredient ID, got nil")
 	}
 }
+
+// Test variant cost calculation
+
+func TestCalculateMenuItemCost_MultiSize_WithVariants(t *testing.T) {
+	menuRepo, ingredientRepo := setupTestData()
+	orderRepo := &mockOrderRepository{orders: make(map[primitive.ObjectID]*order.Order)}
+	orderItemRepo := &mockOrderItemRepository{orderItems: make([]*order.OrderItemWithCost, 0)}
+	service := NewCostCalculatorService(menuRepo, ingredientRepo, orderRepo, orderItemRepo)
+
+	// Add ingredients needed for test
+	coffeeID := primitive.NewObjectID()
+	milkID := primitive.NewObjectID()
+	ingredientRepo.ingredients[coffeeID] = &ingredient.Ingredient{
+		ID:                coffeeID,
+		Name:              "Cà phê",
+		Unit:              ingredient.UnitGram,
+		CostPerUnit:       500.0, // 500đ per gram
+		WastagePercentage: 0.0,
+	}
+	ingredientRepo.ingredients[milkID] = &ingredient.Ingredient{
+		ID:                milkID,
+		Name:              "Sữa đặc",
+		Unit:              ingredient.UnitMilliliter,
+		CostPerUnit:       200.0, // 200đ per ml
+		WastagePercentage: 0.0,
+	}
+
+	// Create multi-size menu item with variants
+	menuItem := &menu.MenuItem{
+		ID:          primitive.NewObjectID(),
+		Name:        "Cà phê sữa đá",
+		Category:    "Cà phê",
+		HasVariants: true,
+		Available:   true,
+		Variants: []menu.MenuItemVariant{
+			{
+				ID:        "M",
+				Name:      "Size M",
+				Price:     25000,
+				Available: true,
+				IsDefault: true,
+				Ingredients: []menu.Ingredient{
+					{Name: "Cà phê", Quantity: 20, Unit: ingredient.UnitGram},
+					{Name: "Sữa đặc", Quantity: 30, Unit: ingredient.UnitMilliliter},
+				},
+			},
+			{
+				ID:        "L",
+				Name:      "Size L",
+				Price:     30000,
+				Available: true,
+				IsDefault: false,
+				Ingredients: []menu.Ingredient{
+					{Name: "Cà phê", Quantity: 30, Unit: ingredient.UnitGram},
+					{Name: "Sữa đặc", Quantity: 45, Unit: ingredient.UnitMilliliter},
+				},
+			},
+		},
+	}
+	menuRepo.Create(context.Background(), menuItem)
+
+	// Calculate cost
+	result, err := service.CalculateMenuItemCost(context.Background(), menuItem.ID)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	// Verify result is for default variant
+	if result.CostStatus != menu.CostStatusFinal {
+		t.Errorf("Expected cost status FINAL, got %s", result.CostStatus)
+	}
+
+	// Fetch updated menu item to verify variant costs
+	updated, _ := menuRepo.FindByID(context.Background(), menuItem.ID)
+	
+	// Verify Size M cost
+	variantM := updated.GetVariantByID("M")
+	if variantM == nil {
+		t.Fatal("Expected variant M to exist")
+	}
+	// Cost = (20g * 500đ/g) + (30ml * 200đ/ml) = 10,000 + 6,000 = 16,000
+	expectedCostM := 16000.0
+	if variantM.CurrentCost != expectedCostM {
+		t.Errorf("Expected variant M cost %f, got %f", expectedCostM, variantM.CurrentCost)
+	}
+	if variantM.CostStatus != menu.CostStatusFinal {
+		t.Errorf("Expected variant M status FINAL, got %s", variantM.CostStatus)
+	}
+
+	// Verify Size L cost
+	variantL := updated.GetVariantByID("L")
+	if variantL == nil {
+		t.Fatal("Expected variant L to exist")
+	}
+	// Cost = (30g * 500đ/g) + (45ml * 200đ/ml) = 15,000 + 9,000 = 24,000
+	expectedCostL := 24000.0
+	if variantL.CurrentCost != expectedCostL {
+		t.Errorf("Expected variant L cost %f, got %f", expectedCostL, variantL.CurrentCost)
+	}
+	if variantL.CostStatus != menu.CostStatusFinal {
+		t.Errorf("Expected variant L status FINAL, got %s", variantL.CostStatus)
+	}
+
+	// Verify old cost fields are cleared
+	if updated.CurrentCost != 0 {
+		t.Errorf("Expected menu item CurrentCost to be 0 (cleared), got %f", updated.CurrentCost)
+	}
+	if updated.CostStatus != "" {
+		t.Errorf("Expected menu item CostStatus to be empty (cleared), got %s", updated.CostStatus)
+	}
+}
+
+func TestCalculateMenuItemCost_MultiSize_WithMissingCost(t *testing.T) {
+	menuRepo, ingredientRepo := setupTestData()
+	orderRepo := &mockOrderRepository{orders: make(map[primitive.ObjectID]*order.Order)}
+	orderItemRepo := &mockOrderItemRepository{orderItems: make([]*order.OrderItemWithCost, 0)}
+	service := NewCostCalculatorService(menuRepo, ingredientRepo, orderRepo, orderItemRepo)
+
+	// Add coffee ingredient
+	coffeeID := primitive.NewObjectID()
+	ingredientRepo.ingredients[coffeeID] = &ingredient.Ingredient{
+		ID:                coffeeID,
+		Name:              "Cà phê",
+		Unit:              ingredient.UnitGram,
+		CostPerUnit:       500.0,
+		WastagePercentage: 0.0,
+	}
+
+	// Create multi-size menu item with variants
+	menuItem := &menu.MenuItem{
+		ID:          primitive.NewObjectID(),
+		Name:        "Cà phê sữa đá",
+		Category:    "Cà phê",
+		HasVariants: true,
+		Available:   true,
+		Variants: []menu.MenuItemVariant{
+			{
+				ID:        "M",
+				Name:      "Size M",
+				Price:     25000,
+				Available: true,
+				IsDefault: true,
+				Ingredients: []menu.Ingredient{
+					{Name: "Cà phê", Quantity: 20, Unit: ingredient.UnitGram},
+					{Name: "Unknown Ingredient", Quantity: 10, Unit: ingredient.UnitGram}, // Missing cost
+				},
+			},
+		},
+	}
+	menuRepo.Create(context.Background(), menuItem)
+
+	// Calculate cost
+	result, err := service.CalculateMenuItemCost(context.Background(), menuItem.ID)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	// Verify status is INCOMPLETE
+	if result.CostStatus != menu.CostStatusIncomplete {
+		t.Errorf("Expected cost status INCOMPLETE, got %s", result.CostStatus)
+	}
+
+	// Fetch updated menu item to verify variant status
+	updated, _ := menuRepo.FindByID(context.Background(), menuItem.ID)
+	variantM := updated.GetVariantByID("M")
+	if variantM.CostStatus != menu.CostStatusIncomplete {
+		t.Errorf("Expected variant M status INCOMPLETE, got %s", variantM.CostStatus)
+	}
+}
+
+func TestCalculateMenuItemCost_SingleSize_BackwardCompatible(t *testing.T) {
+	menuRepo, ingredientRepo := setupTestData()
+	orderRepo := &mockOrderRepository{orders: make(map[primitive.ObjectID]*order.Order)}
+	orderItemRepo := &mockOrderItemRepository{orderItems: make([]*order.OrderItemWithCost, 0)}
+	service := NewCostCalculatorService(menuRepo, ingredientRepo, orderRepo, orderItemRepo)
+
+	// Add coffee ingredient
+	coffeeID := primitive.NewObjectID()
+	ingredientRepo.ingredients[coffeeID] = &ingredient.Ingredient{
+		ID:                coffeeID,
+		Name:              "Cà phê",
+		Unit:              ingredient.UnitGram,
+		CostPerUnit:       500.0,
+		WastagePercentage: 0.0,
+	}
+
+	// Create single-size menu item (backward compatible)
+	menuItem := &menu.MenuItem{
+		ID:          primitive.NewObjectID(),
+		Name:        "Bánh mì",
+		Category:    "Món ăn",
+		HasVariants: false,
+		Price:       20000,
+		Available:   true,
+		Ingredients: []menu.Ingredient{
+			{Name: "Cà phê", Quantity: 10, Unit: ingredient.UnitGram},
+		},
+	}
+	menuRepo.Create(context.Background(), menuItem)
+
+	// Calculate cost
+	result, err := service.CalculateMenuItemCost(context.Background(), menuItem.ID)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	// Verify cost is calculated for single-size item
+	expectedCost := 5000.0 // 10g * 500đ/g
+	if result.CurrentCost != expectedCost {
+		t.Errorf("Expected cost %f, got %f", expectedCost, result.CurrentCost)
+	}
+	if result.CostStatus != menu.CostStatusFinal {
+		t.Errorf("Expected cost status FINAL, got %s", result.CostStatus)
+	}
+
+	// Fetch updated menu item to verify
+	updated, _ := menuRepo.FindByID(context.Background(), menuItem.ID)
+	if updated.CurrentCost != expectedCost {
+		t.Errorf("Expected menu item cost %f, got %f", expectedCost, updated.CurrentCost)
+	}
+	if len(updated.Variants) != 0 {
+		t.Errorf("Expected 0 variants for single-size item, got %d", len(updated.Variants))
+	}
+}
+
+func TestCalculateMenuItemCost_MultiSize_WithConversionAndWastage(t *testing.T) {
+	menuRepo := &mockMenuRepository{menuItems: make(map[primitive.ObjectID]*menu.MenuItem)}
+	ingredientRepo := &mockIngredientRepository{ingredients: make(map[primitive.ObjectID]*ingredient.Ingredient)}
+	orderRepo := &mockOrderRepository{orders: make(map[primitive.ObjectID]*order.Order)}
+	orderItemRepo := &mockOrderItemRepository{orderItems: make([]*order.OrderItemWithCost, 0)}
+	service := NewCostCalculatorService(menuRepo, ingredientRepo, orderRepo, orderItemRepo)
+
+	// Create ingredient with conversion and wastage
+	ing := &ingredient.Ingredient{
+		ID:                primitive.NewObjectID(),
+		Name:              "Cà phê",
+		Unit:              ingredient.UnitKilogram, // Stock in kg
+		CostPerUnit:       500000,                  // 500,000đ per kg
+		WastagePercentage: 10.0,                    // 10% wastage
+	}
+	ingredientRepo.Create(context.Background(), ing)
+
+	// Create multi-size menu item with variants using grams
+	menuItem := &menu.MenuItem{
+		ID:          primitive.NewObjectID(),
+		Name:        "Cà phê sữa đá",
+		Category:    "Cà phê",
+		HasVariants: true,
+		Available:   true,
+		Variants: []menu.MenuItemVariant{
+			{
+				ID:        "M",
+				Name:      "Size M",
+				Price:     25000,
+				Available: true,
+				IsDefault: true,
+				Ingredients: []menu.Ingredient{
+					{Name: "Cà phê", Quantity: 20, Unit: ingredient.UnitGram}, // Recipe in grams
+				},
+			},
+		},
+	}
+	menuRepo.Create(context.Background(), menuItem)
+
+	// Calculate cost
+	_, err := service.CalculateMenuItemCost(context.Background(), menuItem.ID)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	// Verify cost calculation with conversion and wastage
+	// Cost = 20g * (500,000đ/kg) * (1kg/1000g) * (1 + 10/100)
+	// Cost = 20 * 500,000 * 0.001 * 1.1 = 11,000đ
+	expectedCost := 11000.0
+	
+	updated, _ := menuRepo.FindByID(context.Background(), menuItem.ID)
+	variantM := updated.GetVariantByID("M")
+	if variantM.CurrentCost != expectedCost {
+		t.Errorf("Expected variant M cost %f (with conversion and wastage), got %f", expectedCost, variantM.CurrentCost)
+	}
+}

@@ -162,7 +162,7 @@ describe('MenuCostView', () => {
     })
 
     it('should filter items by Coffee category', async () => {
-      await wrapper.vm.categoryFilter = 'Coffee'
+      wrapper.vm.categoryFilter = 'Coffee'
       await wrapper.vm.$nextTick()
 
       const items = wrapper.vm.filteredMenuItems
@@ -171,7 +171,7 @@ describe('MenuCostView', () => {
     })
 
     it('should filter items by Tea category', async () => {
-      await wrapper.vm.categoryFilter = 'Tea'
+      wrapper.vm.categoryFilter = 'Tea'
       await wrapper.vm.$nextTick()
 
       const items = wrapper.vm.filteredMenuItems
@@ -180,10 +180,10 @@ describe('MenuCostView', () => {
     })
 
     it('should show all items when category filter is cleared', async () => {
-      await wrapper.vm.categoryFilter = 'Coffee'
+      wrapper.vm.categoryFilter = 'Coffee'
       await wrapper.vm.$nextTick()
       
-      await wrapper.vm.categoryFilter = ''
+      wrapper.vm.categoryFilter = ''
       await wrapper.vm.$nextTick()
 
       const items = wrapper.vm.filteredMenuItems

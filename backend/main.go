@@ -43,6 +43,11 @@ func main() {
 	userRepo := mongodb.NewUserRepository(db)
 	orderRepo := mongodb.NewOrderRepository(db)
 	shiftRepo := mongodb.NewShiftRepository(db)
+	menuRepo := mongodb.NewMenuRepository(db)
+	ingredientRepo := mongodb.NewIngredientRepository(db)
+	orderItemRepo := mongodb.NewOrderItemRepository(db)
+	shopSettingsRepo := mongodb.NewShopSettingsRepository(db)
+	operatingExpenseRepo := mongodb.NewOperatingExpenseRepository(db)
 	// Cashier repositories
 	cashierShiftRepo := mongodb.NewCashierShiftRepository(db)
 	cashReconciliationRepo := mongodb.NewCashReconciliationRepository(db)
@@ -64,7 +69,7 @@ func main() {
 	jwtService := services.NewJWTService(jwtSecret)
 	authService := services.NewAuthService(userRepo, jwtService)
 	userManagementService := services.NewUserManagementService(userRepo, authService)
-	orderService := services.NewOrderService(orderRepo, shiftRepo, smManager)
+	orderService := services.NewOrderService(orderRepo, shiftRepo, menuRepo, smManager)
 	shiftService := services.NewShiftService(shiftRepo, orderRepo, smManager)
 	// Cashier services
 	cashierShiftService := services.NewCashierShiftService(cashierShiftRepo, shiftRepo, smManager)
@@ -74,13 +79,6 @@ func main() {
 	// Handover service
 	cashHandoverService := services.NewCashHandoverService(cashHandoverRepo, cashDiscrepancyRepo, shiftRepo, cashierShiftRepo, orderRepo)
 
-	// Menu cost and profit analysis repositories and services (needed by shift handler)
-	menuRepo := mongodb.NewMenuRepository(db)
-	ingredientRepo := mongodb.NewIngredientRepository(db)
-	orderItemRepo := mongodb.NewOrderItemRepository(db)
-	shopSettingsRepo := mongodb.NewShopSettingsRepository(db)
-	operatingExpenseRepo := mongodb.NewOperatingExpenseRepository(db)
-	
 	// Create monitoring service for metrics and alerts
 	monitoringService := services.NewMonitoringService()
 	
@@ -349,6 +347,11 @@ func main() {
 				manager.GET("/menu/costs", menuCostHandler.GetMenuCosts)
 				manager.GET("/menu/costs/:id", menuCostHandler.GetMenuCostDetail)
 				manager.GET("/menu/warnings", menuCostHandler.GetMenuWarnings)
+				
+				// Variant-aware cost analysis routes (Task 6.3)
+				manager.GET("/menu/:id/cost-breakdown", menuCostHandler.GetCostBreakdown)
+				manager.GET("/menu/:id/profit-analysis", menuCostHandler.GetProfitAnalysis)
+				manager.POST("/menu/:id/calculate-cost", menuCostHandler.CalculateCost)
 				
 				// Profit analysis routes
 				manager.GET("/reports/category-profit", profitAnalysisHandler.GetCategoryProfit)
