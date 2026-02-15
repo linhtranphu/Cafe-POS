@@ -35,7 +35,7 @@ func TestCompleteMultiSizeItemFlow_Integration(t *testing.T) {
 
 	// Create services
 	menuService := NewMenuService(menuRepo)
-	orderService := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager)
+	orderService := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager, nil)
 	costService := NewCostCalculatorService(menuRepo, ingredientRepo, orderRepo, orderItemRepo)
 
 	// ========================================
@@ -429,7 +429,7 @@ func TestCompleteMultiSizeItemFlow_ErrorCases(t *testing.T) {
 
 	// Create services
 	menuService := NewMenuService(menuRepo)
-	orderService := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager)
+	orderService := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager, nil)
 
 	// Create multi-size item
 	createReq := &menu.CreateMenuItemRequest{
@@ -580,7 +580,7 @@ func TestMixedOrderFlow_Integration(t *testing.T) {
 
 	// Create services
 	menuService := NewMenuService(menuRepo)
-	orderService := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager)
+	orderService := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager, nil)
 	costService := NewCostCalculatorService(menuRepo, ingredientRepo, orderRepo, orderItemRepo)
 
 	// ========================================
@@ -1091,7 +1091,7 @@ func TestTogglingBetweenModes_Integration(t *testing.T) {
 
 	// Create services
 	menuService := NewMenuService(menuRepo)
-	orderService := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager)
+	orderService := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager, nil)
 	costService := NewCostCalculatorService(menuRepo, ingredientRepo, orderRepo, orderItemRepo)
 
 	// ========================================

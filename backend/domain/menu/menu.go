@@ -16,10 +16,40 @@ const (
 	CostStatusIncomplete CostStatus = "INCOMPLETE" // Missing ingredient cost data
 )
 
+// IngredientType represents the type of ingredient in a recipe
+type IngredientType string
+
+const (
+	IngredientTypeRaw   IngredientType = "raw"   // Raw ingredient from inventory
+	IngredientTypeBatch IngredientType = "batch" // Batch ingredient (pre-prepared)
+)
+
 type Ingredient struct {
-	Name     string               `bson:"name" json:"name"`
-	Quantity float64              `bson:"quantity" json:"quantity"`
-	Unit     ingredient.UnitType  `bson:"unit" json:"unit"`
+	Name           string               `bson:"name" json:"name"`
+	Quantity       float64              `bson:"quantity" json:"quantity"`
+	Unit           ingredient.UnitType  `bson:"unit" json:"unit"`
+	
+	// Batch support - NEW
+	IngredientType string               `bson:"ingredient_type" json:"ingredient_type"` // "raw" or "batch"
+	BatchID        *primitive.ObjectID  `bson:"batch_id,omitempty" json:"batch_id,omitempty"` // Reference to batch_definition_id when type is "batch"
+}
+
+// IsRawIngredient returns true if this is a raw ingredient
+func (i *Ingredient) IsRawIngredient() bool {
+	return i.IngredientType == "" || i.IngredientType == string(IngredientTypeRaw)
+}
+
+// IsBatchIngredient returns true if this is a batch ingredient
+func (i *Ingredient) IsBatchIngredient() bool {
+	return i.IngredientType == string(IngredientTypeBatch)
+}
+
+// GetIngredientType returns the ingredient type, defaulting to raw if not set
+func (i *Ingredient) GetIngredientType() IngredientType {
+	if i.IngredientType == "" {
+		return IngredientTypeRaw
+	}
+	return IngredientType(i.IngredientType)
 }
 
 // MenuItemVariant represents a size variant of a menu item
@@ -198,6 +228,11 @@ func (m *MenuItem) Validate() error {
 			if v.Price <= 0 {
 				return fmt.Errorf("variant %s price must be > 0", v.ID)
 			}
+			
+			// Validate variant ingredients
+			if err := validateIngredients(v.Ingredients); err != nil {
+				return fmt.Errorf("variant %s: %w", v.ID, err)
+			}
 		}
 		
 		// IMPORTANT: When has_variants=true, old fields should be empty
@@ -214,11 +249,44 @@ func (m *MenuItem) Validate() error {
 			return fmt.Errorf("price must be > 0 for single-size item")
 		}
 		
+		// Validate single-size ingredients
+		if err := validateIngredients(m.Ingredients); err != nil {
+			return err
+		}
+		
 		// IMPORTANT: When has_variants=false, variants should be empty
 		if len(m.Variants) > 0 {
 			return fmt.Errorf("variants should not be set when has_variants=false")
 		}
 	}
 	
+	return nil
+}
+
+// validateIngredients validates a list of ingredients
+func validateIngredients(ingredients []Ingredient) error {
+	for i, ing := range ingredients {
+		// Validate ingredient type
+		if ing.IngredientType != "" && 
+		   ing.IngredientType != string(IngredientTypeRaw) && 
+		   ing.IngredientType != string(IngredientTypeBatch) {
+			return fmt.Errorf("ingredient %d: invalid ingredient_type '%s', must be 'raw' or 'batch'", i, ing.IngredientType)
+		}
+		
+		// If type is batch, BatchID must be set
+		if ing.IsBatchIngredient() && ing.BatchID == nil {
+			return fmt.Errorf("ingredient %d (%s): batch_id is required when ingredient_type is 'batch'", i, ing.Name)
+		}
+		
+		// If type is raw or not set, BatchID should not be set
+		if ing.IsRawIngredient() && ing.BatchID != nil {
+			return fmt.Errorf("ingredient %d (%s): batch_id should not be set when ingredient_type is 'raw'", i, ing.Name)
+		}
+		
+		// Validate quantity
+		if ing.Quantity <= 0 {
+			return fmt.Errorf("ingredient %d (%s): quantity must be > 0", i, ing.Name)
+		}
+	}
 	return nil
 }

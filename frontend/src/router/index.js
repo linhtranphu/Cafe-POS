@@ -20,6 +20,7 @@ import MenuCostView from '../views/MenuCostView.vue'
 import ProfitAnalysisView from '../views/ProfitAnalysisView.vue'
 import CostAnalysisView from '../views/CostAnalysisView.vue'
 import SettingsView from '../views/SettingsView.vue'
+import BatchManagementView from '../views/BatchManagementView.vue'
 
 const routes = [
   {
@@ -156,6 +157,60 @@ const routes = [
     path: '/settings',
     name: 'Settings',
     component: SettingsView,
+    meta: { requiresAuth: true, requiresManager: true }
+  },
+  {
+    path: '/batch',
+    name: 'BatchManagement',
+    component: BatchManagementView,
+    meta: { requiresAuth: true, requiresManager: true }
+  },
+  {
+    path: '/batch/definitions',
+    name: 'BatchDefinitions',
+    component: () => import('../views/BatchDefinitionsView.vue'),
+    meta: { requiresAuth: true, requiresManager: true }
+  },
+  {
+    path: '/batch/definitions/create',
+    name: 'BatchDefinitionCreate',
+    component: () => import('../views/BatchDefinitionFormView.vue'),
+    meta: { requiresAuth: true, requiresManager: true }
+  },
+  {
+    path: '/batch/definitions/:id',
+    name: 'BatchDefinitionEdit',
+    component: () => import('../views/BatchDefinitionFormView.vue'),
+    meta: { requiresAuth: true, requiresManager: true }
+  },
+  {
+    path: '/batch/records',
+    name: 'BatchRecords',
+    component: () => import('../views/BatchRecordsView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/batch/records/create',
+    name: 'BatchRecordCreate',
+    component: () => import('../views/BatchRecordFormView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/batch/records/:id',
+    name: 'BatchRecordDetail',
+    component: () => import('../views/BatchRecordDetailView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/batch/alerts',
+    name: 'BatchAlerts',
+    component: () => import('../views/BatchAlertsView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/batch/reports',
+    name: 'BatchReports',
+    component: () => import('../views/BatchReportsView.vue'),
     meta: { requiresAuth: true, requiresManager: true }
   }
 ]

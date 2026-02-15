@@ -14,6 +14,7 @@ type OrderRepository interface {
 	Create(ctx context.Context, o *order.Order) error
 	FindByID(ctx context.Context, id primitive.ObjectID) (*order.Order, error)
 	Update(ctx context.Context, id primitive.ObjectID, o *order.Order) error
+	Delete(ctx context.Context, id primitive.ObjectID) error
 	FindByShiftID(ctx context.Context, shiftID primitive.ObjectID) ([]*order.Order, error)
 	FindByWaiterID(ctx context.Context, waiterID primitive.ObjectID) ([]*order.Order, error)
 	FindByStatus(ctx context.Context, status order.OrderStatus) ([]*order.Order, error)
@@ -26,6 +27,7 @@ type OrderService struct {
 	shiftRepo           ShiftRepository
 	menuRepo            MenuRepository
 	stateMachineManager *domain.StateMachineManager
+	batchUsageService   *BatchUsageService
 }
 
 func NewOrderService(
@@ -33,12 +35,14 @@ func NewOrderService(
 	shiftRepo ShiftRepository,
 	menuRepo MenuRepository,
 	stateMachineManager *domain.StateMachineManager,
+	batchUsageService *BatchUsageService,
 ) *OrderService {
 	return &OrderService{
 		orderRepo:           orderRepo,
 		shiftRepo:           shiftRepo,
 		menuRepo:            menuRepo,
 		stateMachineManager: stateMachineManager,
+		batchUsageService:   batchUsageService,
 	}
 }
 
@@ -126,8 +130,33 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *order.CreateOrderRe
 
 	o.CalculateTotal()
 	
+	// Create order first
 	if err := s.orderRepo.Create(ctx, o); err != nil {
 		return nil, err
+	}
+
+	// Deduct batch ingredients after order is created
+	// This happens after order creation so we have an order ID for logging
+	if s.batchUsageService != nil {
+		batchCost, err := s.deductBatchIngredients(ctx, o)
+		if err != nil {
+			// Rollback: restore batch quantities and delete the order
+			_ = s.batchUsageService.RollbackBatchUsage(ctx, o.ID)
+			_ = s.orderRepo.Delete(ctx, o.ID)
+			return nil, fmt.Errorf("failed to deduct batch ingredients: %w", err)
+		}
+		
+		// Store batch cost information in order note for tracking
+		// In a production system, you might want to add a dedicated field for this
+		if batchCost > 0 {
+			if o.Note != "" {
+				o.Note += fmt.Sprintf(" [Batch Cost: %.2f VND]", batchCost)
+			} else {
+				o.Note = fmt.Sprintf("[Batch Cost: %.2f VND]", batchCost)
+			}
+			// Update order with batch cost info
+			_ = s.orderRepo.Update(ctx, o.ID, o)
+		}
 	}
 
 	return o, nil
@@ -532,4 +561,60 @@ func (s *OrderService) GetAllOrders(ctx context.Context) ([]*order.Order, error)
 
 func (s *OrderService) GetOrder(ctx context.Context, id primitive.ObjectID) (*order.Order, error) {
 	return s.orderRepo.FindByID(ctx, id)
+}
+
+// deductBatchIngredients deducts batch ingredients for all items in an order
+// Returns the total batch cost used
+func (s *OrderService) deductBatchIngredients(ctx context.Context, o *order.Order) (float64, error) {
+	totalBatchCost := 0.0
+	
+	for _, item := range o.Items {
+		// Get menu item to check ingredients
+		menuItem, err := s.menuRepo.FindByID(ctx, item.MenuItemID)
+		if err != nil {
+			return 0, fmt.Errorf("failed to fetch menu item %s: %w", item.MenuItemID.Hex(), err)
+		}
+
+		// Get ingredients for this item (considering variants)
+		ingredients := menuItem.GetIngredients(item.VariantID)
+
+		// Process each ingredient
+		for _, ing := range ingredients {
+			// Only process batch ingredients
+			if !ing.IsBatchIngredient() {
+				continue
+			}
+
+			// Skip if no batch ID
+			if ing.BatchID == nil {
+				continue
+			}
+
+			// Calculate total quantity needed (ingredient quantity * order item quantity)
+			quantityNeeded := ing.Quantity * float64(item.Quantity)
+
+			// Deduct batch using BatchUsageService
+			req := UseBatchRequest{
+				BatchDefinitionID: *ing.BatchID,
+				QuantityNeeded:    quantityNeeded,
+				OrderID:           o.ID,
+				MenuItemID:        item.MenuItemID,
+				MenuItemName:      item.Name,
+			}
+
+			result, err := s.batchUsageService.UseBatch(ctx, req)
+			if err != nil {
+				return 0, fmt.Errorf("failed to use batch for ingredient %s: %w", ing.Name, err)
+			}
+
+			if !result.Success {
+				return 0, fmt.Errorf("insufficient batch %s: %s", ing.Name, result.Message)
+			}
+			
+			// Accumulate batch cost
+			totalBatchCost += result.TotalCost
+		}
+	}
+
+	return totalBatchCost, nil
 }

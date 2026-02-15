@@ -105,6 +105,12 @@
               <div class="font-bold text-base">Nguyên liệu</div>
               <div class="text-xs opacity-80 mt-1">Kho & giá vốn</div>
             </button>
+            <button @click="$router.push('/batch')" 
+              class="bg-gradient-to-br from-purple-500 to-indigo-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+              <div class="text-4xl mb-2">🧪</div>
+              <div class="font-bold text-base">Batch</div>
+              <div class="text-xs opacity-80 mt-1">Nguyên liệu chế biến</div>
+            </button>
           </div>
         </div>
 

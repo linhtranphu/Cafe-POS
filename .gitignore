@@ -4,6 +4,9 @@
 .env.production
 .env.*.local
 
+# MongoDB Replica Set keyfile - NEVER COMMIT
+mongodb-keyfile
+
 # Logs
 *.log
 npm-debug.log*

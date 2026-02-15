@@ -295,7 +295,77 @@
                 <div v-else class="space-y-3">
                   <div v-for="(ing, index) in form.ingredients" :key="index"
                     class="bg-gray-50 rounded-lg p-3 border-2 border-gray-200">
-                    <!-- Ingredient details here - keep existing structure -->
+                    
+                    <!-- Ingredient Header - Compact -->
+                    <div class="flex justify-between items-start mb-2">
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                          <div class="font-bold text-sm text-gray-800 truncate">{{ ing.name || 'Không có tên' }}</div>
+                          <span v-if="ing.type === 'batch'" class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full flex-shrink-0">
+                            🧪 Batch
+                          </span>
+                        </div>
+                        <div class="text-xs text-gray-500">
+                          <span v-if="ing.type === 'batch'">
+                            Batch @ {{ formatPrice(ing.costPerUnit || 0) }}/{{ ing.unit }}
+                          </span>
+                          <span v-else>
+                            Kho: {{ ing.stockUnit || ing.unit }} @ {{ formatPrice(ing.costPerUnit || 0) }}/{{ ing.stockUnit || ing.unit }}
+                          </span>
+                        </div>
+                      </div>
+                      <button type="button" @click="removeIngredient(index)"
+                        class="ml-2 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold active:scale-95">
+                        ×
+                      </button>
+                    </div>
+
+                    <!-- Recipe Unit & Quantity - Inline -->
+                    <div class="grid grid-cols-2 gap-2 mb-2">
+                      <div>
+                        <label class="text-xs text-gray-600 block mb-1">Đơn vị:</label>
+                        <select v-model="ing.unit" @change="updateRecipeUnit(index)"
+                          class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg">
+                          <option v-for="unit in ing.compatibleUnits" :key="unit" :value="unit">
+                            {{ unit }}
+                          </option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="text-xs text-gray-600 block mb-1">Số lượng:</label>
+                        <input v-model.number="ing.quantity" 
+                          @input="updateIngredientCost(index)"
+                          type="number" min="0" step="0.1" placeholder="0" required
+                          class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg" />
+                      </div>
+                    </div>
+                    
+                    <!-- Conversion Info -->
+                    <div v-if="ing.conversionRate !== 1" 
+                      class="mb-2 p-2 bg-blue-50 rounded text-xs text-blue-700">
+                      <span class="font-bold">ℹ️</span> {{ getConversionExplanation(ing.stockUnit, ing.unit) }}
+                    </div>
+                    
+                    <!-- Cost Preview - Compact -->
+                    <div v-if="ing.costPerUnit > 0" class="p-2 bg-green-50 rounded-lg border border-green-200">
+                      <div class="flex justify-between items-center">
+                        <span class="text-xs text-green-700 font-bold">Chi phí:</span>
+                        <span class="text-sm font-bold text-green-700">
+                          {{ formatPrice(ing.estimatedCost) }}
+                        </span>
+                      </div>
+                      <div v-if="ing.wastage > 0" class="text-xs text-green-600 mt-1">
+                        (+ {{ ing.wastage }}% hao hụt)
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Total Cost Summary -->
+                  <div v-if="totalIngredientCost > 0" class="bg-gradient-to-r from-yellow-500 to-orange-500 rounded-xl p-4 text-white shadow-lg">
+                    <div class="flex justify-between items-center">
+                      <span class="text-sm font-bold">💰 Tổng chi phí nguyên liệu:</span>
+                      <span class="text-xl font-bold">{{ formatPrice(totalIngredientCost) }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -408,9 +478,19 @@
                           <!-- Ingredient Header - Compact -->
                           <div class="flex justify-between items-start mb-2">
                             <div class="flex-1 min-w-0">
-                              <div class="font-bold text-sm text-gray-800 truncate">{{ ing.name }}</div>
+                              <div class="flex items-center gap-2">
+                                <div class="font-bold text-sm text-gray-800 truncate">{{ ing.name || 'Không có tên' }}</div>
+                                <span v-if="ing.type === 'batch'" class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full flex-shrink-0">
+                                  🧪 Batch
+                                </span>
+                              </div>
                               <div class="text-xs text-gray-500">
-                                Kho: {{ ing.stockUnit }} @ {{ formatPrice(ing.costPerUnit) }}/{{ ing.stockUnit }}
+                                <span v-if="ing.type === 'batch'">
+                                  Batch @ {{ formatPrice(ing.costPerUnit || 0) }}/{{ ing.unit }}
+                                </span>
+                                <span v-else>
+                                  Kho: {{ ing.stockUnit || ing.unit }} @ {{ formatPrice(ing.costPerUnit || 0) }}/{{ ing.stockUnit || ing.unit }}
+                                </span>
                               </div>
                             </div>
                             <button type="button" @click="removeVariantIngredient(vIndex, iIndex)"
@@ -486,14 +566,42 @@
       </div>
     </transition>
 
-    <!-- Ingredient Selector Modal -->
+    <!-- Ingredient/Batch Selector Modal -->
     <transition name="slide-up">
       <div v-if="showIngredientSelector" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
         <div class="bg-white rounded-t-3xl w-full h-[85vh] flex flex-col">
           <!-- Fixed Header -->
-          <div class="flex-shrink-0 bg-white px-4 py-4 border-b flex justify-between items-center rounded-t-3xl">
-            <h3 class="text-lg font-bold">🥬 Chọn nguyên liệu</h3>
-            <button @click="showIngredientSelector = false" class="text-2xl text-gray-400">×</button>
+          <div class="flex-shrink-0 bg-white px-4 py-4 border-b rounded-t-3xl">
+            <div class="flex justify-between items-center mb-3">
+              <h3 class="text-lg font-bold">{{ ingredientType === 'raw' ? '🥬 Chọn nguyên liệu' : '🧪 Chọn Batch' }}</h3>
+              <button @click="showIngredientSelector = false" class="text-2xl text-gray-400">×</button>
+            </div>
+            
+            <!-- Type Toggle -->
+            <div class="flex gap-2 bg-gray-100 p-1 rounded-lg">
+              <button
+                @click="ingredientType = 'raw'"
+                :class="[
+                  'flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors',
+                  ingredientType === 'raw' 
+                    ? 'bg-white text-blue-600 shadow-sm' 
+                    : 'text-gray-600'
+                ]"
+              >
+                🥬 Nguyên liệu thô
+              </button>
+              <button
+                @click="ingredientType = 'batch'"
+                :class="[
+                  'flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors',
+                  ingredientType === 'batch' 
+                    ? 'bg-white text-purple-600 shadow-sm' 
+                    : 'text-gray-600'
+                ]"
+              >
+                🧪 Batch
+              </button>
+            </div>
           </div>
           
           <!-- Search -->
@@ -501,43 +609,88 @@
             <input
               v-model="ingredientSearchQuery"
               type="text"
-              placeholder="Tìm kiếm nguyên liệu..."
+              :placeholder="ingredientType === 'raw' ? 'Tìm kiếm nguyên liệu...' : 'Tìm kiếm batch...'"
               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
           </div>
           
           <!-- Scrollable Content -->
           <div class="flex-1 overflow-y-auto px-4 py-4">
-            <div v-if="ingredientsLoading" class="text-center py-8">
-              <div class="text-4xl mb-2">⏳</div>
-              <p class="text-gray-500">Đang tải...</p>
-            </div>
-            
-            <div v-else-if="filteredAvailableIngredients.length === 0" class="text-center py-8">
-              <div class="text-4xl mb-2">📭</div>
-              <p class="text-gray-500">Không có nguyên liệu nào</p>
-            </div>
-            
-            <div v-else class="space-y-2">
-              <button
-                v-for="ingredient in filteredAvailableIngredients"
-                :key="ingredient.id"
-                @click="selectIngredient(ingredient)"
-                :disabled="isIngredientSelected(ingredient.id)"
-                class="w-full bg-white border border-gray-200 rounded-xl p-4 text-left hover:border-blue-500 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <div class="flex items-center justify-between">
-                  <div class="flex-1">
-                    <div class="font-medium text-gray-800">{{ ingredient.name }}</div>
-                    <div class="text-sm text-gray-500">{{ ingredient.category }}</div>
-                    <div class="text-xs text-gray-400 mt-1">
-                      Tồn kho: {{ ingredient.current_stock }} {{ ingredient.unit }}
+            <!-- Raw Ingredients List -->
+            <div v-if="ingredientType === 'raw'">
+              <div v-if="ingredientsLoading" class="text-center py-8">
+                <div class="text-4xl mb-2">⏳</div>
+                <p class="text-gray-500">Đang tải...</p>
+              </div>
+              
+              <div v-else-if="filteredAvailableIngredients.length === 0" class="text-center py-8">
+                <div class="text-4xl mb-2">📭</div>
+                <p class="text-gray-500">Không có nguyên liệu nào</p>
+              </div>
+              
+              <div v-else class="space-y-2">
+                <button
+                  v-for="ingredient in filteredAvailableIngredients"
+                  :key="ingredient.id"
+                  @click="selectIngredient(ingredient)"
+                  :disabled="isIngredientSelected(ingredient.id)"
+                  class="w-full bg-white border border-gray-200 rounded-xl p-4 text-left hover:border-blue-500 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                      <div class="font-medium text-gray-800">{{ ingredient.name }}</div>
+                      <div class="text-sm text-gray-500">{{ ingredient.category }}</div>
+                      <div class="text-xs text-gray-400 mt-1">
+                        Tồn kho: {{ ingredient.current_stock }} {{ ingredient.unit }}
+                      </div>
                     </div>
+                    <div v-if="isIngredientSelected(ingredient.id)" class="text-green-500 text-xl">✓</div>
+                    <div v-else class="text-blue-500 text-xl">+</div>
                   </div>
-                  <div v-if="isIngredientSelected(ingredient.id)" class="text-green-500 text-xl">✓</div>
-                  <div v-else class="text-blue-500 text-xl">+</div>
-                </div>
-              </button>
+                </button>
+              </div>
+            </div>
+
+            <!-- Batch List -->
+            <div v-else>
+              <div v-if="batchesLoading" class="text-center py-8">
+                <div class="text-4xl mb-2">⏳</div>
+                <p class="text-gray-500">Đang tải...</p>
+              </div>
+              
+              <div v-else-if="filteredAvailableBatches.length === 0" class="text-center py-8">
+                <div class="text-4xl mb-2">📭</div>
+                <p class="text-gray-500">Không có batch nào</p>
+              </div>
+              
+              <div v-else class="space-y-2">
+                <button
+                  v-for="batch in filteredAvailableBatches"
+                  :key="batch.id"
+                  @click="selectBatch(batch)"
+                  :disabled="isBatchSelected(batch.id)"
+                  class="w-full bg-white border border-gray-200 rounded-xl p-4 text-left hover:border-purple-500 hover:bg-purple-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                      <div class="flex items-center gap-2">
+                        <div class="font-medium text-gray-800">{{ batch.name }}</div>
+                        <span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+                          Batch
+                        </span>
+                      </div>
+                      <div class="text-sm text-gray-500 mt-1">
+                        Đơn vị: {{ batch.unit }}
+                      </div>
+                      <div class="text-xs text-gray-400 mt-1">
+                        Thời hạn: {{ batch.shelf_life_hours }} giờ
+                      </div>
+                    </div>
+                    <div v-if="isBatchSelected(batch.id)" class="text-green-500 text-xl">✓</div>
+                    <div v-else class="text-purple-500 text-xl">+</div>
+                  </div>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -550,6 +703,8 @@
 import { ref, onMounted, computed } from 'vue'
 import { useMenuStore } from '../stores/menu'
 import { useIngredientStore } from '../stores/ingredient'
+import { useBatchDefinitionStore } from '../stores/batchDefinition'
+import { useBatchRecordStore } from '../stores/batchRecord'
 import { useUnitConversion } from '../composables/useUnitConversion'
 import { menuCategoryService } from '../services/menuCategory'
 import BottomNav from '../components/BottomNav.vue'
@@ -558,6 +713,8 @@ import { usePullToRefresh } from '../composables/usePullToRefresh'
 
 const menuStore = useMenuStore()
 const ingredientStore = useIngredientStore()
+const batchDefinitionStore = useBatchDefinitionStore()
+const batchRecordStore = useBatchRecordStore()
 
 // Unit conversion composable
 const { 
@@ -573,6 +730,7 @@ const showMenuForm = ref(false)
 const showCategoryModal = ref(false)
 const showIngredientSelector = ref(false)
 const ingredientSearchQuery = ref('')
+const ingredientType = ref('raw') // 'raw' or 'batch'
 const editingItem = ref(null)
 const form = ref({
   name: '',
@@ -601,6 +759,26 @@ const error = computed(() => menuStore.error)
 // Ingredients
 const availableIngredients = computed(() => ingredientStore.items)
 const ingredientsLoading = computed(() => ingredientStore.loading)
+
+// Batches
+const availableBatchDefinitions = computed(() => batchDefinitionStore.definitions)
+const availableBatchRecords = computed(() => batchRecordStore.records)
+const batchesLoading = computed(() => batchDefinitionStore.loading || batchRecordStore.loading)
+
+// Filter available batches based on search and already selected
+const filteredAvailableBatches = computed(() => {
+  // Use batch definitions instead of batch records
+  let filtered = availableBatchDefinitions.value || []
+  
+  if (ingredientSearchQuery.value) {
+    const query = ingredientSearchQuery.value.toLowerCase()
+    filtered = filtered.filter(batch => 
+      batch.name?.toLowerCase().includes(query)
+    )
+  }
+  
+  return filtered
+})
 
 // Menu categories from API
 const menuCategories = ref([])
@@ -698,7 +876,9 @@ const refreshData = async () => {
   await Promise.all([
     menuStore.fetchMenuItems(),
     fetchCategories(),
-    ingredientStore.fetchIngredients()
+    ingredientStore.fetchIngredients(),
+    batchDefinitionStore.fetchDefinitions(),
+    batchRecordStore.fetchRecords()
   ])
 }
 
@@ -964,7 +1144,7 @@ const selectIngredient = (ingredient) => {
     const variant = form.value.variants[currentVariantIndex.value]
     
     // Check if already selected for this variant
-    if (variant.ingredients.some(ing => ing.id === ingredient.id)) {
+    if (variant.ingredients.some(ing => ing.id === ingredient.id && ing.type === 'raw')) {
       return
     }
     
@@ -976,6 +1156,7 @@ const selectIngredient = (ingredient) => {
     // Add ingredient to variant
     variant.ingredients.push({
       id: ingredient.id,
+      type: 'raw', // Mark as raw ingredient
       name: ingredient.name,
       quantity: 1,
       unit: recipeUnit,
@@ -995,6 +1176,7 @@ const selectIngredient = (ingredient) => {
     currentVariantIndex.value = null
     showIngredientSelector.value = false
     ingredientSearchQuery.value = ''
+    ingredientType.value = 'raw'
   } else {
     // Adding to single-size item (existing logic)
     if (isIngredientSelected(ingredient.id)) {
@@ -1007,6 +1189,7 @@ const selectIngredient = (ingredient) => {
     
     form.value.ingredients.push({
       id: ingredient.id,
+      type: 'raw', // Mark as raw ingredient
       name: ingredient.name,
       quantity: 1,
       unit: recipeUnit,
@@ -1021,6 +1204,120 @@ const selectIngredient = (ingredient) => {
     updateIngredientCost(form.value.ingredients.length - 1)
     showIngredientSelector.value = false
     ingredientSearchQuery.value = ''
+    ingredientType.value = 'raw'
+  }
+}
+
+// Calculate batch cost per unit based on conversion rates
+const calculateBatchCostPerUnit = (batch) => {
+  if (!batch.conversion_rates || !Array.isArray(batch.conversion_rates) || batch.conversion_rates.length === 0) {
+    console.warn('⚠️ No conversion_rates found for batch:', batch.name)
+    return 0
+  }
+  
+  let totalCost = 0
+  
+  // Sum up costs from all source ingredients
+  for (const conversionRate of batch.conversion_rates) {
+    // Find the source ingredient
+    const ingredientId = conversionRate.source_ingredient_id || conversionRate.ingredient_id
+    const sourceIngredient = availableIngredients.value.find(ing => ing.id === ingredientId)
+    
+    if (!sourceIngredient) {
+      console.warn(`❌ Source ingredient not found: ${ingredientId}`)
+      continue
+    }
+    
+    // Calculate cost for this ingredient
+    const sourceQuantity = conversionRate.source_quantity || 0
+    const sourceUnit = conversionRate.source_unit || sourceIngredient.unit
+    const ingredientStockUnit = sourceIngredient.unit
+    const wastageRate = conversionRate.wastage_rate || 0 // Already in decimal format (0.1 = 10%)
+    const costPerUnit = sourceIngredient.cost_per_unit || 0
+    
+    // Convert source_quantity from sourceUnit to ingredient stock unit
+    // Example: 200g → 0.2kg
+    const unitConversionRate = getConversionRate(sourceUnit, ingredientStockUnit)
+    const quantityInStockUnit = sourceQuantity * unitConversionRate
+    
+    // Calculate: (quantity_in_stock_unit * (1 + wastage_rate)) * cost_per_unit
+    const ingredientCost = quantityInStockUnit * (1 + wastageRate) * costPerUnit
+    
+    totalCost += ingredientCost
+  }
+  
+  // Divide by batch quantity to get cost per batch output unit
+  const batchQuantity = batch.conversion_rates[0]?.batch_quantity || batch.batch_quantity || 1
+  const costPerBatchUnit = totalCost / batchQuantity
+  
+  return costPerBatchUnit
+}
+
+const selectBatch = (batch) => {
+  // batch is now a batch definition, not a batch record
+  // Calculate cost per unit for this batch
+  const batchCostPerUnit = calculateBatchCostPerUnit(batch)
+  
+  // Check if selecting for variant or single-size
+  if (currentVariantIndex.value !== null) {
+    // Adding to variant
+    const variant = form.value.variants[currentVariantIndex.value]
+    
+    // Check if already selected for this variant
+    if (variant.ingredients.some(ing => ing.id === batch.id && ing.type === 'batch')) {
+      return
+    }
+    
+    // Add batch definition to variant
+    variant.ingredients.push({
+      id: batch.id,
+      batch_definition_id: batch.id,
+      type: 'batch', // Mark as batch
+      name: batch.name,
+      quantity: 1,
+      unit: batch.unit,
+      stockUnit: batch.unit,
+      compatibleUnits: [batch.unit], // Batches typically use single unit
+      costPerUnit: batchCostPerUnit, // Calculated cost per unit
+      wastage: 0, // Batches don't have wastage
+      conversionRate: 1,
+      estimatedCost: batchCostPerUnit // Initial cost for quantity 1
+    })
+    
+    // Calculate initial cost
+    const ingIndex = variant.ingredients.length - 1
+    updateVariantIngredientCost(currentVariantIndex.value, ingIndex)
+    
+    // Reset and close
+    currentVariantIndex.value = null
+    showIngredientSelector.value = false
+    ingredientSearchQuery.value = ''
+    ingredientType.value = 'raw'
+  } else {
+    // Adding to single-size item
+    if (isBatchSelected(batch.id)) {
+      return
+    }
+    
+    form.value.ingredients.push({
+      id: batch.id,
+      batch_definition_id: batch.id,
+      type: 'batch', // Mark as batch
+      name: batch.name,
+      quantity: 1,
+      unit: batch.unit,
+      stockUnit: batch.unit,
+      compatibleUnits: [batch.unit],
+      costPerUnit: batchCostPerUnit, // Calculated cost per unit
+      wastage: 0,
+      conversionRate: 1,
+      estimatedCost: batchCostPerUnit // Initial cost for quantity 1
+    })
+    
+    updateIngredientCost(form.value.ingredients.length - 1)
+    showIngredientSelector.value = false
+    ingredientSearchQuery.value = ''
+    ingredientType.value = 'raw'
   }
 }
 
@@ -1066,10 +1363,32 @@ const isIngredientSelected = (ingredientId) => {
   // If selecting for a variant, check that variant's ingredients
   if (currentVariantIndex.value !== null) {
     const variant = form.value.variants[currentVariantIndex.value]
-    return variant.ingredients.some(ing => ing.id === ingredientId)
+    return variant.ingredients.some(ing => ing.id === ingredientId && ing.type === 'raw')
   }
   // Otherwise check single-size ingredients
-  return form.value.ingredients.some(ing => ing.id === ingredientId)
+  return form.value.ingredients.some(ing => ing.id === ingredientId && ing.type === 'raw')
+}
+
+const isBatchSelected = (batchId) => {
+  // If selecting for a variant, check that variant's ingredients
+  if (currentVariantIndex.value !== null) {
+    const variant = form.value.variants[currentVariantIndex.value]
+    return variant.ingredients.some(ing => ing.id === batchId && ing.type === 'batch')
+  }
+  // Otherwise check single-size ingredients
+  return form.value.ingredients.some(ing => ing.id === batchId && ing.type === 'batch')
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return date.toLocaleDateString('vi-VN', { 
+    day: '2-digit', 
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
 }
 
 // Update conversion rate when recipe unit changes

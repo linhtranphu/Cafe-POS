@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Script to create batch collections and indexes in MongoDB
+# This script creates:
+# - batch_definitions collection
+# - batch_records collection
+# - batch_usage_logs collection
+# And their respective indexes
+
+echo "🚀 Creating batch collections and indexes..."
+echo ""
+
+# Run the migration
+go run cmd/migrate/create_batch_collections.go
+
+if [ $? -eq 0 ]; then
+    echo ""
+    echo "✅ Batch collections created successfully!"
+else
+    echo ""
+    echo "❌ Failed to create batch collections"
+    exit 1
+fi

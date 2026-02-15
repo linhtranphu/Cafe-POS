@@ -477,6 +477,11 @@ func (m *mockOrderRepository) FindByOrderNumber(ctx context.Context, orderNumber
 	return nil, primitive.ErrInvalidHex
 }
 
+func (m *mockOrderRepository) Delete(ctx context.Context, id primitive.ObjectID) error {
+	delete(m.orders, id)
+	return nil
+}
+
 type mockOrderItemRepository struct {
 	orderItems []*order.OrderItemWithCost
 }

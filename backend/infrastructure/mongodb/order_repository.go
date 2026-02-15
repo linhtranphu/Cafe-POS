@@ -114,3 +114,8 @@ func (r *OrderRepository) FindByOrderNumber(ctx context.Context, orderNumber str
 	}
 	return &o, nil
 }
+
+func (r *OrderRepository) Delete(ctx context.Context, id primitive.ObjectID) error {
+	_, err := r.collection.DeleteOne(ctx, bson.M{"_id": id})
+	return err
+}

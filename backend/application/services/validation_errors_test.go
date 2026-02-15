@@ -161,7 +161,7 @@ func TestValidationError_OrderMultiSize_MissingVariantID(t *testing.T) {
 	menuRepo := newMockMenuRepositoryForVariants()
 	smManager := domain.NewStateMachineManager()
 
-	service := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager)
+	service := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager, nil)
 	ctx := context.Background()
 
 	// Create open shift
@@ -230,7 +230,7 @@ func TestValidationError_OrderMultiSize_InvalidVariantID(t *testing.T) {
 	menuRepo := newMockMenuRepositoryForVariants()
 	smManager := domain.NewStateMachineManager()
 
-	service := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager)
+	service := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager, nil)
 	ctx := context.Background()
 
 	// Create open shift
@@ -497,7 +497,7 @@ func TestValidationError_OrderMultiSize_UnavailableVariant(t *testing.T) {
 	menuRepo := newMockMenuRepositoryForVariants()
 	smManager := domain.NewStateMachineManager()
 
-	service := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager)
+	service := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager, nil)
 	ctx := context.Background()
 
 	// Create open shift

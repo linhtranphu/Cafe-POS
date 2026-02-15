@@ -77,6 +77,11 @@ func (m *mockOrderRepositoryForVariants) FindAll(ctx context.Context) ([]*order.
 	return nil, nil
 }
 
+func (m *mockOrderRepositoryForVariants) Delete(ctx context.Context, id primitive.ObjectID) error {
+	delete(m.orders, id)
+	return nil
+}
+
 type mockShiftRepositoryForVariants struct {
 	shifts map[primitive.ObjectID]*order.Shift
 }
@@ -209,7 +214,7 @@ func TestCreateOrder_SingleSize(t *testing.T) {
 	menuRepo := newMockMenuRepositoryForVariants()
 	smManager := domain.NewStateMachineManager()
 	
-	service := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager)
+	service := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager, nil)
 	ctx := context.Background()
 
 	// Create open shift
@@ -281,7 +286,7 @@ func TestCreateOrder_MultiSize_WithVariantID(t *testing.T) {
 	menuRepo := newMockMenuRepositoryForVariants()
 	smManager := domain.NewStateMachineManager()
 	
-	service := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager)
+	service := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager, nil)
 	ctx := context.Background()
 
 	// Create open shift
@@ -367,7 +372,7 @@ func TestCreateOrder_MultiSize_MissingVariantID(t *testing.T) {
 	menuRepo := newMockMenuRepositoryForVariants()
 	smManager := domain.NewStateMachineManager()
 	
-	service := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager)
+	service := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager, nil)
 	ctx := context.Background()
 
 	// Create open shift
@@ -416,7 +421,7 @@ func TestCreateOrder_MultiSize_InvalidVariantID(t *testing.T) {
 	menuRepo := newMockMenuRepositoryForVariants()
 	smManager := domain.NewStateMachineManager()
 	
-	service := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager)
+	service := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager, nil)
 	ctx := context.Background()
 
 	// Create open shift
@@ -468,7 +473,7 @@ func TestCreateOrder_MixedSingleAndMultiSize(t *testing.T) {
 	menuRepo := newMockMenuRepositoryForVariants()
 	smManager := domain.NewStateMachineManager()
 	
-	service := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager)
+	service := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager, nil)
 	ctx := context.Background()
 
 	// Create open shift
@@ -572,7 +577,7 @@ func TestEditOrder_WithVariants(t *testing.T) {
 	menuRepo := newMockMenuRepositoryForVariants()
 	smManager := domain.NewStateMachineManager()
 	
-	service := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager)
+	service := NewOrderService(orderRepo, shiftRepo, menuRepo, smManager, nil)
 	ctx := context.Background()
 
 	// Create open shift

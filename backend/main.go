@@ -56,6 +56,12 @@ func main() {
 	// Handover repositories
 	cashHandoverRepo := mongodb.NewCashHandoverRepository(db)
 	cashDiscrepancyRepo := mongodb.NewCashDiscrepancyRepository(db)
+	// Batch repositories
+	batchDefinitionRepo := mongodb.NewBatchDefinitionRepository(db)
+	batchRecordRepo := mongodb.NewBatchRecordRepository(db)
+	batchUsageLogRepo := mongodb.NewBatchUsageLogRepository(db)
+	// Stock history repository (needed for batch services)
+	stockHistoryRepo := mongodb.NewStockHistoryRepository(db)
 
 	// State Machine Manager
 	smManager := domain.NewStateMachineManager()
@@ -69,7 +75,15 @@ func main() {
 	jwtService := services.NewJWTService(jwtSecret)
 	authService := services.NewAuthService(userRepo, jwtService)
 	userManagementService := services.NewUserManagementService(userRepo, authService)
-	orderService := services.NewOrderService(orderRepo, shiftRepo, menuRepo, smManager)
+	// Batch services - initialize before OrderService
+	batchCostCalculator := services.NewBatchCostCalculator(ingredientRepo)
+	batchDefinitionService := services.NewBatchDefinitionService(batchDefinitionRepo, ingredientRepo)
+	batchRecordService := services.NewBatchRecordService(batchRecordRepo, batchDefinitionRepo, ingredientRepo, stockHistoryRepo, userRepo, batchCostCalculator, client)
+	batchUsageService := services.NewBatchUsageService(batchRecordRepo, batchUsageLogRepo)
+	batchAlertService := services.NewBatchAlertService(batchDefinitionRepo, batchRecordRepo)
+	batchReportService := services.NewBatchReportService(batchRecordRepo, batchUsageLogRepo, batchDefinitionRepo)
+	// OrderService now includes batchUsageService
+	orderService := services.NewOrderService(orderRepo, shiftRepo, menuRepo, smManager, batchUsageService)
 	shiftService := services.NewShiftService(shiftRepo, orderRepo, smManager)
 	// Cashier services
 	cashierShiftService := services.NewCashierShiftService(cashierShiftRepo, shiftRepo, smManager)
@@ -117,6 +131,12 @@ func main() {
 	cashierHandler := http.NewCashierHandler(cashReconciliationService, paymentOversightService, cashierReportService)
 	// Handover handler
 	cashHandoverHandler := http.NewCashHandoverHandler(cashHandoverService)
+	// Batch handlers
+	batchDefinitionHandler := http.NewBatchDefinitionHandler(batchDefinitionService)
+	batchRecordHandler := http.NewBatchRecordHandler(batchRecordService)
+	batchUsageHandler := http.NewBatchUsageHandler(batchUsageService)
+	batchAlertHandler := http.NewBatchAlertHandler(batchAlertService)
+	batchReportHandler := http.NewBatchReportHandler(batchReportService)
 	// State machine handler
 	stateMachineHandler := http.NewStateMachineHandler(smManager)
 	menuService := services.NewMenuService(menuRepo)
@@ -127,7 +147,7 @@ func main() {
 	menuCategoryService := services.NewMenuCategoryService(menuCategoryRepo, menuRepo)
 	menuCategoryHandler := http.NewMenuCategoryHandler(menuCategoryService)
 	
-	stockHistoryRepo := mongodb.NewStockHistoryRepository(db)
+	// Ingredient service (stockHistoryRepo already initialized above)
 	ingredientService := services.NewIngredientService(ingredientRepo, stockHistoryRepo)
 	ingredientHandler := http.NewIngredientHandler(ingredientService)
 	facilityRepo := mongodb.NewFacilityRepository(db)
@@ -247,6 +267,41 @@ func main() {
 			cashierShiftsManager.Use(http.RequireRole(user.RoleManager))
 			{
 				cashierShiftsManager.GET("", cashierShiftHandler.GetAllCashierShifts)
+			}
+			
+			// Batch record routes (barista and manager)
+			batchRecords := protected.Group("/batch-records")
+			batchRecords.Use(http.RequireRole(user.RoleBarista, user.RoleManager))
+			{
+				batchRecords.POST("", batchRecordHandler.CreateBatchRecord)
+				batchRecords.GET("", batchRecordHandler.GetBatchRecords)
+				batchRecords.GET("/:id", batchRecordHandler.GetBatchRecord)
+				batchRecords.PATCH("/:id/quantity", batchRecordHandler.UpdateBatchQuantity)
+				batchRecords.PATCH("/:id/expire", batchRecordHandler.MarkBatchExpired)
+				batchRecords.DELETE("/:id", batchRecordHandler.DeleteBatchRecord)
+			}
+			
+			// Batch usage routes (accessible to all authenticated users for order processing)
+			batchUsage := protected.Group("/batch-usage")
+			{
+				batchUsage.POST("", batchUsageHandler.UseBatch)
+				batchUsage.GET("/history", batchUsageHandler.GetUsageHistory)
+			}
+			
+			// Batch alert routes (barista and manager)
+			batchAlerts := protected.Group("/batch-alerts")
+			batchAlerts.Use(http.RequireRole(user.RoleBarista, user.RoleManager))
+			{
+				batchAlerts.GET("", batchAlertHandler.GetAlerts)
+			}
+			
+			// Batch report routes (manager only)
+			batchReports := protected.Group("/batch-reports")
+			batchReports.Use(http.RequireRole(user.RoleManager))
+			{
+				batchReports.GET("/production", batchReportHandler.GetProductionReport)
+				batchReports.GET("/wastage", batchReportHandler.GetWastageReport)
+				batchReports.GET("/usage", batchReportHandler.GetUsageReport)
 			}
 			
 			// Waiter routes
@@ -390,6 +445,13 @@ func main() {
 				manager.POST("/ingredient-categories", ingredientHandler.CreateCategory)
 				manager.GET("/ingredient-categories", ingredientHandler.GetCategories)
 				manager.DELETE("/ingredient-categories/:id", ingredientHandler.DeleteCategory)
+				
+				// Batch definition routes (manager only)
+				manager.POST("/batch-definitions", batchDefinitionHandler.CreateBatchDefinition)
+				manager.GET("/batch-definitions", batchDefinitionHandler.GetBatchDefinitions)
+				manager.GET("/batch-definitions/:id", batchDefinitionHandler.GetBatchDefinition)
+				manager.PUT("/batch-definitions/:id", batchDefinitionHandler.UpdateBatchDefinition)
+				manager.DELETE("/batch-definitions/:id", batchDefinitionHandler.DeleteBatchDefinition)
 				
 				// Facility management routes
 				manager.GET("/facilities", facilityHandler.GetAllFacilities)

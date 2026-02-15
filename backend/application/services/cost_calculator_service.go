@@ -19,12 +19,24 @@ type OrderItemRepository interface {
 	FindByDateRange(ctx context.Context, startDate, endDate time.Time) ([]*order.OrderItemWithCost, error)
 }
 
+// CostCalculatorBatchRecordRepository interface for batch cost lookup
+type CostCalculatorBatchRecordRepository interface {
+	FindAvailableByDefinition(ctx context.Context, defID primitive.ObjectID) ([]*CostCalculatorBatchRecord, error)
+}
+
+// CostCalculatorBatchRecord represents a batch record for cost calculation (minimal interface)
+type CostCalculatorBatchRecord struct {
+	CostPerUnit float64
+	Unit        string
+}
+
 // CostCalculatorService handles cost calculation for menu items
 type CostCalculatorService struct {
 	menuRepo       MenuRepository
 	ingredientRepo IngredientRepository
 	orderRepo      OrderRepository
 	orderItemRepo  OrderItemRepository
+	batchRecRepo   CostCalculatorBatchRecordRepository
 	
 	// Reference to cost recalculation service for queuing background jobs
 	recalcService *CostRecalculationService
@@ -40,7 +52,13 @@ func NewCostCalculatorService(menuRepo MenuRepository, ingredientRepo Ingredient
 		ingredientRepo: ingredientRepo,
 		orderRepo:      orderRepo,
 		orderItemRepo:  orderItemRepo,
+		batchRecRepo:   nil,
 	}
+}
+
+// SetBatchRecordRepository sets the batch record repository for batch cost calculation
+func (s *CostCalculatorService) SetBatchRecordRepository(batchRecRepo CostCalculatorBatchRecordRepository) {
+	s.batchRecRepo = batchRecRepo
 }
 
 // SetCostRecalculationService sets the cost recalculation service for queuing background jobs
@@ -276,6 +294,32 @@ func (s *CostCalculatorService) calculateIngredientsCost(ingredients []menu.Ingr
 	hasIncompleteCost := false
 
 	for _, menuIngredient := range ingredients {
+		// Check if this is a batch ingredient
+		if menuIngredient.IsBatchIngredient() {
+			// Handle batch ingredient
+			if menuIngredient.BatchID == nil {
+				missingIngredients = append(missingIngredients, menuIngredient.Name)
+				hasIncompleteCost = true
+				continue
+			}
+			
+			// Get batch cost
+			batchCost, err := s.getBatchCostPerUnit(context.Background(), *menuIngredient.BatchID)
+			if err != nil {
+				// Batch not found or no available batches
+				missingIngredients = append(missingIngredients, menuIngredient.Name)
+				hasIncompleteCost = true
+				continue
+			}
+			
+			// Calculate cost for batch ingredient
+			// Formula: quantity * batch_cost_per_unit
+			ingredientCost := menuIngredient.Quantity * batchCost
+			totalCost += ingredientCost
+			continue
+		}
+		
+		// Handle raw ingredient (existing logic)
 		// Find the ingredient in our map
 		ing, exists := ingredientMap[menuIngredient.Name]
 		if !exists {
@@ -321,6 +365,29 @@ func (s *CostCalculatorService) calculateIngredientsCost(ingredients []menu.Ingr
 		status:             costStatus,
 		missingIngredients: missingIngredients,
 	}
+}
+
+// getBatchCostPerUnit retrieves the average cost per unit for available batches
+// Uses FIFO logic - gets cost from the oldest available batch
+func (s *CostCalculatorService) getBatchCostPerUnit(ctx context.Context, batchDefID primitive.ObjectID) (float64, error) {
+	// If batch repository is not set, return error
+	if s.batchRecRepo == nil {
+		return 0, fmt.Errorf("batch repository not configured")
+	}
+	
+	// Get available batches (sorted by expiry date - FIFO)
+	batches, err := s.batchRecRepo.FindAvailableByDefinition(ctx, batchDefID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to find available batches: %w", err)
+	}
+	
+	// If no batches available, return error
+	if len(batches) == 0 {
+		return 0, fmt.Errorf("no available batches")
+	}
+	
+	// Return cost per unit from the first (oldest) batch (FIFO)
+	return batches[0].CostPerUnit, nil
 }
 
 // CalculateAllMenuItemCosts calculates current cost for all menu items

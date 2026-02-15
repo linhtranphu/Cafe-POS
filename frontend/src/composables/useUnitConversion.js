@@ -29,6 +29,7 @@ export function useUnitConversion() {
    * Example:
    *   getConversionRate("L", "ml") => 0.001
    *   getConversionRate("kg", "g") => 0.001
+   *   getConversionRate("g", "kg") => 0.001
    *   getConversionRate("L", "L") => 1.0
    */
   const getConversionRate = (stockUnit, recipeUnit) => {
@@ -38,13 +39,15 @@ export function useUnitConversion() {
     }
     
     // Try mass conversion
+    // To convert from stockUnit to recipeUnit, we need: stockToBase / recipeToBase
+    // Example: g→kg = 0.001 / 1.0 = 0.001
     if (massToKg[stockUnit] && massToKg[recipeUnit]) {
-      return massToKg[recipeUnit] / massToKg[stockUnit]
+      return massToKg[stockUnit] / massToKg[recipeUnit]
     }
     
     // Try volume conversion
     if (volumeToL[stockUnit] && volumeToL[recipeUnit]) {
-      return volumeToL[recipeUnit] / volumeToL[stockUnit]
+      return volumeToL[stockUnit] / volumeToL[recipeUnit]
     }
     
     // No conversion found, assume same unit
@@ -91,8 +94,10 @@ export function useUnitConversion() {
    * @returns {number} - Total cost rounded to 2 decimal places
    */
   const calculateCost = (quantity, recipeUnit, costPerUnit, stockUnit, wastage = 0) => {
-    const conversionRate = getConversionRate(stockUnit, recipeUnit)
-    const cost = quantity * costPerUnit * conversionRate * (1 + wastage / 100)
+    // Convert quantity from recipe unit to stock unit
+    const conversionRate = getConversionRate(recipeUnit, stockUnit)
+    const quantityInStockUnit = quantity * conversionRate
+    const cost = quantityInStockUnit * costPerUnit * (1 + wastage / 100)
     return Math.round(cost * 100) / 100
   }
   
@@ -106,8 +111,11 @@ export function useUnitConversion() {
    * @returns {Object} - { baseCost, wastageCost, totalCost }
    */
   const calculateCostBreakdown = (quantity, recipeUnit, costPerUnit, stockUnit, wastage = 0) => {
-    const conversionRate = getConversionRate(stockUnit, recipeUnit)
-    const baseCost = quantity * costPerUnit * conversionRate
+    // Convert quantity from recipe unit to stock unit
+    // Example: 200g → 0.2kg, so we need rate from g→kg
+    const conversionRate = getConversionRate(recipeUnit, stockUnit)
+    const quantityInStockUnit = quantity * conversionRate
+    const baseCost = quantityInStockUnit * costPerUnit
     const wastageCost = baseCost * (wastage / 100)
     const totalCost = baseCost + wastageCost
     
@@ -120,18 +128,37 @@ export function useUnitConversion() {
   
   /**
    * Format conversion explanation for display
-   * @param {string} stockUnit - Stock unit
-   * @param {string} recipeUnit - Recipe unit
+   * @param {string} stockUnit - Stock unit (unit in inventory)
+   * @param {string} recipeUnit - Recipe unit (unit used in recipe)
    * @returns {string} - Human-readable explanation
    */
   const getConversionExplanation = (stockUnit, recipeUnit) => {
-    const rate = getConversionRate(stockUnit, recipeUnit)
-    if (rate === 1.0) {
+    if (stockUnit === recipeUnit) {
       return 'Không cần quy đổi'
     }
     
-    const inverseRate = 1 / rate
-    return `1${recipeUnit} = ${inverseRate}${stockUnit}`
+    const rate = getConversionRate(stockUnit, recipeUnit)
+    
+    // We always want to show the conversion in a natural way
+    // Example: "1kg = 1000g" (not "1g = 0.001kg")
+    
+    // Determine which unit is larger
+    const stockToBase = massToKg[stockUnit] || volumeToL[stockUnit] || 1
+    const recipeToBase = massToKg[recipeUnit] || volumeToL[recipeUnit] || 1
+    
+    if (stockToBase > recipeToBase) {
+      // Stock unit is larger (e.g., kg > g)
+      // Show: 1kg = Xg
+      const ratio = stockToBase / recipeToBase
+      return `1${stockUnit} = ${ratio}${recipeUnit}`
+    } else if (stockToBase < recipeToBase) {
+      // Recipe unit is larger (e.g., g < kg)
+      // Show: 1kg = Xg
+      const ratio = recipeToBase / stockToBase
+      return `1${recipeUnit} = ${ratio}${stockUnit}`
+    }
+    
+    return 'Không cần quy đổi'
   }
   
   /**
