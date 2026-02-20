@@ -920,39 +920,43 @@ const editItem = (item) => {
   
   // Prepare ingredients for single-size items
   const preparedIngredients = item.ingredients ? item.ingredients.map(ing => {
-    const ingredientData = availableIngredients.value.find(i => i.name === ing.name)
-    if (ingredientData) {
-      const compatibleUnits = getCompatibleUnits(ingredientData.unit)
-      const conversionRate = getConversionRate(ingredientData.unit, ing.unit)
-      
-      // Calculate estimated cost
-      const breakdown = calculateCostBreakdown(
-        ing.quantity,
-        ing.unit,
-        ingredientData.cost_per_unit || 0,
-        ingredientData.unit,
-        ingredientData.wastage_percentage || 0
-      )
-      
-      return {
-        id: ingredientData.id,
-        name: ing.name,
-        quantity: ing.quantity,
-        unit: ing.unit,
-        stockUnit: ingredientData.unit,
-        compatibleUnits: compatibleUnits,
-        costPerUnit: ingredientData.cost_per_unit || 0,
-        wastage: ingredientData.wastage_percentage || 0,
-        conversionRate: conversionRate,
-        estimatedCost: breakdown.totalCost
+    // Check if this is a batch ingredient
+    const isBatch = ing.ingredient_type === 'batch' || ing.type === 'batch'
+    
+    if (isBatch) {
+      // Handle batch ingredient
+      const batchData = availableBatchDefinitions.value.find(b => b.id === ing.batch_id || b.name === ing.name)
+      if (batchData) {
+        const batchCostPerUnit = calculateBatchCostPerUnit(batchData)
+        const compatibleUnits = getCompatibleUnits(batchData.unit)
+        const conversionRate = getConversionRate(batchData.unit, ing.unit)
+        
+        // Calculate estimated cost
+        const breakdown = calculateCostBreakdown(
+          ing.quantity,
+          ing.unit,
+          batchCostPerUnit,
+          batchData.unit,
+          0 // Batches don't have wastage
+        )
+        
+        return {
+          id: batchData.id,
+          batch_definition_id: batchData.id,
+          type: 'batch',
+          name: ing.name,
+          quantity: ing.quantity,
+          unit: ing.unit,
+          stockUnit: batchData.unit,
+          compatibleUnits: compatibleUnits,
+          costPerUnit: batchCostPerUnit,
+          wastage: 0,
+          conversionRate: conversionRate,
+          estimatedCost: breakdown.totalCost
+        }
       }
-    }
-    return ing
-  }) : []
-  
-  // Prepare variants with enriched ingredient data
-  const preparedVariants = item.variants ? item.variants.map(variant => {
-    const enrichedIngredients = variant.ingredients ? variant.ingredients.map(ing => {
+    } else {
+      // Handle raw ingredient
       const ingredientData = availableIngredients.value.find(i => i.name === ing.name)
       if (ingredientData) {
         const compatibleUnits = getCompatibleUnits(ingredientData.unit)
@@ -969,6 +973,7 @@ const editItem = (item) => {
         
         return {
           id: ingredientData.id,
+          type: 'raw',
           name: ing.name,
           quantity: ing.quantity,
           unit: ing.unit,
@@ -978,6 +983,79 @@ const editItem = (item) => {
           wastage: ingredientData.wastage_percentage || 0,
           conversionRate: conversionRate,
           estimatedCost: breakdown.totalCost
+        }
+      }
+    }
+    return ing
+  }) : []
+  
+  // Prepare variants with enriched ingredient data
+  const preparedVariants = item.variants ? item.variants.map(variant => {
+    const enrichedIngredients = variant.ingredients ? variant.ingredients.map(ing => {
+      // Check if this is a batch ingredient
+      const isBatch = ing.ingredient_type === 'batch' || ing.type === 'batch'
+      
+      if (isBatch) {
+        // Handle batch ingredient
+        const batchData = availableBatchDefinitions.value.find(b => b.id === ing.batch_id || b.name === ing.name)
+        if (batchData) {
+          const batchCostPerUnit = calculateBatchCostPerUnit(batchData)
+          const compatibleUnits = getCompatibleUnits(batchData.unit)
+          const conversionRate = getConversionRate(batchData.unit, ing.unit)
+          
+          // Calculate estimated cost
+          const breakdown = calculateCostBreakdown(
+            ing.quantity,
+            ing.unit,
+            batchCostPerUnit,
+            batchData.unit,
+            0 // Batches don't have wastage
+          )
+          
+          return {
+            id: batchData.id,
+            batch_definition_id: batchData.id,
+            type: 'batch',
+            name: ing.name,
+            quantity: ing.quantity,
+            unit: ing.unit,
+            stockUnit: batchData.unit,
+            compatibleUnits: compatibleUnits,
+            costPerUnit: batchCostPerUnit,
+            wastage: 0,
+            conversionRate: conversionRate,
+            estimatedCost: breakdown.totalCost
+          }
+        }
+      } else {
+        // Handle raw ingredient
+        const ingredientData = availableIngredients.value.find(i => i.name === ing.name)
+        if (ingredientData) {
+          const compatibleUnits = getCompatibleUnits(ingredientData.unit)
+          const conversionRate = getConversionRate(ingredientData.unit, ing.unit)
+          
+          // Calculate estimated cost
+          const breakdown = calculateCostBreakdown(
+            ing.quantity,
+            ing.unit,
+            ingredientData.cost_per_unit || 0,
+            ingredientData.unit,
+            ingredientData.wastage_percentage || 0
+          )
+          
+          return {
+            id: ingredientData.id,
+            type: 'raw',
+            name: ing.name,
+            quantity: ing.quantity,
+            unit: ing.unit,
+            stockUnit: ingredientData.unit,
+            compatibleUnits: compatibleUnits,
+            costPerUnit: ingredientData.cost_per_unit || 0,
+            wastage: ingredientData.wastage_percentage || 0,
+            conversionRate: conversionRate,
+            estimatedCost: breakdown.totalCost
+          }
         }
       }
       return ing
@@ -1258,6 +1336,9 @@ const selectBatch = (batch) => {
   // Calculate cost per unit for this batch
   const batchCostPerUnit = calculateBatchCostPerUnit(batch)
   
+  // Get compatible units for batch (allows unit conversion like L→ml, kg→g)
+  const compatibleUnits = getCompatibleUnits(batch.unit)
+  
   // Check if selecting for variant or single-size
   if (currentVariantIndex.value !== null) {
     // Adding to variant
@@ -1277,7 +1358,7 @@ const selectBatch = (batch) => {
       quantity: 1,
       unit: batch.unit,
       stockUnit: batch.unit,
-      compatibleUnits: [batch.unit], // Batches typically use single unit
+      compatibleUnits: compatibleUnits, // Allow unit conversion (e.g., L→ml, kg→g)
       costPerUnit: batchCostPerUnit, // Calculated cost per unit
       wastage: 0, // Batches don't have wastage
       conversionRate: 1,
@@ -1307,7 +1388,7 @@ const selectBatch = (batch) => {
       quantity: 1,
       unit: batch.unit,
       stockUnit: batch.unit,
-      compatibleUnits: [batch.unit],
+      compatibleUnits: compatibleUnits, // Allow unit conversion (e.g., L→ml, kg→g)
       costPerUnit: batchCostPerUnit, // Calculated cost per unit
       wastage: 0,
       conversionRate: 1,
@@ -1506,7 +1587,12 @@ const saveItem = async () => {
       ingredients: v.ingredients.map(ing => ({
         name: ing.name,
         quantity: ing.quantity,
-        unit: ing.unit
+        unit: ing.unit,
+        // Include batch fields if this is a batch ingredient
+        ...(ing.type === 'batch' && {
+          ingredient_type: 'batch',
+          batch_id: ing.batch_definition_id || ing.id
+        })
       })),
       available: v.available !== false,
       is_default: v.is_default || false
@@ -1520,7 +1606,12 @@ const saveItem = async () => {
     itemData.ingredients = form.value.ingredients.map(ing => ({
       name: ing.name,
       quantity: ing.quantity,
-      unit: ing.unit
+      unit: ing.unit,
+      // Include batch fields if this is a batch ingredient
+      ...(ing.type === 'batch' && {
+        ingredient_type: 'batch',
+        batch_id: ing.batch_definition_id || ing.id
+      })
     }))
     
     // Debug log
