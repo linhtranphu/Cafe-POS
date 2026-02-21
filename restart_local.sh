@@ -21,7 +21,7 @@ echo ""
 
 # Check if MongoDB container exists and is running
 echo "=========================================="
-echo "🗄️  Checking MongoDB..."
+echo "🗄️  Checking MongoDB Replica Set..."
 echo "=========================================="
 echo ""
 
@@ -29,24 +29,85 @@ MONGO_CONTAINER="cafe-pos-mongodb"
 
 if docker ps | grep -q "$MONGO_CONTAINER"; then
     echo "✅ MongoDB is already running"
-else
-    echo "⚠️  MongoDB is not running. Starting MongoDB..."
     
-    # Check if container exists but is stopped
-    if docker ps -a | grep -q "$MONGO_CONTAINER"; then
-        echo "Starting existing MongoDB container..."
-        docker start "$MONGO_CONTAINER"
+    # Check if replica set is initialized
+    echo "Checking replica set status..."
+    RS_STATUS=$(docker exec "$MONGO_CONTAINER" mongosh \
+        --username admin \
+        --password password123 \
+        --authenticationDatabase admin \
+        --quiet \
+        --eval "try { rs.status().ok } catch(e) { 0 }" 2>/dev/null || echo "0")
+    
+    if [ "$RS_STATUS" = "1" ]; then
+        echo "✅ Replica set is active"
     else
-        echo "Creating and starting new MongoDB container..."
-        docker-compose -f docker-compose.local.yml up -d mongodb
+        echo "⚠️  Replica set not initialized. Restarting with replica set configuration..."
+        docker-compose down
+        docker-compose -f docker-compose.replica-set.yml up -d mongodb
+        
+        echo "Waiting for MongoDB to start..."
+        sleep 20
+        
+        echo "Initializing replica set..."
+        docker exec "$MONGO_CONTAINER" mongosh \
+            --username admin \
+            --password password123 \
+            --authenticationDatabase admin \
+            --eval "
+            try {
+                rs.status();
+                print('Replica set already initialized');
+            } catch(e) {
+                rs.initiate({
+                    _id: 'rs0',
+                    members: [{ _id: 0, host: 'localhost:27017' }]
+                });
+                print('Replica set initialized');
+            }
+            " > /dev/null 2>&1
+        
+        echo "Waiting for replica set to stabilize..."
+        sleep 10
+        echo "✅ Replica set ready"
     fi
+else
+    echo "⚠️  MongoDB is not running. Starting MongoDB with replica set..."
+    
+    # Stop any existing containers
+    docker-compose down 2>/dev/null || true
+    
+    # Start with replica set configuration
+    docker-compose -f docker-compose.replica-set.yml up -d mongodb
     
     # Wait for MongoDB to be ready
-    echo "Waiting for MongoDB to be ready..."
-    sleep 3
+    echo "Waiting for MongoDB to start..."
+    sleep 20
+    
+    # Initialize replica set
+    echo "Initializing replica set..."
+    docker exec "$MONGO_CONTAINER" mongosh \
+        --username admin \
+        --password password123 \
+        --authenticationDatabase admin \
+        --eval "
+        try {
+            rs.status();
+            print('Replica set already initialized');
+        } catch(e) {
+            rs.initiate({
+                _id: 'rs0',
+                members: [{ _id: 0, host: 'localhost:27017' }]
+            });
+            print('Replica set initialized');
+        }
+        " > /dev/null 2>&1
+    
+    echo "Waiting for replica set to stabilize..."
+    sleep 10
     
     if docker ps | grep -q "$MONGO_CONTAINER"; then
-        echo "✅ MongoDB started successfully"
+        echo "✅ MongoDB replica set started successfully"
     else
         echo "❌ Failed to start MongoDB"
         exit 1
@@ -97,8 +158,8 @@ if [ ! -f "go.mod" ]; then
     exit 1
 fi
 
-# Set MongoDB URI for local development
-export MONGODB_URI="mongodb://admin:password123@localhost:27017"
+# Set MongoDB URI for local development with replica set
+export MONGODB_URI="mongodb://admin:password123@localhost:27017/cafe_pos?replicaSet=rs0&authSource=admin"
 export MONGODB_DATABASE="cafe_pos"
 export JWT_SECRET="your-jwt-secret-key-min-32-chars-long"
 
@@ -166,21 +227,22 @@ echo "✅ All Services Started!"
 echo "=========================================="
 echo ""
 echo "📊 Service Status:"
-echo "  MongoDB:  ✅ Running on localhost:27017"
+echo "  MongoDB:  ✅ Running on localhost:27017 (Replica Set: rs0)"
 echo "  Backend:  ✅ Running on localhost:3000 (PID: $BACKEND_PID)"
 echo "  Frontend: ✅ Running on localhost:5173 (PID: $FRONTEND_PID)"
 echo ""
 echo "🌐 Access Information:"
 echo "  Frontend:  http://localhost:5173"
 echo "  Backend:   http://localhost:3000"
-echo "  MongoDB:   localhost:27017"
+echo "  MongoDB:   mongodb://admin:password123@localhost:27017/cafe_pos?replicaSet=rs0&authSource=admin"
 echo ""
 echo "📋 Logs:"
 echo "  Backend:  tail -f backend.log"
 echo "  Frontend: tail -f frontend.log"
+echo "  MongoDB:  docker logs cafe-pos-mongodb"
 echo ""
 echo "🛑 To stop services:"
 echo "  kill $BACKEND_PID  # Stop backend"
 echo "  kill $FRONTEND_PID # Stop frontend"
-echo "  docker stop cafe-pos-mongodb  # Stop MongoDB"
+echo "  docker-compose -f docker-compose.replica-set.yml down  # Stop MongoDB"
 echo ""

@@ -383,7 +383,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useOrderStore } from '../stores/order'
+import { useOrderStore, cartHelpers } from '../stores/order'
 import { useShiftStore } from '../stores/shift'
 import { useMenuStore } from '../stores/menu'
 import { useRouter } from 'vue-router'
@@ -420,13 +420,36 @@ const cart = ref([])
 // Data
 const statuses = STATUS_FILTER_OPTIONS
 
-const categories = [
-  { id: 'all', name: 'Tất cả', icon: '📋' },
-  { id: 'coffee', name: 'Cà phê', icon: '☕' },
-  { id: 'tea', name: 'Trà', icon: '🍵' },
-  { id: 'juice', name: 'Nước ép', icon: '🧃' },
-  { id: 'food', name: 'Đồ ăn', icon: '🍰' }
-]
+// Get unique categories from menu items dynamically
+const categories = computed(() => {
+  const allCategory = { id: 'all', name: 'Tất cả', icon: '📋' }
+  
+  if (!menuItems.value || menuItems.value.length === 0) {
+    return [allCategory]
+  }
+  
+  // Get unique categories from menu items
+  const uniqueCategories = [...new Set(menuItems.value.map(item => item.category))]
+  
+  // Map categories with icons
+  const categoryIcons = {
+    'Cà phê': '☕',
+    'Trà': '🍵',
+    'Nước ép': '🧃',
+    'Bánh ngọt': '🍰',
+    'Món nhẹ': '🍴',
+    'Sinh tố': '🥤',
+    'Đồ uống khác': '🥛'
+  }
+  
+  const menuCategories = uniqueCategories.map(cat => ({
+    id: cat,
+    name: cat,
+    icon: categoryIcons[cat] || '🍽️'
+  }))
+  
+  return [allCategory, ...menuCategories]
+})
 
 const paymentMethods = PAYMENT_METHOD_DISPLAY
 
@@ -509,11 +532,11 @@ const cancelCreateOrder = () => {
 }
 
 const addToCart = (item, variant = null) => {
-  // Use orderStore helper to create cart item
-  const cartItem = orderStore.helpers.createCartItem(item, variant)
+  // Use cartHelpers to create cart item
+  const cartItem = cartHelpers.createCartItem(item, variant)
   
   // Check if item already exists in cart (considering variant)
-  const existing = cart.value.find(i => orderStore.helpers.isSameCartItem(i, cartItem))
+  const existing = cart.value.find(i => cartHelpers.isSameCartItem(i, cartItem))
   
   if (existing) {
     existing.quantity++

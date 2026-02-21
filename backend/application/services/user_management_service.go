@@ -283,7 +283,7 @@ func (s *UserManagementService) toUserResponse(u *user.User) *UserResponse {
 }
 
 func isValidRole(role user.Role) bool {
-	validRoles := []user.Role{user.RoleManager, user.RoleCashier, user.RoleWaiter}
+	validRoles := []user.Role{user.RoleManager, user.RoleCashier, user.RoleWaiter, user.RoleBarista}
 	for _, validRole := range validRoles {
 		if role == validRole {
 			return true

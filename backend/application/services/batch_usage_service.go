@@ -31,6 +31,7 @@ func NewBatchUsageService(
 type UseBatchRequest struct {
 	BatchDefinitionID primitive.ObjectID
 	QuantityNeeded    float64
+	Unit              string // Unit of QuantityNeeded (e.g., "ml", "g")
 	OrderID           primitive.ObjectID
 	MenuItemID        primitive.ObjectID
 	MenuItemName      string
@@ -92,13 +93,36 @@ func (s *BatchUsageService) UseBatch(ctx context.Context, req UseBatchRequest) (
 		}, nil
 	}
 
+	// Get batch unit from first batch (all batches of same definition have same unit)
+	batchUnit := availableBatches[0].Unit
+
+	// Convert quantity needed to batch unit for comparison
+	quantityNeededInBatchUnit := req.QuantityNeeded
+	if req.Unit != "" && req.Unit != batchUnit {
+		converted, err := batch.ConvertQuantity(req.QuantityNeeded, req.Unit, batchUnit)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert units from %s to %s: %w", req.Unit, batchUnit, err)
+		}
+		quantityNeededInBatchUnit = converted
+	}
+
 	// 3. Calculate total available quantity
 	totalAvailable := 0.0
 	for _, b := range availableBatches {
 		totalAvailable += b.QuantityRemaining
 	}
 
-	if totalAvailable < req.QuantityNeeded {
+	if totalAvailable < quantityNeededInBatchUnit {
+		// Format error message with both original and converted quantities
+		if req.Unit != "" && req.Unit != batchUnit {
+			return &BatchUsageResult{
+				Success: false,
+				Message: fmt.Sprintf("Insufficient batch quantity. Need: %.2f%s (%.2f%s), Available: %.2f%s",
+					req.QuantityNeeded, req.Unit,
+					quantityNeededInBatchUnit, batchUnit,
+					totalAvailable, batchUnit),
+			}, nil
+		}
 		return &BatchUsageResult{
 			Success: false,
 			Message: fmt.Sprintf("Insufficient batch quantity. Need: %.2f, Available: %.2f",
@@ -107,7 +131,7 @@ func (s *BatchUsageService) UseBatch(ctx context.Context, req UseBatchRequest) (
 	}
 
 	// 4. Use batches in FIFO order
-	remainingNeeded := req.QuantityNeeded
+	remainingNeeded := quantityNeededInBatchUnit
 	batchesUsed := make([]BatchUsageDetail, 0)
 	totalCost := 0.0
 

@@ -156,42 +156,43 @@ export const useOrderStore = defineStore('order', {
     servedOrders: (state) => {
       return state.orders.filter(o => o.status === 'SERVED')
     }
-  },
-
-  // Helper methods for cart management with variant support
-  helpers: {
-    // Create cart item from menu item and optional variant
-    createCartItem(menuItem, variant = null) {
-      const item = {
-        menu_item_id: menuItem.id,
-        name: menuItem.name,
-        quantity: 1
-      }
-
-      if (variant) {
-        // Multi-size item with variant
-        item.variant_id = variant.id
-        item.variant_name = variant.name
-        item.price = variant.price
-      } else {
-        // Single-size item (backward compatible)
-        item.price = menuItem.price
-      }
-
-      return item
-    },
-
-    // Check if two cart items are the same (including variant)
-    isSameCartItem(item1, item2) {
-      if (item1.menu_item_id !== item2.menu_item_id) {
-        return false
-      }
-      // For multi-size items, variant_id must match
-      if (item1.variant_id || item2.variant_id) {
-        return item1.variant_id === item2.variant_id
-      }
-      // For single-size items, just menu_item_id match is enough
-      return true
-    }
   }
 })
+
+// Helper functions for cart management with variant support
+// These are exported separately as they don't need store state
+export const cartHelpers = {
+  // Create cart item from menu item and optional variant
+  createCartItem(menuItem, variant = null) {
+    const item = {
+      menu_item_id: menuItem.id,
+      name: menuItem.name,
+      quantity: 1
+    }
+
+    if (variant) {
+      // Multi-size item with variant
+      item.variant_id = variant.id
+      item.variant_name = variant.name
+      item.price = variant.price
+    } else {
+      // Single-size item (backward compatible)
+      item.price = menuItem.price
+    }
+
+    return item
+  },
+
+  // Check if two cart items are the same (including variant)
+  isSameCartItem(item1, item2) {
+    if (item1.menu_item_id !== item2.menu_item_id) {
+      return false
+    }
+    // For multi-size items, variant_id must match
+    if (item1.variant_id || item2.variant_id) {
+      return item1.variant_id === item2.variant_id
+    }
+    // For single-size items, just menu_item_id match is enough
+    return true
+  }
+}

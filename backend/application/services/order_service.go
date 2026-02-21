@@ -597,6 +597,7 @@ func (s *OrderService) deductBatchIngredients(ctx context.Context, o *order.Orde
 			req := UseBatchRequest{
 				BatchDefinitionID: *ing.BatchID,
 				QuantityNeeded:    quantityNeeded,
+				Unit:              string(ing.Unit), // Convert UnitType to string
 				OrderID:           o.ID,
 				MenuItemID:        item.MenuItemID,
 				MenuItemName:      item.Name,

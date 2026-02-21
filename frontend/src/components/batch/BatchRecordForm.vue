@@ -290,23 +290,45 @@ const expectedCost = computed(() => {
   const def = selectedDefinition.value
   const quantity = totalOutput.value
   
+  console.log('=== Batch Cost Calculation ===')
+  console.log('Total Output:', quantity, def.output_unit)
+  
   for (const rate of def.conversion_rates || []) {
     const ingredient = ingredients.value.find(i => i.id === rate.source_ingredient_id)
     if (ingredient && ingredient.cost_per_unit) {
-      // Calculate quantity needed in source unit
+      // Calculate quantity needed in source unit (recipe unit)
       const ratio = quantity / rate.batch_quantity
       const baseQuantity = rate.source_quantity * ratio
       const wastageMultiplier = 1 + (rate.wastage_rate || 0)
       const totalQuantity = baseQuantity * wastageMultiplier
       
-      // Apply unit conversion: convert from source_unit to ingredient stock unit
-      const conversionRate = getConversionRate(ingredient.unit, rate.source_unit)
+      console.log('Ingredient:', ingredient.name)
+      console.log('  Recipe needs:', rate.source_quantity, rate.source_unit)
+      console.log('  Stock unit:', ingredient.unit, '@ ', ingredient.cost_per_unit, 'VNĐ')
+      console.log('  Ratio:', ratio)
+      console.log('  Base quantity:', baseQuantity, rate.source_unit)
+      console.log('  With wastage:', totalQuantity, rate.source_unit)
+      
+      // Apply unit conversion: convert from source_unit (recipe) to ingredient.unit (stock)
+      // We need to convert FROM recipe unit TO stock unit
+      // getConversionRate(fromUnit, toUnit) where result means: 1 fromUnit = result toUnit
+      // Example: getConversionRate("g", "kg") = 0.001 means 1g = 0.001kg
+      // So: 200g * 0.001 = 0.2kg
+      const conversionRate = getConversionRate(rate.source_unit, ingredient.unit)
       const quantityInStockUnit = totalQuantity * conversionRate
       
+      console.log('  Conversion rate:', conversionRate, `(${rate.source_unit} → ${ingredient.unit})`)
+      console.log('  Quantity in stock unit:', quantityInStockUnit, ingredient.unit)
+      
       // Calculate cost using stock unit price
-      total += quantityInStockUnit * ingredient.cost_per_unit
+      const cost = quantityInStockUnit * ingredient.cost_per_unit
+      console.log('  Cost:', cost, 'VNĐ')
+      total += cost
     }
   }
+  
+  console.log('Total Cost:', total, 'VNĐ')
+  console.log('===========================')
   
   return total
 })
