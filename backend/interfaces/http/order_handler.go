@@ -12,15 +12,18 @@ import (
 type OrderHandler struct {
 	orderService        *services.OrderService
 	stateMachineManager *domain.StateMachineManager
+	printService        services.PrintService
 }
 
 func NewOrderHandler(
 	orderService *services.OrderService,
 	stateMachineManager *domain.StateMachineManager,
+	printService services.PrintService,
 ) *OrderHandler {
 	return &OrderHandler{
 		orderService:        orderService,
 		stateMachineManager: stateMachineManager,
+		printService:        printService,
 	}
 }
 
@@ -444,4 +447,61 @@ func (h *OrderHandler) GetOrder(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, o)
+}
+
+// ReprintBill handles POST /api/orders/:id/reprint-bill
+func (h *OrderHandler) ReprintBill(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	// Check if print service is available
+	if h.printService == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "print service not available"})
+		return
+	}
+
+	// Reprint bill
+	if err := h.printService.ReprintBill(c.Request.Context(), id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Bill queued for printing"})
+}
+
+// ReprintLabel handles POST /api/orders/:id/reprint-label
+func (h *OrderHandler) ReprintLabel(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	// Check if print service is available
+	if h.printService == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "print service not available"})
+		return
+	}
+
+	// Get item index from query parameter (default to 0 for all items)
+	var req struct {
+		ItemIndex int `json:"item_index"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Reprint label for specific item
+	if err := h.printService.ReprintLabel(c.Request.Context(), id, req.ItemIndex); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Label queued for printing"})
 }

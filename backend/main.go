@@ -9,6 +9,7 @@ import (
 	"cafe-pos/backend/domain"
 	"cafe-pos/backend/domain/user"
 	"cafe-pos/backend/infrastructure/mongodb"
+	"cafe-pos/backend/infrastructure/websocket"
 	"cafe-pos/backend/interfaces/http"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -62,9 +63,22 @@ func main() {
 	batchUsageLogRepo := mongodb.NewBatchUsageLogRepository(db)
 	// Stock history repository (needed for batch services)
 	stockHistoryRepo := mongodb.NewStockHistoryRepository(db)
+	// Print repositories
+	printJobRepo := mongodb.NewPrintJobRepository(db)
+	printerConfigRepo := mongodb.NewPrinterConfigRepository(db)
+	printTemplateRepo := mongodb.NewPrintTemplateRepository(db)
+	printNotificationRepo := mongodb.NewPrintNotificationRepository(db)
 
 	// State Machine Manager
 	smManager := domain.NewStateMachineManager()
+
+	// WebSocket Hub - Initialize and start
+	wsHub := websocket.NewHub()
+	go wsHub.Run()
+	log.Println("✅ WebSocket hub started")
+	
+	// WebSocket Broadcaster
+	wsBroadcaster := websocket.NewBroadcaster(wsHub)
 
 	// Services
 	jwtSecret := os.Getenv("JWT_SECRET")
@@ -82,8 +96,37 @@ func main() {
 	batchUsageService := services.NewBatchUsageService(batchRecordRepo, batchUsageLogRepo)
 	batchAlertService := services.NewBatchAlertService(batchDefinitionRepo, batchRecordRepo)
 	batchReportService := services.NewBatchReportService(batchRecordRepo, batchUsageLogRepo, batchDefinitionRepo)
+	// Print services - now with WebSocket broadcaster
+	templateRenderer := services.NewTemplateRenderer()
+	printService := services.NewPrintService(services.PrintServiceConfig{
+		PrintJobRepo:      printJobRepo,
+		PrinterConfigRepo: printerConfigRepo,
+		TemplateRepo:      printTemplateRepo,
+		TemplateRenderer:  templateRenderer,
+		OrderRepo:         orderRepo,
+		ShopSettingsRepo:  shopSettingsRepo,
+		WSBroadcaster:     wsBroadcaster,
+	})
+	printerManager := services.NewPrinterManager()
+	printNotificationService := services.NewPrintNotificationService(printNotificationRepo)
+	printWorker := services.NewPrintWorker(services.PrintWorkerConfig{
+		PrintJobRepo:        printJobRepo,
+		PrinterConfigRepo:   printerConfigRepo,
+		PrinterManager:      printerManager,
+		NotificationService: printNotificationService,
+		PollInterval:        10 * time.Second,
+	})
+	printCleanupJob := services.NewPrintCleanupJob(services.PrintCleanupJobConfig{
+		PrintJobRepo:     printJobRepo,
+		NotificationRepo: printNotificationRepo,
+		Interval:         24 * time.Hour,
+		RetentionDays:    7,
+	})
 	// OrderService now includes batchUsageService
 	orderService := services.NewOrderService(orderRepo, shiftRepo, menuRepo, smManager, batchUsageService)
+	// Wire up print service for auto-printing
+	orderService.SetPrintService(printService)
+	orderService.SetSettingsRepository(shopSettingsRepo)
 	shiftService := services.NewShiftService(shiftRepo, orderRepo, smManager)
 	// Cashier services
 	cashierShiftService := services.NewCashierShiftService(cashierShiftRepo, shiftRepo, smManager)
@@ -113,17 +156,37 @@ func main() {
 	costRecalculationService.Start()
 	log.Println("✅ Cost recalculation worker pool started")
 
+	// Start print worker
+	// Requirements: 1.8, 1.9, 2.9, 2.10
+	log.Println("Starting print worker...")
+	go printWorker.Start(context.Background())
+	log.Println("✅ Print worker started")
+
+	// Start print cleanup job
+	// Requirements: 4.7
+	log.Println("Starting print cleanup job...")
+	go printCleanupJob.Start(context.Background())
+	log.Println("✅ Print cleanup job started")
+
 	// Setup graceful shutdown for worker pool
 	defer func() {
 		log.Println("Stopping cost recalculation worker pool...")
 		costRecalculationService.Stop()
 		log.Println("✅ Cost recalculation worker pool stopped")
+		
+		log.Println("Stopping print worker...")
+		printWorker.Stop()
+		log.Println("✅ Print worker stopped")
+		
+		log.Println("Stopping print cleanup job...")
+		printCleanupJob.Stop()
+		log.Println("✅ Print cleanup job stopped")
 	}()
 
 	// Handlers
 	authHandler := http.NewAuthHandler(authService)
 	userManagementHandler := http.NewUserManagementHandler(userManagementService)
-	orderHandler := http.NewOrderHandler(orderService, smManager)
+	orderHandler := http.NewOrderHandler(orderService, smManager, printService)
 	shiftHandler := http.NewShiftHandler(shiftService, smManager, costCalculatorService)
 	// Cashier handlers
 	cashierShiftHandler := http.NewCashierShiftHandler(cashierShiftService)
@@ -137,6 +200,11 @@ func main() {
 	batchUsageHandler := http.NewBatchUsageHandler(batchUsageService)
 	batchAlertHandler := http.NewBatchAlertHandler(batchAlertService)
 	batchReportHandler := http.NewBatchReportHandler(batchReportService)
+	// Print handlers - now with WebSocket broadcaster
+	printJobHandler := http.NewPrintJobHandler(printService, printJobRepo, wsBroadcaster)
+	printerConfigHandler := http.NewPrinterConfigHandler(printerConfigRepo, printerManager)
+	printTemplateHandler := http.NewPrintTemplateHandler(printTemplateRepo, templateRenderer, shopSettingsRepo)
+	shopSettingsHandler := http.NewShopSettingsHandler(shopSettingsRepo)
 	// State machine handler
 	stateMachineHandler := http.NewStateMachineHandler(smManager)
 	menuService := services.NewMenuService(menuRepo)
@@ -187,6 +255,10 @@ func main() {
 		}
 		c.Next()
 	})
+
+	// WebSocket endpoint (Socket.IO compatible)
+	r.GET("/socket.io/", websocket.HandleSocketIO(wsHub))
+	log.Println("✅ WebSocket endpoint registered at /socket.io/")
 
 	// Routes
 	api := r.Group("/api")
@@ -317,6 +389,10 @@ func main() {
 				waiter.GET("/orders", orderHandler.GetMyOrders)
 				waiter.GET("/orders/:id", orderHandler.GetOrder)
 				
+				// Reprint routes
+				waiter.POST("/orders/:id/reprint-bill", orderHandler.ReprintBill)
+				waiter.POST("/orders/:id/reprint-label", orderHandler.ReprintLabel)
+				
 				// Menu (read-only)
 				waiter.GET("/menu", menuHandler.GetAllMenuItems)
 				
@@ -356,6 +432,10 @@ func main() {
 				cashier.GET("/orders/:id", orderHandler.GetOrder)
 				cashier.POST("/orders/:id/cancel", orderHandler.CancelOrder)
 				cashier.POST("/orders/:id/refund", orderHandler.RefundPartial)
+				
+				// Reprint routes
+				cashier.POST("/orders/:id/reprint-bill", orderHandler.ReprintBill)
+				cashier.POST("/orders/:id/reprint-label", orderHandler.ReprintLabel)
 				
 				// Shift management
 				cashier.POST("/shifts/:id/close", shiftHandler.CloseShift)
@@ -513,6 +593,39 @@ func main() {
 				manager.POST("/orders/:id/cancel", orderHandler.CancelOrder)
 				manager.POST("/orders/:id/refund", orderHandler.RefundPartial)
 				manager.PUT("/orders/:id/edit", orderHandler.EditOrder)
+				
+				// Reprint routes
+				manager.POST("/orders/:id/reprint-bill", orderHandler.ReprintBill)
+				manager.POST("/orders/:id/reprint-label", orderHandler.ReprintLabel)
+				
+				// Print job management routes
+				manager.GET("/print-jobs", printJobHandler.ListPrintJobs)
+				manager.GET("/print-jobs/pending", printJobHandler.GetPendingJobs)
+				manager.GET("/print-jobs/failed", printJobHandler.GetFailedJobs)
+				manager.GET("/print-jobs/:id", printJobHandler.GetPrintJob)
+				manager.POST("/print-jobs/:id/retry", printJobHandler.RetryPrintJob)
+				manager.DELETE("/print-jobs/:id", printJobHandler.CancelPrintJob)
+				manager.PUT("/print-jobs/:id/status", printJobHandler.UpdatePrintJobStatus) // For local print bridge
+				
+				// Printer configuration routes
+				manager.GET("/printers", printerConfigHandler.ListPrinters)
+				manager.GET("/printers/:id", printerConfigHandler.GetPrinter)
+				manager.POST("/printers", printerConfigHandler.CreatePrinter)
+				manager.PUT("/printers/:id", printerConfigHandler.UpdatePrinter)
+				manager.DELETE("/printers/:id", printerConfigHandler.DeletePrinter)
+				manager.POST("/printers/:id/test", printerConfigHandler.TestConnection)
+				
+				// Print template routes
+				manager.GET("/print-templates", printTemplateHandler.ListTemplates)
+				manager.GET("/print-templates/:id", printTemplateHandler.GetTemplate)
+				manager.POST("/print-templates", printTemplateHandler.CreateTemplate)
+				manager.PUT("/print-templates/:id", printTemplateHandler.UpdateTemplate)
+				manager.DELETE("/print-templates/:id", printTemplateHandler.DeleteTemplate)
+				manager.POST("/print-templates/:id/preview", printTemplateHandler.PreviewTemplate)
+				
+				// Shop settings routes
+				manager.GET("/shop-settings", shopSettingsHandler.GetSettings)
+				manager.PUT("/shop-settings/:id", shopSettingsHandler.UpdateSettings)
 				
 				// Shift management routes
 				manager.GET("/shifts", shiftHandler.GetAllShifts)

@@ -21,6 +21,7 @@ import ProfitAnalysisView from '../views/ProfitAnalysisView.vue'
 import CostAnalysisView from '../views/CostAnalysisView.vue'
 import SettingsView from '../views/SettingsView.vue'
 import BatchManagementView from '../views/BatchManagementView.vue'
+import PrintManagementView from '../views/PrintManagementView.vue'
 
 const routes = [
   {
@@ -212,12 +213,33 @@ const routes = [
     name: 'BatchReports',
     component: () => import('../views/BatchReportsView.vue'),
     meta: { requiresAuth: true, requiresManager: true }
+  },
+  {
+    path: '/print-management',
+    name: 'PrintManagement',
+    component: PrintManagementView,
+    meta: { requiresAuth: true, requiresManager: true }
   }
 ]
 
 const router = createRouter({
   history: createWebHashHistory(),
-  routes
+  routes,
+  scrollBehavior(to, from, savedPosition) {
+    // If using browser back/forward, restore the saved position
+    if (savedPosition) {
+      return savedPosition
+    }
+    
+    // For hash links (e.g., #section)
+    if (to.hash) {
+      return { el: to.hash, behavior: 'smooth' }
+    }
+    
+    // Default: scroll to top for new navigation
+    // But we'll handle this manually in components for better control
+    return { top: 0 }
+  }
 })
 
 router.beforeEach(async (to, from, next) => {

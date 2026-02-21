@@ -28,6 +28,8 @@ type OrderService struct {
 	menuRepo            MenuRepository
 	stateMachineManager *domain.StateMachineManager
 	batchUsageService   *BatchUsageService
+	printService        PrintService              // Optional: for auto-printing
+	settingsRepo        ShopSettingsRepository    // Optional: for auto-print setting
 }
 
 func NewOrderService(
@@ -43,7 +45,18 @@ func NewOrderService(
 		menuRepo:            menuRepo,
 		stateMachineManager: stateMachineManager,
 		batchUsageService:   batchUsageService,
+		printService:        nil, // Will be set via SetPrintService
 	}
+}
+
+// SetPrintService sets the print service for auto-printing (optional)
+func (s *OrderService) SetPrintService(printService PrintService) {
+	s.printService = printService
+}
+
+// SetSettingsRepository sets the settings repository for auto-print setting (optional)
+func (s *OrderService) SetSettingsRepository(settingsRepo ShopSettingsRepository) {
+	s.settingsRepo = settingsRepo
 }
 
 func (s *OrderService) CreateOrder(ctx context.Context, req *order.CreateOrderRequest, waiterID, waiterName string) (*order.Order, error) {
@@ -220,6 +233,37 @@ func (s *OrderService) CollectPayment(ctx context.Context, id primitive.ObjectID
 	if err := s.orderRepo.Update(ctx, id, o); err != nil {
 		return nil, err
 	}
+
+	// Emit OrderCreated event for printing if order is now PAID
+	// This happens after order is committed to ensure order persistence before print jobs
+	if o.Status == order.StatusPaid && s.printService != nil {
+		// Check auto-print setting before creating print jobs
+		autoPrintEnabled := true // Default to true if settings not available
+		if s.settingsRepo != nil {
+			settings, err := s.settingsRepo.FindFirst(ctx)
+			if err == nil && settings != nil {
+				autoPrintEnabled = settings.AutoPrintEnabled
+			}
+		}
+
+		if autoPrintEnabled {
+			// Call print service asynchronously to not block order creation
+			// Errors in print job creation should not affect order creation
+			go func() {
+				// Use background context to avoid cancellation
+				printCtx := context.Background()
+				if err := s.printService.CreatePrintJobsForOrder(printCtx, o); err != nil {
+					// Log error but don't fail the order creation
+					fmt.Printf("ERROR: Failed to create print jobs for order %s: %v\n", o.OrderNumber, err)
+				} else {
+					fmt.Printf("INFO: Print jobs created for order %s\n", o.OrderNumber)
+				}
+			}()
+		} else {
+			fmt.Printf("INFO: Auto-print disabled, skipping print jobs for order %s\n", o.OrderNumber)
+		}
+	}
+
 	return o, nil
 }
 

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+    <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .log {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #ccc;
+            padding-left: 10px;
+        }
+        .log-entry.success {
+            border-left-color: #4CAF50;
+            background: #e8f5e9;
+        }
+        .log-entry.error {
+            border-left-color: #f44336;
+            background: #ffebee;
+        }
+        .log-entry.info {
+            border-left-color: #2196F3;
+            background: #e3f2fd;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Connection Test</h1>
+    <p>Testing Socket.IO v4 connection to backend</p>
+    
+    <div>
+        <button onclick="connectWebSocket()">Connect</button>
+        <button onclick="disconnectWebSocket()">Disconnect</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+    
+    <div class="log" id="log"></div>
+
+    <script>
+        let socket = null;
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        function connectWebSocket() {
+            if (socket && socket.connected) {
+                log('Already connected', 'info');
+                return;
+            }
+
+            log('Connecting to http://localhost:3000...', 'info');
+
+            socket = io('http://localhost:3000', {
+                transports: ['websocket', 'polling'],
+                reconnection: true,
+                reconnectionDelay: 1000,
+                reconnectionDelayMax: 5000,
+                reconnectionAttempts: 5
+            });
+
+            socket.on('connect', () => {
+                log('✅ Connected successfully!', 'success');
+                log(`Socket ID: ${socket.id}`, 'info');
+            });
+
+            socket.on('disconnect', (reason) => {
+                log(`Disconnected: ${reason}`, 'error');
+            });
+
+            socket.on('connect_error', (error) => {
+                log(`❌ Connection error: ${error.message}`, 'error');
+            });
+
+            socket.on('reconnect', (attemptNumber) => {
+                log(`Reconnected after ${attemptNumber} attempts`, 'success');
+            });
+
+            socket.on('reconnect_error', (error) => {
+                log(`Reconnection error: ${error.message}`, 'error');
+            });
+
+            socket.on('reconnect_failed', () => {
+                log('❌ Reconnection failed', 'error');
+            });
+
+            // Listen for print job events
+            socket.on('print-job-created', (data) => {
+                log(`📄 Print job created: ${JSON.stringify(data)}`, 'success');
+            });
+
+            socket.on('print-job-updated', (data) => {
+                log(`📝 Print job updated: ${JSON.stringify(data)}`, 'success');
+            });
+
+            socket.on('print-job-failed', (data) => {
+                log(`❌ Print job failed: ${JSON.stringify(data)}`, 'error');
+            });
+        }
+
+        function disconnectWebSocket() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+                log('Disconnected', 'info');
+            }
+        }
+
+        // Auto-connect on page load
+        window.onload = () => {
+            log('Page loaded. Click "Connect" to test WebSocket connection.', 'info');
+        };
+    </script>
+</body>
+</html>

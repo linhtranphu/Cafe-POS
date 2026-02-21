@@ -61,6 +61,13 @@
           <span class="text-base font-medium text-center">Nhân viên</span>
         </router-link>
 
+        <!-- Print Management -->
+        <router-link to="/print-management" @click="handleNavClick"
+          class="bg-gradient-to-br from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white rounded-xl p-6 flex flex-col items-center justify-center min-h-[120px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+          <div class="text-3xl mb-2">🖨️</div>
+          <span class="text-base font-medium text-center">In ấn</span>
+        </router-link>
+
         <!-- Settings -->
         <router-link to="/settings" @click="handleNavClick"
           class="bg-gradient-to-br from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white rounded-xl p-6 flex flex-col items-center justify-center min-h-[120px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">

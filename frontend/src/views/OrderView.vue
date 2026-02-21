@@ -319,6 +319,42 @@
                 ⏳ Barista đang pha chế...
               </div>
             </div>
+
+            <!-- Reprint Section -->
+            <div class="mt-6 pt-4 border-t">
+              <h5 class="font-bold mb-3 text-gray-700">🖨️ In lại</h5>
+              <div class="space-y-2">
+                <!-- Reprint Bill Button -->
+                <button
+                  @click="handleReprintBill(selectedOrder.id)"
+                  :disabled="reprintingBill"
+                  class="w-full bg-purple-500 text-white py-3 rounded-xl font-medium active:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  <span v-if="reprintingBill" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  <span v-else>🧾</span>
+                  <span>{{ reprintingBill ? 'Đang in...' : 'In lại Bill' }}</span>
+                </button>
+
+                <!-- Reprint Labels for Each Item -->
+                <div class="space-y-2">
+                  <div
+                    v-for="(item, index) in selectedOrder.items"
+                    :key="index"
+                    class="flex gap-2"
+                  >
+                    <button
+                      @click="handleReprintLabel(selectedOrder.id, index)"
+                      :disabled="reprintingLabel === index"
+                      class="flex-1 bg-orange-500 text-white py-2 rounded-lg text-sm font-medium active:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      <span v-if="reprintingLabel === index" class="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      <span v-else>🏷️</span>
+                      <span>{{ reprintingLabel === index ? 'Đang in...' : `In tem: ${item.name}` }}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -390,6 +426,7 @@ import { useRouter } from 'vue-router'
 import BottomNav from '../components/BottomNav.vue'
 import PullToRefresh from '../components/PullToRefresh.vue'
 import { usePullToRefresh } from '../composables/usePullToRefresh'
+import { printJobService } from '../services/printJob'
 import { 
   ORDER_STATUS, 
   PAYMENT_METHOD, 
@@ -411,6 +448,10 @@ const showPayment = ref(false)
 const paymentOrder = ref(null)
 const paymentAmount = ref(0)
 const paymentMethod = ref(PAYMENT_METHOD.CASH)
+
+// Reprint State
+const reprintingBill = ref(false)
+const reprintingLabel = ref(null)
 
 // Create Order State
 const customerName = ref('')
@@ -639,6 +680,37 @@ const serveOrder = async (orderId) => {
 const editOrder = (order) => {
   // TODO: Implement edit order functionality
   alert('Chức năng chỉnh sửa order đang được phát triển')
+}
+
+// Reprint Functions
+const handleReprintBill = async (orderId) => {
+  if (reprintingBill.value) return
+
+  reprintingBill.value = true
+  try {
+    await printJobService.reprintBill(orderId)
+    alert('✅ Đã gửi lệnh in lại bill')
+  } catch (error) {
+    console.error('Reprint bill error:', error)
+    alert('❌ Lỗi in lại bill: ' + (error.response?.data?.error || error.message))
+  } finally {
+    reprintingBill.value = false
+  }
+}
+
+const handleReprintLabel = async (orderId, itemIndex) => {
+  if (reprintingLabel.value !== null) return
+
+  reprintingLabel.value = itemIndex
+  try {
+    await printJobService.reprintLabel(orderId, itemIndex)
+    alert('✅ Đã gửi lệnh in lại tem')
+  } catch (error) {
+    console.error('Reprint label error:', error)
+    alert('❌ Lỗi in lại tem: ' + (error.response?.data?.error || error.message))
+  } finally {
+    reprintingLabel.value = null
+  }
 }
 
 // Lifecycle

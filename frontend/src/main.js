@@ -3,6 +3,7 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import { useAuthStore } from './stores/auth'
+import { websocketService } from './services/websocket'
 import './style.css'
 
 const app = createApp(App)
@@ -23,6 +24,21 @@ if (authStore.isAuthenticated) {
     alert('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.')
     router.push('/login')
   })
+
+  // Connect WebSocket after authentication
+  const token = localStorage.getItem('token')
+  if (token) {
+    websocketService.connect(token)
+  }
 }
+
+// Watch for auth changes to connect/disconnect WebSocket
+authStore.$subscribe((mutation, state) => {
+  if (state.isAuthenticated && state.token) {
+    websocketService.connect(state.token)
+  } else {
+    websocketService.disconnect()
+  }
+})
 
 app.mount('#app')

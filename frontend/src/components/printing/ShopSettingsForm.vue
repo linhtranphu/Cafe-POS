@@ -1,0 +1,355 @@
+<template>
+  <div class="h-full flex flex-col bg-gray-50">
+    <!-- Header -->
+    <div class="bg-white shadow-sm flex-shrink-0 px-4 py-3 border-b">
+      <h2 class="text-lg font-bold text-gray-800">⚙️ Cài Đặt In Ấn</h2>
+      <p class="text-sm text-gray-600 mt-1">Cấu hình thông tin quán và tùy chỉnh mẫu in</p>
+    </div>
+
+    <!-- Loading State -->
+    <div v-if="loading && !settings" class="flex-1 flex items-center justify-center">
+      <div class="text-center">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+        <p class="mt-4 text-gray-600">Đang tải cài đặt...</p>
+      </div>
+    </div>
+
+    <!-- Error State -->
+    <div v-else-if="error && !settings" class="flex-1 flex items-center justify-center">
+      <div class="text-center">
+        <p class="text-red-600 mb-4">❌ {{ error }}</p>
+        <button
+          @click="loadSettings"
+          class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Thử lại
+        </button>
+      </div>
+    </div>
+
+    <!-- Form -->
+    <div v-else-if="settings" class="flex-1 overflow-y-auto">
+      <div class="max-w-4xl mx-auto p-6">
+        <form @submit.prevent="handleSubmit" class="space-y-6">
+          <!-- Shop Information Section -->
+          <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">📋 Thông Tin Quán</h3>
+            
+            <div class="space-y-4">
+              <!-- Shop Name -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  Tên Quán <span class="text-red-500">*</span>
+                </label>
+                <input
+                  v-model="formData.shop_name"
+                  type="text"
+                  required
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Nhập tên quán"
+                />
+              </div>
+
+              <!-- Shop Address -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  Địa Chỉ
+                </label>
+                <input
+                  v-model="formData.shop_address"
+                  type="text"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Nhập địa chỉ quán"
+                />
+                <div class="mt-2">
+                  <label class="inline-flex items-center">
+                    <input
+                      v-model="formData.show_address"
+                      type="checkbox"
+                      class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="ml-2 text-sm text-gray-700">Hiển thị trên bill</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Shop Phone -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  Số Điện Thoại
+                </label>
+                <input
+                  v-model="formData.shop_phone"
+                  type="tel"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Nhập số điện thoại"
+                />
+                <div class="mt-2">
+                  <label class="inline-flex items-center">
+                    <input
+                      v-model="formData.show_phone"
+                      type="checkbox"
+                      class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="ml-2 text-sm text-gray-700">Hiển thị trên bill</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Logo URL -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  Logo URL
+                </label>
+                <input
+                  v-model="formData.logo_url"
+                  type="url"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="https://example.com/logo.png"
+                />
+                <p class="mt-1 text-xs text-gray-500">URL của logo quán (nếu có)</p>
+                <div class="mt-2">
+                  <label class="inline-flex items-center">
+                    <input
+                      v-model="formData.show_logo"
+                      type="checkbox"
+                      class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="ml-2 text-sm text-gray-700">Hiển thị logo trên bill</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Custom Message -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  Lời Cảm Ơn / Thông Điệp
+                </label>
+                <textarea
+                  v-model="formData.custom_message"
+                  rows="3"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Cảm ơn quý khách! Hẹn gặp lại..."
+                ></textarea>
+                <div class="mt-2">
+                  <label class="inline-flex items-center">
+                    <input
+                      v-model="formData.show_custom_message"
+                      type="checkbox"
+                      class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="ml-2 text-sm text-gray-700">Hiển thị trên bill</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Print Configuration Section -->
+          <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">🖨️ Cấu Hình In</h3>
+            
+            <div class="space-y-4">
+              <!-- Paper Width -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  Khổ Giấy Bill <span class="text-red-500">*</span>
+                </label>
+                <select
+                  v-model.number="formData.paper_width"
+                  required
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option
+                    v-for="option in paperWidthOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </option>
+                </select>
+                <p class="mt-1 text-xs text-gray-500">Chọn khổ giấy phù hợp với máy in bill</p>
+              </div>
+
+              <!-- Label Size -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  Kích Thước Tem <span class="text-red-500">*</span>
+                </label>
+                <select
+                  v-model="formData.label_size"
+                  required
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option
+                    v-for="option in labelSizeOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </option>
+                </select>
+                <p class="mt-1 text-xs text-gray-500">Chọn kích thước tem phù hợp với máy in tem</p>
+              </div>
+
+              <!-- Auto Print -->
+              <div class="border-t pt-4">
+                <label class="inline-flex items-center">
+                  <input
+                    v-model="formData.auto_print_enabled"
+                    type="checkbox"
+                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span class="ml-2 text-sm font-medium text-gray-700">
+                    Tự động in bill và tem khi tạo đơn hàng
+                  </span>
+                </label>
+                <p class="mt-1 ml-6 text-xs text-gray-500">
+                  Nếu tắt, bạn có thể in thủ công từ chi tiết đơn hàng
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex justify-end gap-3 bg-white rounded-lg shadow p-4">
+            <button
+              type="button"
+              @click="resetForm"
+              class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              :disabled="loading"
+            >
+              Đặt lại
+            </button>
+            <button
+              type="submit"
+              class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="loading"
+            >
+              <span v-if="loading">Đang lưu...</span>
+              <span v-else>💾 Lưu cài đặt</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Success Toast -->
+    <div
+      v-if="showSuccess"
+      class="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-fade-in"
+    >
+      <span>✅</span>
+      <span>Đã lưu cài đặt thành công!</span>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted, computed } from 'vue'
+import { useShopSettingsStore } from '../../stores/shopSettings'
+
+const store = useShopSettingsStore()
+
+const loading = computed(() => store.loading)
+const error = computed(() => store.error)
+const settings = computed(() => store.settings)
+const paperWidthOptions = computed(() => store.paperWidthOptions)
+const labelSizeOptions = computed(() => store.labelSizeOptions)
+
+const showSuccess = ref(false)
+
+const formData = reactive({
+  shop_name: '',
+  shop_address: '',
+  shop_phone: '',
+  logo_url: '',
+  custom_message: '',
+  paper_width: 80,
+  label_size: '60x40',
+  show_logo: true,
+  show_address: true,
+  show_phone: true,
+  show_custom_message: true,
+  auto_print_enabled: true
+})
+
+onMounted(async () => {
+  await loadSettings()
+})
+
+async function loadSettings() {
+  try {
+    await store.fetchSettings()
+    if (settings.value) {
+      Object.assign(formData, {
+        shop_name: settings.value.shop_name || '',
+        shop_address: settings.value.shop_address || '',
+        shop_phone: settings.value.shop_phone || '',
+        logo_url: settings.value.logo_url || '',
+        custom_message: settings.value.custom_message || '',
+        paper_width: settings.value.paper_width || 80,
+        label_size: settings.value.label_size || '60x40',
+        show_logo: settings.value.show_logo !== false,
+        show_address: settings.value.show_address !== false,
+        show_phone: settings.value.show_phone !== false,
+        show_custom_message: settings.value.show_custom_message !== false,
+        auto_print_enabled: settings.value.auto_print_enabled !== false
+      })
+    }
+  } catch (err) {
+    console.error('Failed to load settings:', err)
+  }
+}
+
+function resetForm() {
+  if (settings.value) {
+    Object.assign(formData, {
+      shop_name: settings.value.shop_name || '',
+      shop_address: settings.value.shop_address || '',
+      shop_phone: settings.value.shop_phone || '',
+      logo_url: settings.value.logo_url || '',
+      custom_message: settings.value.custom_message || '',
+      paper_width: settings.value.paper_width || 80,
+      label_size: settings.value.label_size || '60x40',
+      show_logo: settings.value.show_logo !== false,
+      show_address: settings.value.show_address !== false,
+      show_phone: settings.value.show_phone !== false,
+      show_custom_message: settings.value.show_custom_message !== false,
+      auto_print_enabled: settings.value.auto_print_enabled !== false
+    })
+  }
+}
+
+async function handleSubmit() {
+  try {
+    await store.updateSettings(formData)
+    
+    // Show success message
+    showSuccess.value = true
+    setTimeout(() => {
+      showSuccess.value = false
+    }, 3000)
+  } catch (err) {
+    console.error('Failed to update settings:', err)
+    alert('Lỗi: ' + (err.response?.data?.error || 'Không thể lưu cài đặt'))
+  }
+}
+</script>
+
+<style scoped>
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+</style>

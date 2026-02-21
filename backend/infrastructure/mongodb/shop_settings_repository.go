@@ -76,7 +76,18 @@ func (r *ShopSettingsRepository) UpdateSettings(ctx context.Context, shopSetting
 	update := bson.M{
 		"$set": bson.M{
 			"shop_name":            shopSettings.ShopName,
+			"shop_address":         shopSettings.ShopAddress,
+			"shop_phone":           shopSettings.ShopPhone,
+			"logo_url":             shopSettings.LogoURL,
+			"custom_message":       shopSettings.CustomMessage,
+			"paper_width":          shopSettings.PaperWidth,
+			"label_size":           shopSettings.LabelSize,
+			"show_logo":            shopSettings.ShowLogo,
+			"show_address":         shopSettings.ShowAddress,
+			"show_phone":           shopSettings.ShowPhone,
+			"show_custom_message":  shopSettings.ShowCustomMessage,
 			"low_margin_threshold": shopSettings.LowMarginThreshold,
+			"auto_print_enabled":   shopSettings.AutoPrintEnabled,
 			"updated_at":           shopSettings.UpdatedAt,
 		},
 	}

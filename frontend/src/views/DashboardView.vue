@@ -136,11 +136,11 @@
           </div>
         </div>
 
-        <!-- 👥 Nhân sự -->
+        <!-- 👥 Nhân sự & Hệ thống -->
         <div class="mb-6">
           <h2 class="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
             <span>👥</span>
-            <span>Nhân sự</span>
+            <span>Nhân sự & Hệ thống</span>
           </h2>
           <div class="grid grid-cols-2 gap-3">
             <button @click="$router.push('/users')" 
@@ -148,6 +148,18 @@
               <div class="text-4xl mb-2">👥</div>
               <div class="font-bold text-base">Nhân viên</div>
               <div class="text-xs opacity-80 mt-1">Quản lý tài khoản</div>
+            </button>
+            <button @click="$router.push('/print-management')" 
+              class="bg-gradient-to-br from-teal-500 to-cyan-600 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+              <div class="text-4xl mb-2">🖨️</div>
+              <div class="font-bold text-base">In ấn</div>
+              <div class="text-xs opacity-80 mt-1">Máy in & templates</div>
+            </button>
+            <button @click="$router.push('/settings')" 
+              class="bg-gradient-to-br from-gray-500 to-gray-600 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+              <div class="text-4xl mb-2">⚙️</div>
+              <div class="font-bold text-base">Cài đặt</div>
+              <div class="text-xs opacity-80 mt-1">Cấu hình hệ thống</div>
             </button>
           </div>
         </div>
