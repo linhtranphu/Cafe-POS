@@ -45,8 +45,6 @@ type UpdateSettingsRequest struct {
 	ShopPhone         string `json:"shop_phone"`
 	LogoURL           string `json:"logo_url"`
 	CustomMessage     string `json:"custom_message"`
-	PaperWidth        int    `json:"paper_width" binding:"required,oneof=58 80"`
-	LabelSize         string `json:"label_size" binding:"required,oneof=40x30 50x30 60x40"`
 	ShowLogo          bool   `json:"show_logo"`
 	ShowAddress       bool   `json:"show_address"`
 	ShowPhone         bool   `json:"show_phone"`
@@ -83,18 +81,12 @@ func (h *ShopSettingsHandler) UpdateSettings(c *gin.Context) {
 
 	// Update fields
 	shopSettings.ShopName = req.ShopName
-	err = shopSettings.UpdatePrintSettings(
+	shopSettings.UpdatePrintSettings(
 		req.ShopAddress,
 		req.ShopPhone,
 		req.LogoURL,
 		req.CustomMessage,
-		req.PaperWidth,
-		req.LabelSize,
 	)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
 
 	shopSettings.SetFieldVisibility(
 		req.ShowLogo,

@@ -1,0 +1,7 @@
+{
+  "jobId": "test-001",
+  "content": "=== TEST PRINT ===\nWebSocket Test\nTest from API\n",
+  "printerIP": "192.168.1.115",
+  "printerPort": 9100,
+  "type": "TEST"
+}

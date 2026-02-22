@@ -1,25 +1,28 @@
 import api from './api'
 
-/**
- * Shop Settings API Service
- */
-
-/**
- * Fetch shop settings
- * @returns {Promise<Object>} Shop settings
- */
+// Named exports for store compatibility
 export async function fetchShopSettings() {
-  const response = await api.get('/shop-settings')
-  return response.data
+  try {
+    const response = await api.get('/manager/shop-settings')
+    return response.data
+  } catch (error) {
+    console.error('Error fetching shop settings:', error)
+    throw error
+  }
 }
 
-/**
- * Update shop settings
- * @param {string} id - Settings ID
- * @param {Object} settings - Settings data
- * @returns {Promise<Object>} Updated settings
- */
 export async function updateShopSettings(id, settings) {
-  const response = await api.put(`/shop-settings/${id}`, settings)
-  return response.data
+  try {
+    const response = await api.put(`/manager/shop-settings/${id}`, settings)
+    return response.data
+  } catch (error) {
+    console.error('Error updating shop settings:', error)
+    throw error
+  }
+}
+
+// Object export for direct usage in components
+export const shopSettingsService = {
+  getSettings: fetchShopSettings,
+  updateSettings: updateShopSettings
 }

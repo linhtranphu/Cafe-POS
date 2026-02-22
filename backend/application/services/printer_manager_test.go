@@ -209,8 +209,10 @@ func TestESCPOSPrinter_Connect(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			printer := infraPrinting.NewESCPOSPrinter(tt.config)
-			err := printer.Connect()
+			printer, err := infraPrinting.NewESCPOSPrinter(tt.config)
+			require.NoError(t, err)
+			
+			err = printer.Connect()
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -234,7 +236,8 @@ func TestESCPOSPrinter_Print(t *testing.T) {
 		Port:           9100,
 		PaperWidth:     80,
 	}
-	printer := infraPrinting.NewESCPOSPrinter(config)
+	printer, err := infraPrinting.NewESCPOSPrinter(config)
+	require.NoError(t, err)
 
 	tests := []struct {
 		name        string
@@ -246,7 +249,7 @@ func TestESCPOSPrinter_Print(t *testing.T) {
 			name:        "print without connection should fail",
 			content:     "Test print content",
 			expectError: true,
-			errorMsg:    "printer not connected",
+			errorMsg:    "not connected",
 		},
 		{
 			name:        "empty content should fail",
@@ -280,7 +283,8 @@ func TestESCPOSPrinter_GetStatus(t *testing.T) {
 		Port:           9100,
 		PaperWidth:     80,
 	}
-	printer := infraPrinting.NewESCPOSPrinter(config)
+	printer, err := infraPrinting.NewESCPOSPrinter(config)
+	require.NoError(t, err)
 
 	// Without connection, status should show offline
 	status, err := printer.GetStatus()
@@ -298,10 +302,11 @@ func TestESCPOSPrinter_Disconnect(t *testing.T) {
 		Port:           9100,
 		PaperWidth:     80,
 	}
-	printer := infraPrinting.NewESCPOSPrinter(config)
+	printer, err := infraPrinting.NewESCPOSPrinter(config)
+	require.NoError(t, err)
 
 	// Disconnect without connection should succeed (no-op)
-	err := printer.Disconnect()
+	err = printer.Disconnect()
 	assert.NoError(t, err)
 }
 

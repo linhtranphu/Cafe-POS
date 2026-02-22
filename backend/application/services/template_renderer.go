@@ -52,7 +52,6 @@ func (r *templateRenderer) RenderBill(ord *order.Order, tmpl *printing.PrintTemp
 		ShowAddress:       shopSettings.ShowAddress,
 		ShowPhone:         shopSettings.ShowPhone,
 		ShowCustomMessage: shopSettings.ShowCustomMessage,
-		PaperWidth:        shopSettings.PaperWidth,
 		Order:             ord,
 		PrintTime:         time.Now(),
 	}
@@ -103,7 +102,6 @@ func (r *templateRenderer) RenderLabel(ord *order.Order, itemIndex int, tmpl *pr
 		ShowAddress:       shopSettings.ShowAddress,
 		ShowPhone:         shopSettings.ShowPhone,
 		ShowCustomMessage: shopSettings.ShowCustomMessage,
-		PaperWidth:        shopSettings.PaperWidth,
 		Order:             ord,
 		PrintTime:         time.Now(),
 		ItemIndex:         itemIndex,

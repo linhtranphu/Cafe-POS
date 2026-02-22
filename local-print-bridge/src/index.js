@@ -3,6 +3,8 @@ const cors = require('cors')
 const dotenv = require('dotenv')
 const printerService = require('./services/printerService')
 const backendSync = require('./services/backendSync')
+const websocketClient = require('./services/websocketClient')
+const printJobHandler = require('./services/printJobHandler')
 const logger = require('./utils/logger')
 
 // Load environment variables
@@ -157,15 +159,33 @@ app.listen(PORT, () => {
   logger.info('='.repeat(50))
   logger.info('Ready to accept print requests!')
   logger.info('='.repeat(50))
+
+  // Connect to backend WebSocket for real-time job notifications
+  const backendUrl = process.env.BACKEND_URL
+  if (backendUrl) {
+    logger.info(`[WebSocket] Connecting to backend: ${backendUrl}`)
+    websocketClient.connect(backendUrl)
+    
+    // Register handler for incoming print jobs
+    websocketClient.onPrintJob((jobData) => {
+      logger.info('[WebSocket] 📨 Received print job via WebSocket:', jobData.id)
+      printJobHandler.handlePrintJob(jobData)
+    })
+  } else {
+    logger.warn('[WebSocket] ⚠️  BACKEND_URL not configured - WebSocket disabled')
+    logger.warn('[WebSocket] Print jobs will only work via HTTP POST /print endpoint')
+  }
 })
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received, shutting down gracefully...')
+  websocketClient.disconnect()
   process.exit(0)
 })
 
 process.on('SIGINT', () => {
   logger.info('SIGINT received, shutting down gracefully...')
+  websocketClient.disconnect()
   process.exit(0)
 })

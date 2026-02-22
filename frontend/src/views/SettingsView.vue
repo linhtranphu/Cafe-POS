@@ -20,9 +20,117 @@
       </div>
 
       <div v-else class="space-y-4">
+        <!-- Shop Information Card -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm">
+          <h3 class="text-lg font-bold mb-4">🏪 Thông tin cửa hàng</h3>
+          
+          <div class="space-y-4">
+            <!-- Shop Name -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Tên cửa hàng *
+              </label>
+              <input 
+                v-model="shopSettings.shop_name" 
+                type="text" 
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Cafe POS">
+            </div>
+
+            <!-- Shop Address -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Địa chỉ
+              </label>
+              <input 
+                v-model="shopSettings.shop_address" 
+                type="text" 
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="123 Main Street">
+            </div>
+
+            <!-- Shop Phone -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Số điện thoại
+              </label>
+              <input 
+                v-model="shopSettings.shop_phone" 
+                type="text" 
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="0123-456-789">
+            </div>
+
+            <!-- Custom Message -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Tin nhắn tùy chỉnh (hiển thị trên hóa đơn)
+              </label>
+              <textarea 
+                v-model="shopSettings.custom_message" 
+                rows="3"
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Cảm ơn quý khách! Hẹn gặp lại!"></textarea>
+            </div>
+
+            <!-- Display Options -->
+            <div class="space-y-2">
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Hiển thị trên hóa đơn
+              </label>
+              
+              <label class="flex items-center space-x-3 cursor-pointer">
+                <input 
+                  v-model="shopSettings.show_address" 
+                  type="checkbox" 
+                  class="w-5 h-5 text-blue-500 rounded focus:ring-2 focus:ring-blue-500">
+                <span class="text-sm text-gray-700">Hiển thị địa chỉ</span>
+              </label>
+
+              <label class="flex items-center space-x-3 cursor-pointer">
+                <input 
+                  v-model="shopSettings.show_phone" 
+                  type="checkbox" 
+                  class="w-5 h-5 text-blue-500 rounded focus:ring-2 focus:ring-blue-500">
+                <span class="text-sm text-gray-700">Hiển thị số điện thoại</span>
+              </label>
+
+              <label class="flex items-center space-x-3 cursor-pointer">
+                <input 
+                  v-model="shopSettings.show_custom_message" 
+                  type="checkbox" 
+                  class="w-5 h-5 text-blue-500 rounded focus:ring-2 focus:ring-blue-500">
+                <span class="text-sm text-gray-700">Hiển thị tin nhắn tùy chỉnh</span>
+              </label>
+            </div>
+
+            <!-- Auto Print -->
+            <div class="border-t pt-4">
+              <label class="flex items-center space-x-3 cursor-pointer">
+                <input 
+                  v-model="shopSettings.auto_print_enabled" 
+                  type="checkbox" 
+                  class="w-5 h-5 text-blue-500 rounded focus:ring-2 focus:ring-blue-500">
+                <div>
+                  <span class="text-sm font-medium text-gray-700">Tự động in khi thu tiền</span>
+                  <p class="text-xs text-gray-500">Tự động in hóa đơn và nhãn món khi waiter thu tiền</p>
+                </div>
+              </label>
+            </div>
+
+            <!-- Save Button -->
+            <button 
+              @click="saveShopSettings" 
+              :disabled="savingShopSettings"
+              class="w-full bg-blue-500 text-white py-3 rounded-lg font-medium hover:bg-blue-600 active:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              {{ savingShopSettings ? 'Đang lưu...' : 'Lưu thông tin cửa hàng' }}
+            </button>
+          </div>
+        </div>
+
         <!-- Shop Settings Card -->
         <div class="bg-white rounded-2xl p-6 shadow-sm">
-          <h3 class="text-lg font-bold mb-4">🏪 Cài đặt cửa hàng</h3>
+          <h3 class="text-lg font-bold mb-4">⚙️ Cài đặt hệ thống</h3>
           
           <div class="space-y-4">
             <!-- Low Margin Threshold -->
@@ -48,7 +156,7 @@
               @click="saveSettings" 
               :disabled="savingSettings"
               class="w-full bg-blue-500 text-white py-3 rounded-lg font-medium hover:bg-blue-600 active:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-              {{ savingSettings ? 'Đang lưu...' : 'Lưu cài đặt' }}
+              {{ savingSettings ? 'Đang lưu...' : 'Lưu cài đặt hệ thống' }}
             </button>
           </div>
         </div>
@@ -126,18 +234,32 @@ import PullToRefresh from '../components/PullToRefresh.vue'
 import OperatingExpenseForm from '../components/OperatingExpenseForm.vue'
 import { usePullToRefresh } from '../composables/usePullToRefresh'
 import { profitAnalysisService } from '../services/profitAnalysis'
+import { shopSettingsService } from '../services/shopSettings'
 import api from '../services/api'
 
 const authStore = useAuthStore()
 
 const loading = ref(false)
 const savingSettings = ref(false)
+const savingShopSettings = ref(false)
 const showExpenseForm = ref(false)
 const selectedExpense = ref(null)
 const expenses = ref([])
 
 const settings = ref({
   low_margin_threshold: 20.0
+})
+
+const shopSettings = ref({
+  id: null,
+  shop_name: '',
+  shop_address: '',
+  shop_phone: '',
+  custom_message: '',
+  show_address: true,
+  show_phone: true,
+  show_custom_message: true,
+  auto_print_enabled: true
 })
 
 // Fetch settings
@@ -155,6 +277,28 @@ const fetchSettings = async () => {
   }
 }
 
+// Fetch shop settings
+const fetchShopSettings = async () => {
+  try {
+    const response = await shopSettingsService.getSettings()
+    if (response) {
+      shopSettings.value = {
+        id: response.id,
+        shop_name: response.shop_name || '',
+        shop_address: response.shop_address || '',
+        shop_phone: response.shop_phone || '',
+        custom_message: response.custom_message || '',
+        show_address: response.show_address !== false,
+        show_phone: response.show_phone !== false,
+        show_custom_message: response.show_custom_message !== false,
+        auto_print_enabled: response.auto_print_enabled !== false
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching shop settings:', error)
+  }
+}
+
 // Save settings
 const saveSettings = async () => {
   try {
@@ -162,12 +306,40 @@ const saveSettings = async () => {
     await api.patch('/settings', {
       low_margin_threshold: settings.value.low_margin_threshold
     })
-    alert('Cài đặt đã được lưu!')
+    alert('Cài đặt hệ thống đã được lưu!')
   } catch (error) {
     console.error('Error saving settings:', error)
     alert('Lỗi khi lưu cài đặt: ' + (error.response?.data?.error || error.message))
   } finally {
     savingSettings.value = false
+  }
+}
+
+// Save shop settings
+const saveShopSettings = async () => {
+  try {
+    if (!shopSettings.value.shop_name) {
+      alert('Vui lòng nhập tên cửa hàng')
+      return
+    }
+
+    savingShopSettings.value = true
+    await shopSettingsService.updateSettings(shopSettings.value.id, {
+      shop_name: shopSettings.value.shop_name,
+      shop_address: shopSettings.value.shop_address,
+      shop_phone: shopSettings.value.shop_phone,
+      custom_message: shopSettings.value.custom_message,
+      show_address: shopSettings.value.show_address,
+      show_phone: shopSettings.value.show_phone,
+      show_custom_message: shopSettings.value.show_custom_message,
+      auto_print_enabled: shopSettings.value.auto_print_enabled
+    })
+    alert('Thông tin cửa hàng đã được lưu!')
+  } catch (error) {
+    console.error('Error saving shop settings:', error)
+    alert('Lỗi khi lưu thông tin: ' + (error.response?.data?.error || error.message))
+  } finally {
+    savingShopSettings.value = false
   }
 }
 
@@ -238,6 +410,7 @@ const getPeriodType = (start, end) => {
 const refreshData = async () => {
   await Promise.all([
     fetchSettings(),
+    fetchShopSettings(),
     fetchExpenses()
   ])
 }

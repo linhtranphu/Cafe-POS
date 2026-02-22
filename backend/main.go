@@ -72,13 +72,24 @@ func main() {
 	// State Machine Manager
 	smManager := domain.NewStateMachineManager()
 
-	// WebSocket Hub - Initialize and start
+	// WebSocket Hub - Initialize and start (keep for backward compatibility)
 	wsHub := websocket.NewHub()
 	go wsHub.Run()
 	log.Println("✅ WebSocket hub started")
 	
+	// Socket.IO Server - Initialize with standard library
+	socketIOServer, err := websocket.NewSocketIOServer()
+	if err != nil {
+		log.Fatalf("❌ Failed to create Socket.IO server: %v", err)
+	}
+	go socketIOServer.Serve()
+	defer socketIOServer.Close()
+	log.Println("✅ Socket.IO server started")
+	
 	// WebSocket Broadcaster
 	wsBroadcaster := websocket.NewBroadcaster(wsHub)
+	wsBroadcaster.SetPrinterRepository(printerConfigRepo)
+	wsBroadcaster.SetSocketIOServer(socketIOServer)
 
 	// Services
 	jwtSecret := os.Getenv("JWT_SECRET")
@@ -256,9 +267,10 @@ func main() {
 		c.Next()
 	})
 
-	// WebSocket endpoint (Socket.IO compatible)
-	r.GET("/socket.io/", websocket.HandleSocketIO(wsHub))
-	log.Println("✅ WebSocket endpoint registered at /socket.io/")
+	// Socket.IO endpoint (using standard library)
+	r.GET("/socket.io/*any", gin.WrapH(socketIOServer))
+	r.POST("/socket.io/*any", gin.WrapH(socketIOServer))
+	log.Println("✅ Socket.IO endpoint registered at /socket.io/")
 
 	// Routes
 	api := r.Group("/api")
@@ -375,6 +387,14 @@ func main() {
 				batchReports.GET("/wastage", batchReportHandler.GetWastageReport)
 				batchReports.GET("/usage", batchReportHandler.GetUsageReport)
 			}
+			
+			// Print template routes (read access for all authenticated users)
+			protected.GET("/print-templates", printTemplateHandler.ListTemplates)
+			protected.GET("/print-templates/:id", printTemplateHandler.GetTemplate)
+			
+			// Settings routes (read access for all authenticated users)
+			protected.GET("/settings", settingsHandler.GetSettings)
+			protected.PATCH("/settings", settingsHandler.UpdateSettings)
 			
 			// Waiter routes
 			waiter := protected.Group("/waiter")

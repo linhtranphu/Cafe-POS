@@ -116,6 +116,46 @@ fi
 
 echo ""
 
+# Check and start Print Bridge
+echo "=========================================="
+echo "🖨️  Checking Print Bridge..."
+echo "=========================================="
+echo ""
+
+PRINT_BRIDGE_CONTAINER="local-print-bridge"
+
+if docker ps | grep -q "$PRINT_BRIDGE_CONTAINER"; then
+    echo "✅ Print Bridge is already running"
+else
+    echo "⚠️  Print Bridge is not running. Starting..."
+    
+    # Check if container exists but stopped
+    if docker ps -a | grep -q "$PRINT_BRIDGE_CONTAINER"; then
+        echo "Starting existing container..."
+        docker start "$PRINT_BRIDGE_CONTAINER"
+    else
+        echo "Creating new container..."
+        # Use port mapping instead of host network for macOS compatibility
+        docker run -d \
+            --name "$PRINT_BRIDGE_CONTAINER" \
+            --restart unless-stopped \
+            -p 3001:3001 \
+            --env-file local-print-bridge/.env \
+            linhtranphu/local-print-bridge:latest
+    fi
+    
+    sleep 2
+    
+    if docker ps | grep -q "$PRINT_BRIDGE_CONTAINER"; then
+        echo "✅ Print Bridge started successfully"
+    else
+        echo "❌ Failed to start Print Bridge"
+        echo "Check logs: docker logs $PRINT_BRIDGE_CONTAINER"
+    fi
+fi
+
+echo ""
+
 # Kill existing backend and frontend processes
 echo "=========================================="
 echo "🛑 Stopping existing processes..."
@@ -199,8 +239,11 @@ if [ ! -f "package.json" ]; then
     exit 1
 fi
 
-# Run frontend in background
-npm run dev > ../frontend.log 2>&1 &
+# Get local IP address for LAN access
+LOCAL_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "localhost")
+
+# Run frontend in background with --host flag to allow LAN access
+npm run dev -- --host > ../frontend.log 2>&1 &
 FRONTEND_PID=$!
 
 echo "Frontend PID: $FRONTEND_PID"
@@ -227,22 +270,30 @@ echo "✅ All Services Started!"
 echo "=========================================="
 echo ""
 echo "📊 Service Status:"
-echo "  MongoDB:  ✅ Running on localhost:27017 (Replica Set: rs0)"
-echo "  Backend:  ✅ Running on localhost:3000 (PID: $BACKEND_PID)"
-echo "  Frontend: ✅ Running on localhost:5173 (PID: $FRONTEND_PID)"
+echo "  MongoDB:      ✅ Running on localhost:27017 (Replica Set: rs0)"
+echo "  Backend:      ✅ Running on localhost:3000 (PID: $BACKEND_PID)"
+echo "  Frontend:     ✅ Running on localhost:5173 (PID: $FRONTEND_PID)"
+echo "  Print Bridge: ✅ Running on localhost:3001 (Docker)"
 echo ""
 echo "🌐 Access Information:"
-echo "  Frontend:  http://localhost:5173"
-echo "  Backend:   http://localhost:3000"
-echo "  MongoDB:   mongodb://admin:password123@localhost:27017/cafe_pos?replicaSet=rs0&authSource=admin"
+echo "  Frontend (Local):  http://localhost:5173"
+echo "  Frontend (LAN):    http://$LOCAL_IP:5173"
+echo "  Backend:           http://localhost:3000"
+echo "  Print Bridge:      http://localhost:3001/health"
+echo "  MongoDB:           mongodb://admin:password123@localhost:27017/cafe_pos?replicaSet=rs0&authSource=admin"
+echo ""
+echo "📱 Access from other devices in LAN:"
+echo "  Open browser and go to: http://$LOCAL_IP:5173"
 echo ""
 echo "📋 Logs:"
-echo "  Backend:  tail -f backend.log"
-echo "  Frontend: tail -f frontend.log"
-echo "  MongoDB:  docker logs cafe-pos-mongodb"
+echo "  Backend:       tail -f backend.log"
+echo "  Frontend:      tail -f frontend.log"
+echo "  MongoDB:       docker logs cafe-pos-mongodb"
+echo "  Print Bridge:  docker logs local-print-bridge"
 echo ""
 echo "🛑 To stop services:"
 echo "  kill $BACKEND_PID  # Stop backend"
 echo "  kill $FRONTEND_PID # Stop frontend"
+echo "  docker stop local-print-bridge  # Stop Print Bridge"
 echo "  docker-compose -f docker-compose.replica-set.yml down  # Stop MongoDB"
 echo ""

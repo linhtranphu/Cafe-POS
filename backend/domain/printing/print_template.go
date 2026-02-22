@@ -36,7 +36,6 @@ type TemplateData struct {
 	ShowAddress       bool
 	ShowPhone         bool
 	ShowCustomMessage bool
-	PaperWidth        int
 	Order             interface{} // Will be *order.Order, using interface{} to avoid circular dependency
 	PrintTime         time.Time
 	// For labels

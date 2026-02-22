@@ -2,7 +2,9 @@ package http
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"time"
 
 	"cafe-pos/backend/application/services"
 	"cafe-pos/backend/domain/printing"
@@ -258,18 +260,55 @@ func (h *PrinterConfigHandler) TestConnection(c *gin.Context) {
 		return
 	}
 
-	// Test connection
-	if err := h.printerManager.TestConnection(config); err != nil {
+	// Get printer instance
+	printer, err := h.printerManager.GetPrinter(config)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"error":   err.Error(),
+			"error":   "Failed to get printer: " + err.Error(),
+		})
+		return
+	}
+
+	// Connect to printer
+	if err := printer.Connect(); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Connection failed: " + err.Error(),
+		})
+		return
+	}
+	defer printer.Disconnect()
+
+	// Print test receipt
+	testContent := `================================
+       TEST PRINT
+================================
+Printer: ` + config.Name + `
+Type: ` + string(config.Type) + `
+Connection: ` + string(config.ConnectionType) + `
+IP: ` + config.IPAddress + `:` + fmt.Sprintf("%d", config.Port) + `
+================================
+This is a test print
+Đây là bản in thử nghiệm
+================================
+Date: ` + time.Now().Format("2006-01-02 15:04:05") + `
+================================
+
+
+`
+
+	if err := printer.Print(testContent); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Print test failed: " + err.Error(),
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "Connection test successful",
+		"message": "Test print successful - Check your printer",
 	})
 }
 

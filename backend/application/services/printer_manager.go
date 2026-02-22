@@ -36,7 +36,11 @@ func (pm *printerManager) GetPrinter(config *printing.PrinterConfig) (Printer, e
 	// Factory pattern: create appropriate printer based on type
 	switch config.Type {
 	case printing.PrinterTypeBill:
-		return infraPrinting.NewESCPOSPrinter(config), nil
+		printer, err := infraPrinting.NewESCPOSPrinter(config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create ESC/POS printer: %w", err)
+		}
+		return printer, nil
 	case printing.PrinterTypeLabel:
 		return infraPrinting.NewLabelPrinter(config), nil
 	default:

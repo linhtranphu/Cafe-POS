@@ -9,18 +9,7 @@ export const useShopSettingsStore = defineStore('shopSettings', {
   }),
 
   getters: {
-    hasSettings: (state) => state.settings !== null,
-    
-    paperWidthOptions: () => [
-      { value: 58, label: '58mm' },
-      { value: 80, label: '80mm' }
-    ],
-    
-    labelSizeOptions: () => [
-      { value: '40x30', label: '40x30mm' },
-      { value: '50x30', label: '50x30mm' },
-      { value: '60x40', label: '60x40mm' }
-    ]
+    hasSettings: (state) => state.settings !== null
   },
 
   actions: {
