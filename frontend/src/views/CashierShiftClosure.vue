@@ -71,15 +71,61 @@
         <!-- Step 1: Initiate Closure -->
         <div v-if="shift.status === CASHIER_SHIFT_STATUS.OPEN" class="bg-white rounded-2xl p-6 shadow-sm">
           <h3 class="text-lg font-bold text-gray-800 mb-4">Bước 1: Bắt đầu đóng ca</h3>
-          <p class="text-sm text-gray-600 mb-4">
+          
+          <!-- Waiter Shifts Warning -->
+          <div v-if="waiterShiftsStatus && !waiterShiftsStatus.can_close" class="bg-red-50 border-2 border-red-300 rounded-xl p-4 mb-4">
+            <div class="flex items-start gap-3 mb-3">
+              <span class="text-2xl">⚠️</span>
+              <div>
+                <p class="font-bold text-red-800 mb-2">Không thể đóng ca!</p>
+                <p class="text-sm text-red-700 mb-2">
+                  Còn {{ waiterShiftsStatus.open_count }} ca waiter đang mở:
+                </p>
+                <ul class="text-sm text-red-700 list-disc list-inside">
+                  <li v-for="openShift in waiterShiftsStatus.open_shifts" :key="openShift.id">
+                    {{ openShift.user_name }} ({{ openShift.role_type }})
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <p class="text-xs text-red-600">
+              Vui lòng đóng tất cả ca waiter trước khi đóng ca thu ngân.
+            </p>
+          </div>
+          
+          <p v-else class="text-sm text-gray-600 mb-4">
             Xác nhận bắt đầu quy trình đóng ca. Sau khi bắt đầu, bạn cần hoàn thành tất cả các bước.
           </p>
+          
           <button
             @click="initiateClosure"
-            :disabled="processing"
+            :disabled="processing || (waiterShiftsStatus && !waiterShiftsStatus.can_close)"
             class="w-full py-4 bg-yellow-500 text-white rounded-xl font-bold active:scale-95 transition-transform disabled:opacity-50"
           >
             {{ processing ? 'Đang xử lý...' : '▶️ Bắt đầu đóng ca' }}
+          </button>
+        </div>
+
+        <!-- Cancel Closure Option (shown anytime during CLOSURE_INITIATED) -->
+        <div v-if="shift.status === CASHIER_SHIFT_STATUS.CLOSURE_INITIATED && shift.status !== CASHIER_SHIFT_STATUS.CLOSED" class="bg-orange-50 border-2 border-orange-200 rounded-2xl p-4 shadow-sm">
+          <div class="flex items-start gap-3 mb-3">
+            <span class="text-2xl">⚠️</span>
+            <div class="flex-1">
+              <p class="font-bold text-orange-800 mb-1">Đang trong quy trình đóng ca</p>
+              <p class="text-sm text-orange-700">
+                Nếu bạn muốn hủy quy trình đóng ca và quay về trạng thái mở ca, bấm nút bên dưới.
+                <span v-if="shift.actual_cash" class="font-semibold">
+                  Lưu ý: Tiền thực tế và chênh lệch đã nhập sẽ bị xóa.
+                </span>
+              </p>
+            </div>
+          </div>
+          <button
+            @click="cancelClosure"
+            :disabled="processing"
+            class="w-full py-3 bg-orange-500 text-white rounded-xl font-bold active:scale-95 transition-transform disabled:opacity-50"
+          >
+            {{ processing ? 'Đang hủy...' : '↩️ Hủy đóng ca' }}
           </button>
         </div>
 
@@ -114,7 +160,7 @@
         </div>
 
         <!-- Step 3: Document Variance (if needed) -->
-        <div v-if="shift.variance && shift.variance.amount !== 0 && !shift.variance.reason" class="bg-white rounded-2xl p-6 shadow-sm">
+        <div v-if="needsVarianceDocumentation" class="bg-white rounded-2xl p-6 shadow-sm">
           <h3 class="text-lg font-bold text-gray-800 mb-4">Bước 3: Giải trình chênh lệch</h3>
           
           <div class="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 mb-4">
@@ -159,75 +205,21 @@
             </div>
 
             <button
-              @click="documentVariance"
+              @click="documentVarianceAndClose"
               :disabled="!varianceReason || varianceNotes.length < 10 || processing"
-              class="w-full py-4 bg-orange-500 text-white rounded-xl font-bold active:scale-95 transition-transform disabled:opacity-50"
+              class="w-full py-4 bg-red-500 text-white rounded-xl font-bold active:scale-95 transition-transform disabled:opacity-50"
             >
-              {{ processing ? 'Đang xử lý...' : '📝 Ghi nhận giải trình' }}
+              {{ processing ? 'Đang xử lý...' : '🔒 Ghi nhận và đóng ca' }}
             </button>
           </div>
         </div>
 
-        <!-- Step 4: Confirm Responsibility -->
-        <div v-if="canConfirmResponsibility" class="bg-white rounded-2xl p-6 shadow-sm">
-          <h3 class="text-lg font-bold text-gray-800 mb-4">Bước 4: Xác nhận trách nhiệm</h3>
-          
-          <div class="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-4">
-            <p class="text-sm text-blue-800">
-              Tôi xác nhận rằng tôi đã kiểm tra kỹ lưỡng và chịu trách nhiệm về số liệu tài chính trong ca làm việc này.
-            </p>
+        <!-- Auto Close (no variance or variance documented) -->
+        <div v-if="readyToAutoClose" class="bg-white rounded-2xl p-6 shadow-sm">
+          <div class="text-center py-4">
+            <div class="animate-spin text-5xl mb-3">⏳</div>
+            <p class="text-gray-600">Đang đóng ca...</p>
           </div>
-
-          <button
-            @click="confirmResponsibility"
-            :disabled="processing"
-            class="w-full py-4 bg-blue-500 text-white rounded-xl font-bold active:scale-95 transition-transform disabled:opacity-50"
-          >
-            {{ processing ? 'Đang xử lý...' : '✓ Tôi xác nhận' }}
-          </button>
-        </div>
-
-        <!-- Step 5: Close Shift -->
-        <div v-if="canCloseShift" class="bg-white rounded-2xl p-6 shadow-sm">
-          <h3 class="text-lg font-bold text-gray-800 mb-4">Bước 5: Hoàn tất đóng ca</h3>
-          
-          <!-- Waiter Shifts Warning -->
-          <div v-if="waiterShiftsStatus && !waiterShiftsStatus.can_close" class="bg-red-50 border-2 border-red-300 rounded-xl p-4 mb-4">
-            <div class="flex items-start gap-3 mb-3">
-              <span class="text-2xl">⚠️</span>
-              <div>
-                <p class="font-bold text-red-800 mb-2">Không thể đóng ca!</p>
-                <p class="text-sm text-red-700 mb-2">
-                  Còn {{ waiterShiftsStatus.open_count }} ca waiter đang mở:
-                </p>
-                <ul class="text-sm text-red-700 list-disc list-inside">
-                  <li v-for="openShift in waiterShiftsStatus.open_shifts" :key="openShift.id">
-                    {{ openShift.user_name }} ({{ openShift.role_type }})
-                  </li>
-                </ul>
-              </div>
-            </div>
-            <p class="text-xs text-red-600">
-              Vui lòng đóng tất cả ca waiter trước khi đóng ca thu ngân.
-            </p>
-          </div>
-          
-          <div class="bg-green-50 border-2 border-green-200 rounded-xl p-4 mb-4">
-            <p class="text-sm text-green-800 mb-2">
-              ✓ Tất cả các bước đã hoàn thành. Bạn có thể đóng ca ngay bây giờ.
-            </p>
-            <p class="text-xs text-green-700">
-              Lưu ý: Sau khi đóng ca, bạn không thể thay đổi thông tin.
-            </p>
-          </div>
-
-          <button
-            @click="closeShift"
-            :disabled="processing"
-            class="w-full py-4 bg-red-500 text-white rounded-xl font-bold active:scale-95 transition-transform disabled:opacity-50"
-          >
-            {{ processing ? 'Đang xử lý...' : '🔒 Đóng ca' }}
-          </button>
         </div>
 
         <!-- Completed -->
@@ -250,7 +242,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import cashierShiftService from '../services/cashierShift'
 import PullToRefresh from '../components/PullToRefresh.vue'
@@ -265,6 +257,7 @@ const loading = ref(true)
 const error = ref(null)
 const processing = ref(false)
 const waiterShiftsStatus = ref(null)
+const autoClosing = ref(false)
 
 // Form data
 const actualCash = ref(null)
@@ -272,24 +265,32 @@ const varianceReason = ref('')
 const varianceNotes = ref('')
 
 // Computed
-const canConfirmResponsibility = computed(() => {
+const needsVarianceDocumentation = computed(() => {
   if (!shift.value) return false
   if (shift.value.status !== CASHIER_SHIFT_STATUS.CLOSURE_INITIATED) return false
   if (!shift.value.actual_cash) return false
-  if (shift.value.confirmation) return false
-  
-  // If there's variance, it must be documented
-  if (shift.value.variance && shift.value.variance.amount !== 0) {
-    return shift.value.variance.reason !== null
-  }
-  
+  if (!shift.value.variance) return false
+  if (shift.value.variance.amount === 0) return false
+  if (shift.value.variance.reason) return false // Already documented
   return true
 })
 
-const canCloseShift = computed(() => {
+const readyToAutoClose = computed(() => {
   if (!shift.value) return false
   if (shift.value.status !== CASHIER_SHIFT_STATUS.CLOSURE_INITIATED) return false
-  return shift.value.confirmation !== null
+  if (!shift.value.actual_cash) return false
+  
+  // If no variance, ready to close
+  if (!shift.value.variance || shift.value.variance.amount === 0) {
+    return true
+  }
+  
+  // If variance is documented, ready to close
+  if (shift.value.variance.reason && shift.value.variance.notes) {
+    return true
+  }
+  
+  return false
 })
 
 // Methods
@@ -329,6 +330,11 @@ const recordActualCash = async () => {
   try {
     await cashierShiftService.recordActualCash(shift.value.id, actualCash.value)
     await loadShift()
+    
+    // Auto close if no variance
+    if (shift.value.variance && shift.value.variance.amount === 0) {
+      await autoCloseShift()
+    }
   } catch (err) {
     error.value = err.response?.data?.error || 'Không thể ghi nhận tiền mặt'
   } finally {
@@ -336,16 +342,20 @@ const recordActualCash = async () => {
   }
 }
 
-const documentVariance = async () => {
+const documentVarianceAndClose = async () => {
   processing.value = true
   error.value = null
   
   try {
+    // Document variance first
     await cashierShiftService.documentVariance(shift.value.id, {
       reason: varianceReason.value,
       notes: varianceNotes.value
     })
     await loadShift()
+    
+    // Then auto close
+    await autoCloseShift()
   } catch (err) {
     error.value = err.response?.data?.error || 'Không thể ghi nhận giải trình'
   } finally {
@@ -353,49 +363,45 @@ const documentVariance = async () => {
   }
 }
 
-const confirmResponsibility = async () => {
-  processing.value = true
-  error.value = null
-  
-  try {
-    await cashierShiftService.confirmResponsibility(shift.value.id)
-    await loadShift()
-  } catch (err) {
-    error.value = err.response?.data?.error || 'Không thể xác nhận trách nhiệm'
-  } finally {
-    processing.value = false
-  }
-}
-
-const closeShift = async () => {
-  // Check waiter shifts first
-  try {
-    const status = await cashierShiftService.checkWaiterShifts()
-    waiterShiftsStatus.value = status
-    
-    if (!status.can_close) {
-      const shiftList = status.open_shifts.map(s => `- ${s.user_name} (${s.role_type})`).join('\n')
-      const message = `Không thể đóng ca thu ngân!\n\nCòn ${status.open_count} ca waiter đang mở:\n${shiftList}\n\nVui lòng đóng tất cả ca waiter trước.`
-      alert(message)
-      return
-    }
-  } catch (err) {
-    error.value = 'Không thể kiểm tra trạng thái ca waiter'
-    return
-  }
-  
-  if (!confirm('Bạn có chắc muốn đóng ca? Không thể hoàn tác sau khi đóng.')) {
-    return
-  }
-  
-  processing.value = true
-  error.value = null
-  
+const autoCloseShift = async () => {
   try {
     await cashierShiftService.closeShift(shift.value.id)
     await loadShift()
   } catch (err) {
     error.value = err.response?.data?.error || 'Không thể đóng ca'
+    throw err
+  }
+}
+
+const cancelClosure = async () => {
+  // Build confirmation message based on what will be rolled back
+  let confirmMessage = 'Bạn có chắc muốn hủy quy trình đóng ca?\n\nCa sẽ quay về trạng thái mở.'
+  
+  if (shift.value.actual_cash) {
+    confirmMessage += '\n\n⚠️ Các dữ liệu sau sẽ bị xóa:'
+    confirmMessage += '\n• Tiền thực tế đã nhập'
+    if (shift.value.variance) {
+      confirmMessage += '\n• Chênh lệch đã tính'
+      if (shift.value.variance.reason) {
+        confirmMessage += '\n• Giải trình chênh lệch'
+      }
+    }
+  }
+  
+  if (!confirm(confirmMessage)) {
+    return
+  }
+  
+  processing.value = true
+  error.value = null
+  
+  try {
+    await cashierShiftService.cancelClosure(shift.value.id)
+    await loadShift()
+    // Show success message
+    alert('✅ Đã hủy quy trình đóng ca thành công!\n\nCa đã quay về trạng thái mở.')
+  } catch (err) {
+    error.value = err.response?.data?.error || 'Không thể hủy đóng ca'
   } finally {
     processing.value = false
   }
@@ -404,7 +410,6 @@ const closeShift = async () => {
 const goBack = () => {
   router.push('/cashier')
 }
-
 // Utility functions
 const formatPrice = (amount) => {
   if (!amount && amount !== 0) return '0₫'
@@ -449,10 +454,6 @@ const refreshData = async () => {
 
 const { pullDistance, isRefreshing } = usePullToRefresh(refreshData)
 
-onMounted(async () => {
-  await refreshData()
-})
-
 // Auto-check waiter shifts status
 const checkWaiterShiftsStatus = async () => {
   try {
@@ -462,6 +463,24 @@ const checkWaiterShiftsStatus = async () => {
     console.error('Failed to check waiter shifts:', err)
   }
 }
+
+// Watch for readyToAutoClose and trigger auto close
+watch(readyToAutoClose, async (isReady) => {
+  if (isReady && !autoClosing.value && shift.value.status !== CASHIER_SHIFT_STATUS.CLOSED) {
+    autoClosing.value = true
+    try {
+      await autoCloseShift()
+    } catch (err) {
+      console.error('Auto close failed:', err)
+    } finally {
+      autoClosing.value = false
+    }
+  }
+})
+
+onMounted(async () => {
+  await refreshData()
+})
 </script>
 
 <style scoped>

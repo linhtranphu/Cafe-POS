@@ -3,9 +3,12 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
+	"math"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 
 	"cafe-pos/backend/domain/cashier"
 	"cafe-pos/backend/domain/handover"
@@ -20,6 +23,7 @@ type CashHandoverService struct {
 	shiftRepo            *mongodb.ShiftRepository
 	cashierShiftRepo     *mongodb.CashierShiftRepository
 	orderRepo            *mongodb.OrderRepository
+	mongoClient          *mongo.Client
 	discrepancyThreshold float64
 }
 
@@ -30,6 +34,7 @@ func NewCashHandoverService(
 	shiftRepo *mongodb.ShiftRepository,
 	cashierShiftRepo *mongodb.CashierShiftRepository,
 	orderRepo *mongodb.OrderRepository,
+	mongoClient *mongo.Client,
 ) *CashHandoverService {
 	return &CashHandoverService{
 		handoverRepo:         handoverRepo,
@@ -37,18 +42,33 @@ func NewCashHandoverService(
 		shiftRepo:            shiftRepo,
 		cashierShiftRepo:     cashierShiftRepo,
 		orderRepo:            orderRepo,
+		mongoClient:          mongoClient,
 		discrepancyThreshold: 100000, // 100k VND
 	}
 }
 
+// ============================================================================
+// CREATE HANDOVER
+// ============================================================================
+
 // CreateHandover creates a new handover request from waiter
+// Supports both cash and transfer amounts
 func (s *CashHandoverService) CreateHandover(
 	ctx context.Context,
 	waiterShiftID primitive.ObjectID,
-	req *handover.CreateHandoverRequest,
+	cashAmount, transferAmount float64,
+	handoverType handover.HandoverType,
+	waiterNote string,
 	waiterID, waiterName string,
 ) (*handover.CashHandover, error) {
-	// 1. Validate waiter shift exists and is open
+	fmt.Printf("🔵 [CREATE HANDOVER] Starting - Cash: %.0f, Transfer: %.0f\n", cashAmount, transferAmount)
+
+	// 1. Validate at least one amount is provided
+	if cashAmount == 0 && transferAmount == 0 {
+		return nil, errors.New("at least one amount (cash or transfer) must be greater than 0")
+	}
+
+	// 2. Validate waiter shift exists and is open
 	waiterShift, err := s.shiftRepo.FindByID(ctx, waiterShiftID)
 	if err != nil {
 		return nil, errors.New("waiter shift not found")
@@ -57,7 +77,10 @@ func (s *CashHandoverService) CreateHandover(
 		return nil, errors.New("waiter shift is not open")
 	}
 
-	// 2. Check if waiter owns the shift
+	fmt.Printf("🔵 [CREATE HANDOVER] Shift before - RemainingCash: %.0f, RemainingTransfer: %.0f\n", 
+		waiterShift.RemainingCash, waiterShift.RemainingTransfer)
+
+	// 3. Check if waiter owns the shift
 	waiterOID, err := primitive.ObjectIDFromHex(waiterID)
 	if err != nil {
 		return nil, errors.New("invalid waiter ID")
@@ -66,7 +89,7 @@ func (s *CashHandoverService) CreateHandover(
 		return nil, errors.New("unauthorized: not your shift")
 	}
 
-	// 3. Check if there's already a pending handover
+	// 4. Check if there's already a pending handover
 	existingPending, err := s.handoverRepo.FindPendingByWaiterShift(ctx, waiterShiftID)
 	if err != nil {
 		return nil, err
@@ -75,32 +98,42 @@ func (s *CashHandoverService) CreateHandover(
 		return nil, errors.New("there is already a pending handover for this shift")
 	}
 
-	// 4. Validate declared amount
-	if req.DeclaredAmount > waiterShift.RemainingCash {
-		return nil, errors.New("declared amount exceeds remaining cash")
+	// 5. Validate amounts against shift balances
+	if cashAmount > waiterShift.RemainingCash {
+		return nil, fmt.Errorf("cash amount (%.0f) exceeds remaining cash (%.0f)", cashAmount, waiterShift.RemainingCash)
+	}
+	if transferAmount > waiterShift.RemainingTransfer {
+		return nil, fmt.Errorf("transfer amount (%.0f) exceeds remaining transfer (%.0f)", transferAmount, waiterShift.RemainingTransfer)
 	}
 
-	// 5. Find active cashier shift
+	// 6. Find active cashier shift
 	cashierShifts, err := s.cashierShiftRepo.FindByStatus(ctx, cashier.CashierShiftOpen)
 	if err != nil || len(cashierShifts) == 0 {
 		return nil, errors.New("no active cashier shift found")
 	}
-	cashierShift := cashierShifts[0] // Get first open shift
+	cashierShift := cashierShifts[0]
 
-	// 6. Create handover record
+	// 7. Create handover record
 	h := &handover.CashHandover{
-		WaiterShiftID:  waiterShiftID,
-		CashierShiftID: cashierShift.ID,
-		WaiterID:       waiterOID,
-		WaiterName:     waiterName,
-		CashierID:      cashierShift.CashierID,
-		CashierName:    cashierShift.CashierName,
-		DeclaredAmount: req.DeclaredAmount,
-		ActualAmount:   0, // Will be set by cashier
-		Discrepancy:    0, // Will be calculated
-		HandoverType:   req.HandoverType,
+		WaiterShiftID:          waiterShiftID,
+		CashierShiftID:         cashierShift.ID,
+		WaiterID:               waiterOID,
+		WaiterName:             waiterName,
+		CashierID:              cashierShift.CashierID,
+		CashierName:            cashierShift.CashierName,
+		CashDeclaredAmount:     cashAmount,
+		TransferDeclaredAmount: transferAmount,
+		CashActualAmount:       0, // Will be set by cashier
+		TransferActualAmount:   0, // Will be set by cashier
+		CashDiscrepancy:        0, // Will be calculated
+		TransferDiscrepancy:    0, // Will be calculated
+		// Deprecated fields for backward compatibility
+		DeclaredAmount: cashAmount + transferAmount,
+		ActualAmount:   0,
+		Discrepancy:    0,
+		HandoverType:   handoverType,
 		Status:         handover.StatusPending,
-		WaiterNote:     req.WaiterNote,
+		WaiterNote:     waiterNote,
 		HandoverAt:     time.Now(),
 		CreatedAt:      time.Now(),
 		UpdatedAt:      time.Now(),
@@ -110,95 +143,49 @@ func (s *CashHandoverService) CreateHandover(
 		return nil, err
 	}
 
-	return h, nil
-}
+	// 8. CRITICAL: Reduce remaining amounts immediately
+	// This is the ONLY place where remaining amounts are reduced
+	waiterShift.RemainingCash -= cashAmount
+	waiterShift.RemainingTransfer -= transferAmount
+	waiterShift.UpdatedAt = time.Now()
 
-// CreateHandoverAndEndShift creates handover and prepares shift for closure
-func (s *CashHandoverService) CreateHandoverAndEndShift(
-	ctx context.Context,
-	waiterShiftID primitive.ObjectID,
-	req *handover.CreateHandoverAndEndShiftRequest,
-	waiterID, waiterName string,
-) (*handover.CashHandover, error) {
-	// 1. Validate waiter shift exists and is open
-	waiterShift, err := s.shiftRepo.FindByID(ctx, waiterShiftID)
-	if err != nil {
-		return nil, errors.New("waiter shift not found")
-	}
-	if waiterShift.Status != order.ShiftOpen {
-		return nil, errors.New("waiter shift is not open")
-	}
+	fmt.Printf("🔵 [CREATE HANDOVER] Shift after - RemainingCash: %.0f, RemainingTransfer: %.0f\n", 
+		waiterShift.RemainingCash, waiterShift.RemainingTransfer)
 
-	// 2. Check if waiter owns the shift
-	waiterOID, err := primitive.ObjectIDFromHex(waiterID)
-	if err != nil {
-		return nil, errors.New("invalid waiter ID")
-	}
-	if waiterShift.UserID != waiterOID {
-		return nil, errors.New("unauthorized: not your shift")
-	}
-
-	// 3. Check if there's already a pending handover
-	existingPending, err := s.handoverRepo.FindPendingByWaiterShift(ctx, waiterShiftID)
-	if err != nil {
-		return nil, err
-	}
-	if existingPending != nil {
-		return nil, errors.New("there is already a pending handover for this shift")
-	}
-
-	// 4. Find active cashier shift
-	cashierShifts, err := s.cashierShiftRepo.FindByStatus(ctx, cashier.CashierShiftOpen)
-	if err != nil || len(cashierShifts) == 0 {
-		return nil, errors.New("no active cashier shift found")
-	}
-	cashierShift := cashierShifts[0] // Get first open shift
-
-	// 5. Amount must equal remaining cash for END_SHIFT
-	handoverAmount := waiterShift.RemainingCash
-	if handoverAmount <= 0 {
-		return nil, errors.New("no remaining cash to handover")
-	}
-
-	// 6. Create handover record
-	h := &handover.CashHandover{
-		WaiterShiftID:  waiterShiftID,
-		CashierShiftID: cashierShift.ID,
-		WaiterID:       waiterOID,
-		WaiterName:     waiterName,
-		CashierID:      cashierShift.CashierID,
-		CashierName:    cashierShift.CashierName,
-		DeclaredAmount: handoverAmount,
-		ActualAmount:   0, // Will be set by cashier
-		Discrepancy:    0, // Will be calculated
-		HandoverType:   handover.TypeEndShift,
-		Status:         handover.StatusPending,
-		WaiterNote:     req.WaiterNote,
-		EndCash:        req.EndCash, // Store end cash for later use
-		HandoverAt:     time.Now(),
-		CreatedAt:      time.Now(),
-		UpdatedAt:      time.Now(),
-	}
-
-	if err := s.handoverRepo.Create(ctx, h); err != nil {
+	if err := s.shiftRepo.Update(ctx, waiterShiftID, waiterShift); err != nil {
 		return nil, err
 	}
 
+	fmt.Printf("✅ [CREATE HANDOVER] Success - Handover ID: %s\n", h.ID.Hex())
 	return h, nil
 }
 
-// ConfirmHandoverWithReconciliation confirms handover with actual amount and handles discrepancy
-func (s *CashHandoverService) ConfirmHandoverWithReconciliation(
+// ============================================================================
+// CONFIRM HANDOVER
+// ============================================================================
+
+// ConfirmHandover confirms or rejects a handover with actual amounts
+// Uses MongoDB transaction to ensure atomicity - if rejected, rollback remaining amounts
+func (s *CashHandoverService) ConfirmHandover(
 	ctx context.Context,
 	handoverID primitive.ObjectID,
-	req *handover.ConfirmHandoverRequest,
+	actualCashAmount, actualTransferAmount float64,
+	status handover.HandoverStatus,
+	cashierNote, discrepancyReason string,
+	discrepancyResponsibility handover.ResponsibilityType,
 	cashierID string,
 ) error {
+	fmt.Printf("🟢 [CONFIRM HANDOVER] Starting - ActualCash: %.0f, ActualTransfer: %.0f, Status: %s\n", 
+		actualCashAmount, actualTransferAmount, status)
+
 	// 1. Get handover record
 	h, err := s.handoverRepo.FindByID(ctx, handoverID)
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("🟢 [CONFIRM HANDOVER] Handover - DeclaredCash: %.0f, DeclaredTransfer: %.0f\n", 
+		h.CashDeclaredAmount, h.TransferDeclaredAmount)
 
 	// 2. Validate cashier authorization
 	cashierOID, err := primitive.ObjectIDFromHex(cashierID)
@@ -214,118 +201,177 @@ func (s *CashHandoverService) ConfirmHandoverWithReconciliation(
 		return errors.New("handover is not pending")
 	}
 
-	// 4. Validate actual_amount for CONFIRMED status
-	if req.Status == handover.StatusConfirmed && req.ActualAmount == 0 {
-		return errors.New("actual_amount is required when confirming handover")
-	}
-
-	// 5. Calculate discrepancy (only for CONFIRMED)
-	var discrepancy float64
-	if req.Status == handover.StatusConfirmed {
-		discrepancy = req.ActualAmount - h.DeclaredAmount
-	}
-
-	// 6. Update handover with reconciliation data
-	now := time.Now()
-	h.Status = req.Status
-	h.CashierNote = req.CashierNote
-	h.ConfirmedAt = &now
-	h.UpdatedAt = now
-
-	if req.Status == handover.StatusConfirmed {
-		h.ActualAmount = req.ActualAmount
-		h.Discrepancy = discrepancy
-		h.ReconciledAt = &now
-	}
-
-	// 7. Handle discrepancy if exists (only for CONFIRMED)
-	if req.Status == handover.StatusConfirmed && h.HasDiscrepancy() {
-		h.DiscrepancyReason = req.DiscrepancyReason
-		h.DiscrepancyResponsibility = req.DiscrepancyResponsibility
-
-		// Check if requires manager approval
-		if h.RequiresManagerApproval(s.discrepancyThreshold) {
-			h.RequiresApproval = true
-			h.Status = handover.StatusDiscrepancy
+	// 4. Validate actual amounts match declared amounts
+	if status == handover.StatusConfirmed {
+		if h.CashDeclaredAmount > 0 && actualCashAmount == 0 {
+			return errors.New("actual_cash_amount is required when cash was declared")
 		}
-
-		// Create discrepancy record
-		if err := s.createDiscrepancyRecord(ctx, h); err != nil {
-			return err
+		if h.TransferDeclaredAmount > 0 && actualTransferAmount == 0 {
+			return errors.New("actual_transfer_amount is required when transfer was declared")
 		}
 	}
 
-	// 8. Update handover record
-	if err := s.handoverRepo.Update(ctx, handoverID, h); err != nil {
+	// 5. Calculate discrepancies
+	cashDiscrepancy := actualCashAmount - h.CashDeclaredAmount
+	transferDiscrepancy := actualTransferAmount - h.TransferDeclaredAmount
+	totalDiscrepancy := cashDiscrepancy + transferDiscrepancy
+
+	fmt.Printf("🟢 [CONFIRM HANDOVER] Discrepancy - Cash: %.0f, Transfer: %.0f, Total: %.0f\n", 
+		cashDiscrepancy, transferDiscrepancy, totalDiscrepancy)
+
+	// 6. START MONGODB TRANSACTION
+	// This ensures atomicity - either all updates succeed or all rollback
+	session, err := s.mongoClient.StartSession()
+	if err != nil {
+		return fmt.Errorf("failed to start transaction session: %w", err)
+	}
+	defer session.EndSession(ctx)
+
+	// Execute transaction
+	_, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
+		// 6a. Update handover record
+		now := time.Now()
+		h.Status = status
+		h.CashierNote = cashierNote
+		h.ConfirmedAt = &now
+		h.UpdatedAt = now
+
+		if status == handover.StatusConfirmed {
+			h.CashActualAmount = actualCashAmount
+			h.TransferActualAmount = actualTransferAmount
+			h.CashDiscrepancy = cashDiscrepancy
+			h.TransferDiscrepancy = transferDiscrepancy
+			// Update deprecated fields
+			h.ActualAmount = actualCashAmount + actualTransferAmount
+			h.Discrepancy = totalDiscrepancy
+			h.ReconciledAt = &now
+		}
+
+		// 6b. Handle discrepancy if exists
+		if status == handover.StatusConfirmed && totalDiscrepancy != 0 {
+			h.DiscrepancyReason = discrepancyReason
+			h.DiscrepancyResponsibility = discrepancyResponsibility
+
+			// Check if requires manager approval
+			totalAbsDiscrepancy := math.Abs(totalDiscrepancy)
+			if totalAbsDiscrepancy > s.discrepancyThreshold {
+				h.RequiresApproval = true
+				h.Status = handover.StatusDiscrepancy
+				fmt.Printf("⚠️  [CONFIRM HANDOVER] Large discrepancy - requires manager approval\n")
+			}
+
+			// Create discrepancy record
+			if err := s.createDiscrepancyRecord(sessCtx, h); err != nil {
+				return nil, err
+			}
+		}
+
+		// 6c. Update handover record
+		if err := s.handoverRepo.Update(sessCtx, handoverID, h); err != nil {
+			return nil, err
+		}
+
+		// 6d. Handle REJECTION - Rollback remaining amounts
+		if status == handover.StatusRejected {
+			fmt.Printf("🔴 [CONFIRM HANDOVER] REJECTED - Rolling back remaining amounts\n")
+			
+			// Get waiter shift
+			waiterShift, err := s.shiftRepo.FindByID(sessCtx, h.WaiterShiftID)
+			if err != nil {
+				return nil, err
+			}
+
+			fmt.Printf("🔴 [ROLLBACK] Before - RemainingCash: %.0f, RemainingTransfer: %.0f\n", 
+				waiterShift.RemainingCash, waiterShift.RemainingTransfer)
+
+			// RESTORE the amounts that were deducted in CreateHandover
+			waiterShift.RemainingCash += h.CashDeclaredAmount
+			waiterShift.RemainingTransfer += h.TransferDeclaredAmount
+			waiterShift.UpdatedAt = now
+
+			fmt.Printf("🔴 [ROLLBACK] After - RemainingCash: %.0f, RemainingTransfer: %.0f\n", 
+				waiterShift.RemainingCash, waiterShift.RemainingTransfer)
+
+			// Update waiter shift
+			if err := s.shiftRepo.Update(sessCtx, h.WaiterShiftID, waiterShift); err != nil {
+				return nil, err
+			}
+
+			fmt.Printf("✅ [ROLLBACK] Success - Amounts restored\n")
+		}
+
+		// 6e. If confirmed and not requiring approval, update balances
+		if status == handover.StatusConfirmed && !h.RequiresApproval {
+			if err := s.updateBalances(sessCtx, h); err != nil {
+				return nil, err
+			}
+		}
+
+		return nil, nil
+	})
+
+	if err != nil {
+		fmt.Printf("❌ [CONFIRM HANDOVER] Transaction failed: %v\n", err)
 		return err
 	}
 
-	// 9. If confirmed (and not requiring approval), update cash amounts
-	if req.Status == handover.StatusConfirmed && !h.RequiresApproval {
-		if err := s.updateCashAmounts(ctx, h); err != nil {
-			return err
-		}
-	}
-
+	fmt.Printf("✅ [CONFIRM HANDOVER] Success\n")
 	return nil
 }
 
-// createDiscrepancyRecord creates a discrepancy record
-func (s *CashHandoverService) createDiscrepancyRecord(ctx context.Context, h *handover.CashHandover) error {
-	d := &handover.CashDiscrepancy{
-		HandoverID:              h.ID,
-		WaiterShiftID:           h.WaiterShiftID,
-		CashierShiftID:          h.CashierShiftID,
-		DeclaredAmount:          h.DeclaredAmount,
-		ActualAmount:            h.ActualAmount,
-		DiscrepancyAmount:       h.Discrepancy,
-		DiscrepancyType:         h.GetDiscrepancyType(),
-		DetailedReason:          h.DiscrepancyReason,
-		Responsibility:          h.DiscrepancyResponsibility,
-		ResolutionStatus:        "PENDING",
-		RequiresManagerApproval: h.RequiresApproval,
-		CreatedAt:               time.Now(),
-		UpdatedAt:               time.Now(),
-	}
+// ============================================================================
+// UPDATE BALANCES
+// ============================================================================
 
-	return s.discrepancyRepo.Create(ctx, d)
-}
-
-// updateCashAmounts updates cash amounts for both shifts
-func (s *CashHandoverService) updateCashAmounts(ctx context.Context, h *handover.CashHandover) error {
+// updateBalances updates handed_over amounts for both shifts
+// CRITICAL: This function does NOT reduce remaining amounts
+// Remaining amounts were already reduced in CreateHandover
+func (s *CashHandoverService) updateBalances(ctx context.Context, h *handover.CashHandover) error {
+	fmt.Printf("🟡 [UPDATE BALANCES] Starting\n")
 	now := time.Now()
 
-	// Update waiter shift - use actual amount received
+	// Update waiter shift
 	waiterShift, err := s.shiftRepo.FindByID(ctx, h.WaiterShiftID)
 	if err != nil {
 		return err
 	}
 
-	waiterShift.HandedOverCash += h.ActualAmount
-	waiterShift.RemainingCash -= h.DeclaredAmount // Reduce by declared amount
-	waiterShift.TotalDiscrepancy += h.Discrepancy
+	fmt.Printf("🟡 [UPDATE BALANCES] Waiter shift before - HandedOverCash: %.0f, HandedOverTransfer: %.0f, RemainingCash: %.0f, RemainingTransfer: %.0f\n", 
+		waiterShift.HandedOverCash, waiterShift.HandedOverTransfer, waiterShift.RemainingCash, waiterShift.RemainingTransfer)
+
+	// ONLY update handed_over amounts - DO NOT touch remaining amounts
+	waiterShift.HandedOverCash += h.CashActualAmount
+	waiterShift.HandedOverTransfer += h.TransferActualAmount
+	waiterShift.TotalDiscrepancy += h.TotalDiscrepancy()
 	waiterShift.HandoverCount++
 	waiterShift.UpdatedAt = now
 
+	fmt.Printf("🟡 [UPDATE BALANCES] Waiter shift after - HandedOverCash: %.0f, HandedOverTransfer: %.0f, RemainingCash: %.0f, RemainingTransfer: %.0f\n", 
+		waiterShift.HandedOverCash, waiterShift.HandedOverTransfer, waiterShift.RemainingCash, waiterShift.RemainingTransfer)
+
 	// Handle END_SHIFT type
 	if h.HandoverType == handover.TypeEndShift {
-		// Calculate total revenue and orders
+		fmt.Printf("🟡 [UPDATE BALANCES] Ending shift\n")
 		orders, err := s.orderRepo.FindByShiftID(ctx, h.WaiterShiftID)
 		if err != nil {
 			return err
 		}
 
-		totalRevenue := 0.0
+		cashRevenue := 0.0
+		transferRevenue := 0.0
 		for _, o := range orders {
 			if o.Status == order.StatusPaid || o.Status == order.StatusInProgress || o.Status == order.StatusServed {
-				totalRevenue += o.Total
+				if o.PaymentMethod == order.PaymentCash {
+					cashRevenue += o.Total
+				} else if o.PaymentMethod == order.PaymentTransfer || o.PaymentMethod == order.PaymentQR {
+					transferRevenue += o.Total
+				}
 			}
 		}
 
-		// End the shift
 		waiterShift.Status = order.ShiftClosed
 		waiterShift.EndCash = h.EndCash
-		waiterShift.TotalRevenue = totalRevenue
+		waiterShift.TotalRevenue = cashRevenue + transferRevenue
 		waiterShift.TotalOrders = len(orders)
 		waiterShift.EndedAt = &now
 
@@ -351,102 +397,57 @@ func (s *CashHandoverService) updateCashAmounts(ctx context.Context, h *handover
 		return err
 	}
 
-	cashierShift.ReceivedCash += h.ActualAmount
-	cashierShift.TotalDiscrepancy += h.Discrepancy
+	fmt.Printf("🟡 [UPDATE BALANCES] Cashier shift before - ReceivedCash: %.0f, ReceivedTransfer: %.0f\n", 
+		cashierShift.ReceivedCash, cashierShift.ReceivedTransfer)
+
+	cashierShift.ReceivedCash += h.CashActualAmount
+	cashierShift.ReceivedTransfer += h.TransferActualAmount
+	cashierShift.TotalDiscrepancy += h.TotalDiscrepancy()
 	cashierShift.HandoverCount++
-	if h.HasDiscrepancy() {
+	if h.TotalDiscrepancy() != 0 {
 		cashierShift.DiscrepancyCount++
 	}
 	cashierShift.UpdatedAt = now
+
+	fmt.Printf("🟡 [UPDATE BALANCES] Cashier shift after - ReceivedCash: %.0f, ReceivedTransfer: %.0f\n", 
+		cashierShift.ReceivedCash, cashierShift.ReceivedTransfer)
 
 	if err := s.cashierShiftRepo.Save(ctx, cashierShift); err != nil {
 		return err
 	}
 
+	fmt.Printf("✅ [UPDATE BALANCES] Success\n")
 	return nil
 }
 
-// ApproveDiscrepancy approves or rejects a discrepancy (manager only)
-func (s *CashHandoverService) ApproveDiscrepancy(
-	ctx context.Context,
-	handoverID primitive.ObjectID,
-	managerID string,
-	approved bool,
-	note string,
-) error {
-	h, err := s.handoverRepo.FindByID(ctx, handoverID)
-	if err != nil {
-		return err
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+// createDiscrepancyRecord creates a discrepancy record
+func (s *CashHandoverService) createDiscrepancyRecord(ctx context.Context, h *handover.CashHandover) error {
+	d := &handover.CashDiscrepancy{
+		HandoverID:              h.ID,
+		WaiterShiftID:           h.WaiterShiftID,
+		CashierShiftID:          h.CashierShiftID,
+		DeclaredAmount:          h.DeclaredAmount,
+		ActualAmount:            h.ActualAmount,
+		DiscrepancyAmount:       h.Discrepancy,
+		DiscrepancyType:         h.GetDiscrepancyType(),
+		DetailedReason:          h.DiscrepancyReason,
+		Responsibility:          h.DiscrepancyResponsibility,
+		ResolutionStatus:        "PENDING",
+		RequiresManagerApproval: h.RequiresApproval,
+		CreatedAt:               time.Now(),
+		UpdatedAt:               time.Now(),
 	}
 
-	if !h.RequiresApproval {
-		return errors.New("handover does not require approval")
-	}
-
-	now := time.Now()
-	managerOID, err := primitive.ObjectIDFromHex(managerID)
-	if err != nil {
-		return errors.New("invalid manager ID")
-	}
-
-	h.ApprovedBy = managerOID
-	h.ApprovedAt = &now
-	h.UpdatedAt = now
-
-	if approved {
-		h.Status = handover.StatusConfirmed
-		// Update cash amounts after approval
-		if err := s.updateCashAmounts(ctx, h); err != nil {
-			return err
-		}
-	} else {
-		h.Status = handover.StatusRejected
-		if h.CashierNote != "" {
-			h.CashierNote += " | Manager rejected: " + note
-		} else {
-			h.CashierNote = "Manager rejected: " + note
-		}
-	}
-
-	// Update discrepancy record
-	d, err := s.discrepancyRepo.FindByHandoverID(ctx, handoverID)
-	if err == nil && d != nil {
-		d.ManagerApproved = approved
-		d.ApprovedBy = managerOID
-		d.ApprovedAt = &now
-		d.ManagerNote = note
-		d.ResolutionStatus = "RESOLVED"
-		d.UpdatedAt = now
-		if err := s.discrepancyRepo.Update(ctx, d.ID, d); err != nil {
-			return err
-		}
-	}
-
-	return s.handoverRepo.Update(ctx, handoverID, h)
+	return s.discrepancyRepo.Create(ctx, d)
 }
 
-// CancelHandover cancels a pending handover
-func (s *CashHandoverService) CancelHandover(ctx context.Context, handoverID primitive.ObjectID, userID string) error {
-	h, err := s.handoverRepo.FindByID(ctx, handoverID)
-	if err != nil {
-		return err
-	}
-
-	if h.Status != handover.StatusPending {
-		return errors.New("can only cancel pending handovers")
-	}
-
-	// Verify user is the waiter who created it
-	userOID, err := primitive.ObjectIDFromHex(userID)
-	if err != nil {
-		return errors.New("invalid user ID")
-	}
-	if h.WaiterID != userOID {
-		return errors.New("unauthorized: not your handover")
-	}
-
-	return s.handoverRepo.Delete(ctx, handoverID)
-}
+// ============================================================================
+// QUERY FUNCTIONS
+// ============================================================================
 
 // GetPendingHandover gets pending handover for a shift
 func (s *CashHandoverService) GetPendingHandover(ctx context.Context, shiftID primitive.ObjectID) (*handover.CashHandover, error) {
@@ -478,54 +479,39 @@ func (s *CashHandoverService) GetTodayByCashier(ctx context.Context, cashierID p
 	return s.handoverRepo.FindTodayByCashier(ctx, cashierID)
 }
 
-// GetRequiringApproval gets handovers requiring manager approval
-func (s *CashHandoverService) GetRequiringApproval(ctx context.Context) ([]*handover.CashHandover, error) {
-	return s.handoverRepo.FindRequiringApproval(ctx)
-}
-
-// DiscrepancyStats represents discrepancy statistics
-type DiscrepancyStats struct {
-	TotalHandovers   int     `json:"total_handovers"`
-	TotalDiscrepancy float64 `json:"total_discrepancy"`
-	ShortageCount    int     `json:"shortage_count"`
-	OverageCount     int     `json:"overage_count"`
-	ShortageAmount   float64 `json:"shortage_amount"`
-	OverageAmount    float64 `json:"overage_amount"`
-	RequiredApproval int     `json:"required_approval"`
-}
-
-// GetDiscrepancyStats gets discrepancy statistics for a date range
-func (s *CashHandoverService) GetDiscrepancyStats(ctx context.Context, startDate, endDate time.Time) (*DiscrepancyStats, error) {
-	handovers, err := s.handoverRepo.FindByDateRange(ctx, startDate, endDate)
+// CancelHandover cancels a pending handover
+func (s *CashHandoverService) CancelHandover(ctx context.Context, handoverID primitive.ObjectID, userID string) error {
+	h, err := s.handoverRepo.FindByID(ctx, handoverID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	stats := &DiscrepancyStats{
-		TotalHandovers:   len(handovers),
-		TotalDiscrepancy: 0,
-		ShortageCount:    0,
-		OverageCount:     0,
-		ShortageAmount:   0,
-		OverageAmount:    0,
-		RequiredApproval: 0,
+	if h.Status != handover.StatusPending {
+		return errors.New("can only cancel pending handovers")
 	}
 
-	for _, h := range handovers {
-		if h.HasDiscrepancy() {
-			stats.TotalDiscrepancy += h.Discrepancy
-			if h.Discrepancy < 0 {
-				stats.ShortageCount++
-				stats.ShortageAmount += -h.Discrepancy
-			} else {
-				stats.OverageCount++
-				stats.OverageAmount += h.Discrepancy
-			}
-			if h.RequiresApproval {
-				stats.RequiredApproval++
-			}
-		}
+	// Verify user is the waiter who created it
+	userOID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return errors.New("invalid user ID")
+	}
+	if h.WaiterID != userOID {
+		return errors.New("unauthorized: not your handover")
 	}
 
-	return stats, nil
+	// IMPORTANT: Restore remaining amounts when canceling
+	waiterShift, err := s.shiftRepo.FindByID(ctx, h.WaiterShiftID)
+	if err != nil {
+		return err
+	}
+
+	waiterShift.RemainingCash += h.CashDeclaredAmount
+	waiterShift.RemainingTransfer += h.TransferDeclaredAmount
+	waiterShift.UpdatedAt = time.Now()
+
+	if err := s.shiftRepo.Update(ctx, h.WaiterShiftID, waiterShift); err != nil {
+		return err
+	}
+
+	return s.handoverRepo.Delete(ctx, handoverID)
 }

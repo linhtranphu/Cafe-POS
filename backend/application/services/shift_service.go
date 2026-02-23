@@ -63,13 +63,19 @@ func (s *ShiftService) StartShift(ctx context.Context, req *order.StartShiftRequ
 	}
 
 	shift := &order.Shift{
-		Type:       req.Type,
-		Status:     order.ShiftOpen,
-		RoleType:   roleType,
-		UserID:     userOID,
-		UserName:   userName,
-		StartCash:  req.StartCash,
-		StartedAt:  time.Now(),
+		Type:              req.Type,
+		Status:            order.ShiftOpen,
+		RoleType:          roleType,
+		UserID:            userOID,
+		UserName:          userName,
+		StartCash:         req.StartCash,
+		CurrentCash:       req.StartCash,       // Initialize with start cash
+		RemainingCash:     req.StartCash,       // Initialize with start cash
+		TransferRevenue:   0,                   // Initialize transfer revenue
+		RemainingTransfer: 0,                   // Initialize remaining transfer
+		HandedOverCash:    0,                   // Initialize handed over cash
+		HandedOverTransfer: 0,                  // Initialize handed over transfer
+		StartedAt:         time.Now(),
 	}
 
 	if err := s.shiftRepo.Create(ctx, shift); err != nil {
@@ -172,4 +178,40 @@ func (s *ShiftService) CloseShiftAndLockOrders(ctx context.Context, shiftID prim
 	}
 
 	return shift, nil
+}
+
+// CalculateTransferRevenue calculates transfer revenue from orders and updates shift
+func (s *ShiftService) CalculateTransferRevenue(ctx context.Context, shiftID primitive.ObjectID) error {
+	shift, err := s.shiftRepo.FindByID(ctx, shiftID)
+	if err != nil {
+		return err
+	}
+
+	orders, err := s.orderRepo.FindByShiftID(ctx, shiftID)
+	if err != nil {
+		return err
+	}
+
+	// Calculate cash and transfer revenue separately
+	cashRevenue := 0.0
+	transferRevenue := 0.0
+	for _, o := range orders {
+		if o.Status == order.StatusPaid || o.Status == order.StatusInProgress || o.Status == order.StatusServed {
+			if o.PaymentMethod == order.PaymentCash {
+				cashRevenue += o.Total
+			} else if o.PaymentMethod == order.PaymentTransfer || o.PaymentMethod == order.PaymentQR {
+				transferRevenue += o.Total
+			}
+		}
+	}
+
+	// Update shift with transfer revenue
+	shift.TransferRevenue = transferRevenue
+	shift.RemainingTransfer = transferRevenue - shift.HandedOverTransfer
+	shift.CurrentCash = shift.StartCash + cashRevenue
+	shift.RemainingCash = shift.CurrentCash - shift.HandedOverCash
+	shift.TotalRevenue = cashRevenue + transferRevenue
+	shift.UpdatedAt = time.Now()
+
+	return s.shiftRepo.Update(ctx, shiftID, shift)
 }

@@ -13,7 +13,7 @@ import ShiftView from '../views/ShiftView.vue'
 import ManagerShiftView from '../views/ManagerShiftView.vue'
 import CashierDashboard from '../views/CashierDashboard.vue'
 import CashierReports from '../views/CashierReports.vue'
-import CashierShiftClosure from '../views/CashierShiftClosure.vue'
+import CashierShiftClosureV2 from '../views/CashierShiftClosureV2.vue'
 import UserManagementView from '../views/UserManagementView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import MenuCostView from '../views/MenuCostView.vue'
@@ -127,7 +127,7 @@ const routes = [
   {
     path: '/cashier/shift-closure/:id',
     name: 'CashierShiftClosure',
-    component: CashierShiftClosure,
+    component: CashierShiftClosureV2,
     meta: { requiresAuth: true, requiresCashier: true }
   },
   {

@@ -2,6 +2,7 @@ package cashier
 
 import (
 	"errors"
+	"log"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -68,6 +69,9 @@ type CashierShift struct {
 	TotalDiscrepancy float64 `json:"total_discrepancy" bson:"total_discrepancy"`
 	HandoverCount    int     `json:"handover_count" bson:"handover_count"`
 	DiscrepancyCount int     `json:"discrepancy_count" bson:"discrepancy_count"`
+
+	// Transfer tracking fields
+	ReceivedTransfer float64 `json:"received_transfer" bson:"received_transfer"`
 
 	// CreatedAt is when the shift record was created
 	CreatedAt time.Time `json:"created_at" bson:"created_at"`
@@ -297,7 +301,7 @@ func (cs *CashierShift) ConfirmResponsibility(userID, deviceID string, timestamp
 //
 // The method validates that:
 //   - The shift status is ClosureInitiated
-//   - The cashier has confirmed responsibility (Confirmation is not nil)
+//   - Actual cash has been recorded
 //   - If variance is non-zero, it has been documented
 //
 // Returns:
@@ -308,16 +312,20 @@ func (cs *CashierShift) CanClose() error {
 		return errors.New("cannot close shift: status must be ClosureInitiated")
 	}
 
-	// Check confirmation exists
-	if cs.Confirmation == nil {
-		return errors.New("cannot close shift: responsibility confirmation is required")
+	// Check actual cash has been recorded
+	if cs.ActualCash == nil {
+		return errors.New("cannot close shift: actual cash must be recorded")
 	}
 
-	// Check variance is documented if non-zero
+	// Check variance is documented if non-zero (with tolerance)
 	if cs.Variance != nil && cs.Variance.RequiresDocumentation() {
+		log.Printf("⚠️ [CanClose] Variance requires documentation: amount=%.10f, reason=%v, notes=%s",
+			cs.Variance.Amount, cs.Variance.Reason, cs.Variance.Notes)
 		if cs.Variance.Reason == nil || cs.Variance.Notes == "" {
 			return errors.New("cannot close shift: variance must be documented with reason and notes")
 		}
+	} else if cs.Variance != nil {
+		log.Printf("✅ [CanClose] Variance exists but does not require documentation: amount=%.10f", cs.Variance.Amount)
 	}
 
 	return nil
@@ -376,4 +384,54 @@ func (cs *CashierShift) Close(userID, deviceID string, timestamp time.Time) erro
 func (cs *CashierShift) UpdateSystemCash(systemCash float64) {
 	cs.SystemCash = systemCash
 	cs.UpdatedAt = time.Now()
+}
+
+// CancelClosure cancels the shift closure process and returns the shift to Open status.
+// This method can be called when the shift is in ClosureInitiated status.
+// It will rollback all closure-related data including actual_cash and variance.
+//
+// The method validates that:
+//   - The shift status is ClosureInitiated
+//   - All audit log entry parameters are valid (userID, deviceID, timestamp)
+//
+// On success:
+//   - Transitions status from ClosureInitiated back to Open
+//   - Clears actual_cash and variance (rollback)
+//   - Adds an audit log entry with action "closure_cancelled"
+//
+// Parameters:
+//   - userID: The unique identifier of the user cancelling the closure
+//   - deviceID: The unique identifier of the device used
+//   - timestamp: The time when the closure was cancelled
+//
+// Returns:
+//   - error: if validation fails or audit log entry creation fails
+func (cs *CashierShift) CancelClosure(userID, deviceID string, timestamp time.Time) error {
+	// Validate current status is ClosureInitiated
+	if cs.Status != CashierShiftClosureInitiated {
+		return errors.New("cannot cancel closure: shift status must be ClosureInitiated")
+	}
+
+	// Create audit log entry first to validate parameters before changing state
+	auditData := map[string]interface{}{
+		"had_actual_cash": cs.ActualCash != nil,
+		"had_variance":    cs.Variance != nil,
+	}
+	auditEntry, err := NewAuditLogEntry("closure_cancelled", userID, deviceID, timestamp, auditData)
+	if err != nil {
+		return err
+	}
+
+	// Rollback closure data
+	cs.ActualCash = nil
+	cs.Variance = nil
+
+	// Transition status back to Open
+	cs.Status = CashierShiftOpen
+
+	// Add audit log entry
+	cs.AuditLog = append(cs.AuditLog, *auditEntry)
+	cs.UpdatedAt = timestamp
+
+	return nil
 }

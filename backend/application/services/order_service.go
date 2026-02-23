@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 	"cafe-pos/backend/domain"
 	"cafe-pos/backend/domain/order"
@@ -204,30 +205,70 @@ func (s *OrderService) CollectPayment(ctx context.Context, id primitive.ObjectID
 		o.PaidAt = &now
 	}
 
-	// Update shift cash if payment is cash and order has shift_id
-	if req.PaymentMethod == order.PaymentCash && !o.ShiftID.IsZero() {
-		fmt.Printf("DEBUG: Updating shift cash - ShiftID: %s, Amount: %.2f\n", o.ShiftID.Hex(), req.Amount)
+	// Update shift revenue based on payment method
+	if !o.ShiftID.IsZero() {
+		log.Printf("💰 [PAYMENT] Received - ShiftID: %s, Method: %s, Amount: %.0f VND", 
+			o.ShiftID.Hex(), req.PaymentMethod, req.Amount)
+		
 		shift, err := s.shiftRepo.FindByID(ctx, o.ShiftID)
-		if err == nil && shift != nil {
-			fmt.Printf("DEBUG: Found shift - Current RemainingCash: %.2f\n", shift.RemainingCash)
-			// Add cash to shift
-			shift.RemainingCash += req.Amount
-			shift.CurrentCash += req.Amount
+		if err != nil {
+			log.Printf("❌ [PAYMENT] Failed to find shift: %v", err)
+		} else if shift == nil {
+			log.Printf("❌ [PAYMENT] Shift is nil")
+		} else {
+			log.Printf("✅ [PAYMENT] Found shift - ID: %s", shift.ID.Hex())
+			log.Printf("📊 [PAYMENT] BEFORE UPDATE:")
+			log.Printf("   - CurrentCash: %.0f VND", shift.CurrentCash)
+			log.Printf("   - RemainingCash: %.0f VND", shift.RemainingCash)
+			log.Printf("   - TransferRevenue: %.0f VND", shift.TransferRevenue)
+			log.Printf("   - RemainingTransfer: %.0f VND", shift.RemainingTransfer)
+			log.Printf("   - TotalRevenue: %.0f VND", shift.TotalRevenue)
+			
+			// Update total revenue for all payment methods
 			shift.TotalRevenue += req.Amount
-			fmt.Printf("DEBUG: New RemainingCash: %.2f\n", shift.RemainingCash)
+			
+			// Update specific payment method fields
+			if req.PaymentMethod == order.PaymentCash {
+				log.Printf("💵 [PAYMENT] Processing CASH payment")
+				shift.RemainingCash += req.Amount
+				shift.CurrentCash += req.Amount
+			} else if req.PaymentMethod == order.PaymentTransfer || req.PaymentMethod == order.PaymentQR {
+				log.Printf("🏦 [PAYMENT] Processing TRANSFER/QR payment")
+				shift.TransferRevenue += req.Amount
+				shift.RemainingTransfer += req.Amount
+			} else {
+				log.Printf("⚠️  [PAYMENT] Unknown payment method: %s", req.PaymentMethod)
+			}
+			
+			log.Printf("📊 [PAYMENT] AFTER UPDATE (in memory):")
+			log.Printf("   - CurrentCash: %.0f VND", shift.CurrentCash)
+			log.Printf("   - RemainingCash: %.0f VND", shift.RemainingCash)
+			log.Printf("   - TransferRevenue: %.0f VND", shift.TransferRevenue)
+			log.Printf("   - RemainingTransfer: %.0f VND", shift.RemainingTransfer)
+			log.Printf("   - TotalRevenue: %.0f VND", shift.TotalRevenue)
 			
 			// Update shift
 			if err := s.shiftRepo.Update(ctx, o.ShiftID, shift); err != nil {
-				// Log error but don't fail the payment
-				fmt.Printf("ERROR: Failed to update shift cash: %v\n", err)
+				log.Printf("❌ [PAYMENT] Failed to update shift in DB: %v", err)
 			} else {
-				fmt.Printf("DEBUG: Shift cash updated successfully\n")
+				log.Printf("✅ [PAYMENT] Shift updated successfully in DB")
+				
+				// Verify the update by reading back
+				verifyShift, verifyErr := s.shiftRepo.FindByID(ctx, o.ShiftID)
+				if verifyErr == nil && verifyShift != nil {
+					log.Printf("🔍 [PAYMENT] VERIFY (from DB):")
+					log.Printf("   - CurrentCash: %.0f VND", verifyShift.CurrentCash)
+					log.Printf("   - RemainingCash: %.0f VND", verifyShift.RemainingCash)
+					log.Printf("   - TransferRevenue: %.0f VND", verifyShift.TransferRevenue)
+					log.Printf("   - RemainingTransfer: %.0f VND", verifyShift.RemainingTransfer)
+					log.Printf("   - TotalRevenue: %.0f VND", verifyShift.TotalRevenue)
+				} else {
+					log.Printf("❌ [PAYMENT] Failed to verify shift update: %v", verifyErr)
+				}
 			}
-		} else {
-			fmt.Printf("DEBUG: Shift not found or error: %v\n", err)
 		}
 	} else {
-		fmt.Printf("DEBUG: Not updating shift - PaymentMethod: %s, ShiftID.IsZero: %v\n", req.PaymentMethod, o.ShiftID.IsZero())
+		log.Printf("⚠️  [PAYMENT] Not updating shift - ShiftID is zero")
 	}
 
 	if err := s.orderRepo.Update(ctx, id, o); err != nil {

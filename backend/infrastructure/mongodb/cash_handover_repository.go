@@ -290,6 +290,9 @@ func (r *CashHandoverRepository) CreateIndexes(ctx context.Context) error {
 				{Key: "status", Value: 1},
 			},
 		},
+		{
+			Keys: bson.D{{Key: "transfer_declared_amount", Value: 1}},
+		},
 	}
 
 	_, err := r.collection.Indexes().CreateMany(ctx, indexes)

@@ -77,6 +77,16 @@ export default {
   },
 
   /**
+   * Cancel shift closure and return to OPEN status
+   * @param {string} shiftId - The cashier shift ID
+   * @returns {Promise<Object>} The updated shift
+   */
+  async cancelClosure(shiftId) {
+    const response = await api.post(`/cashier-shifts/${shiftId}/cancel-closure`, {})
+    return response.data
+  },
+
+  /**
    * Record actual cash counted
    * @param {string} shiftId - The cashier shift ID
    * @param {number} actualCash - The actual cash amount
@@ -128,6 +138,52 @@ export default {
    */
   async checkWaiterShifts() {
     const response = await api.get('/cashier-shifts/check-waiter-shifts')
+    return response.data
+  },
+
+  /**
+   * Complete entire closure workflow in one transaction (Frontend-driven)
+   * All data is collected on the client and submitted once.
+   * If user clicks "Back", no API call is made and no data is saved.
+   * 
+   * @param {string} shiftId - The cashier shift ID
+   * @param {Object} data - Complete closure data
+   * @param {number} data.actual_cash - The actual cash amount
+   * @param {string} [data.variance_reason] - Variance reason (if variance exists)
+   * @param {string} [data.variance_notes] - Variance notes (if variance exists)
+   * @returns {Promise<Object>} The closed shift
+   */
+  async completeClosure(shiftId, data) {
+    const response = await api.post(`/cashier-shifts/${shiftId}/complete-closure`, data)
+    return response.data
+  },
+
+  /**
+   * Close shift with fund handover (NEW - includes fund handover creation)
+   * This is the new closure flow that creates a fund handover record
+   * 
+   * @param {string} shiftId - The cashier shift ID
+   * @param {Object} data - Complete closure data with fund handover
+   * @param {number} data.actual_cash - The actual cash amount
+   * @param {string} [data.variance_reason] - Variance reason (if variance exists)
+   * @param {string} [data.variance_notes] - Variance notes (if variance exists)
+   * @param {string} [data.receiver_id] - Optional receiver ID (for future use)
+   * @returns {Promise<Object>} Response with closed shift and fund handover
+   */
+  async closeShiftWithFundHandover(shiftId, data) {
+    const response = await api.post(`/cashier-shifts/${shiftId}/close-with-fund-handover`, data)
+    return response.data
+  },
+
+  /**
+   * Get managed funds summary for a cashier shift
+   * Shows the total cash and transfer amounts the cashier is responsible for
+   * 
+   * @param {string} shiftId - The cashier shift ID
+   * @returns {Promise<Object>} Managed funds summary
+   */
+  async getManagedFunds(shiftId) {
+    const response = await api.get(`/cashier-shifts/${shiftId}/managed-funds`)
     return response.data
   }
 }

@@ -173,6 +173,7 @@ func (h *ShiftHandler) GetCurrentShift(c *gin.Context) {
 		return
 	}
 
+	// No need to recalculate - values are updated realtime on payment
 	c.JSON(http.StatusOK, shift)
 }
 
@@ -200,6 +201,7 @@ func (h *ShiftHandler) GetAllShifts(c *gin.Context) {
 		return
 	}
 
+	// No need to recalculate - values are updated realtime on payment
 	c.JSON(http.StatusOK, shifts)
 }
 
@@ -217,5 +219,6 @@ func (h *ShiftHandler) GetShift(c *gin.Context) {
 		return
 	}
 
+	// No need to recalculate - values are updated realtime on payment
 	c.JSON(http.StatusOK, shift)
 }

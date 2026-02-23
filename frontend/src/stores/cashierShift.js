@@ -223,6 +223,21 @@ export const useCashierShiftStore = defineStore('cashierShift', {
       this.shifts = []
       this.loading = false
       this.error = null
+    },
+
+    /**
+     * Get managed funds summary for a cashier shift
+     * @param {string} shiftId - The cashier shift ID
+     * @returns {Promise<Object>} Managed funds summary
+     */
+    async getManagedFunds(shiftId) {
+      try {
+        const managedFunds = await cashierShiftService.getManagedFunds(shiftId)
+        return managedFunds
+      } catch (error) {
+        console.error('Failed to fetch managed funds:', error)
+        throw error
+      }
     }
   }
 })

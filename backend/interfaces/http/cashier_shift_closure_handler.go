@@ -62,6 +62,15 @@ type CloseShiftRequest struct {
 	DeviceID string `json:"device_id"`
 }
 
+// CompleteClosureRequest represents the request to complete entire closure workflow
+type CompleteClosureRequest struct {
+	ActualCash     float64  `json:"actual_cash" binding:"required,min=0"`
+	VarianceReason *string  `json:"variance_reason"`
+	VarianceNotes  *string  `json:"variance_notes"`
+	UserID         string   `json:"user_id"`
+	DeviceID       string   `json:"device_id"`
+}
+
 // InitiateClosure starts the shift closure process
 func (h *CashierShiftClosureHandler) InitiateClosure(c *gin.Context) {
 	shiftID := c.Param("id")
@@ -79,34 +88,15 @@ func (h *CashierShiftClosureHandler) InitiateClosure(c *gin.Context) {
 	}
 	deviceID := "web"
 
-	// Get the shift
-	shift, err := h.cashierShiftService.GetCashierShift(c.Request.Context(), shiftObjID)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "shift not found"})
-		return
-	}
-
-	// Validate state transition using state machine
-	err = h.stateMachineManager.ValidateCashierShiftTransition(shift, cashier.EventInitiateClosure)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":     err.Error(),
-			"next_step": h.stateMachineManager.GetCashierShiftNextStep(shift),
-		})
-		return
-	}
-
-	// Initiate closure
-	err = shift.InitiateClosure(userID, deviceID, time.Now())
+	// Use transaction-wrapped method
+	shift, err := h.cashierShiftService.InitiateClosureWithTransaction(
+		c.Request.Context(),
+		shiftObjID,
+		userID,
+		deviceID,
+	)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Save the shift
-	err = h.cashierShiftService.SaveCashierShift(c.Request.Context(), shift)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save shift"})
 		return
 	}
 
@@ -136,34 +126,16 @@ func (h *CashierShiftClosureHandler) RecordActualCash(c *gin.Context) {
 	}
 	deviceID := "web"
 
-	// Get the shift
-	shift, err := h.cashierShiftService.GetCashierShift(c.Request.Context(), shiftObjID)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "shift not found"})
-		return
-	}
-
-	// Validate step using state machine
-	err = h.stateMachineManager.ValidateCashierShiftStep(shift, "record_actual_cash")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":     err.Error(),
-			"next_step": h.stateMachineManager.GetCashierShiftNextStep(shift),
-		})
-		return
-	}
-
-	// Record actual cash
-	variance, err := shift.RecordActualCash(req.ActualCash, userID, deviceID, time.Now())
+	// Use transaction-wrapped method
+	shift, variance, err := h.cashierShiftService.RecordActualCashWithTransaction(
+		c.Request.Context(),
+		shiftObjID,
+		req.ActualCash,
+		userID,
+		deviceID,
+	)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Save the shift
-	err = h.cashierShiftService.SaveCashierShift(c.Request.Context(), shift)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save shift"})
 		return
 	}
 
@@ -196,35 +168,18 @@ func (h *CashierShiftClosureHandler) DocumentVariance(c *gin.Context) {
 	}
 	deviceID := "web"
 
-	// Get the shift
-	shift, err := h.cashierShiftService.GetCashierShift(c.Request.Context(), shiftObjID)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "shift not found"})
-		return
-	}
-
-	// Validate step using state machine
-	err = h.stateMachineManager.ValidateCashierShiftStep(shift, "document_variance")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":     err.Error(),
-			"next_step": h.stateMachineManager.GetCashierShiftNextStep(shift),
-		})
-		return
-	}
-
-	// Document variance
+	// Use transaction-wrapped method
 	reason := cashier.VarianceReason(req.Reason)
-	err = shift.DocumentVariance(reason, req.Notes, userID, deviceID, time.Now())
+	shift, err := h.cashierShiftService.DocumentVarianceWithTransaction(
+		c.Request.Context(),
+		shiftObjID,
+		reason,
+		req.Notes,
+		userID,
+		deviceID,
+	)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Save the shift
-	err = h.cashierShiftService.SaveCashierShift(c.Request.Context(), shift)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save shift"})
 		return
 	}
 
@@ -299,51 +254,53 @@ func (h *CashierShiftClosureHandler) CloseShift(c *gin.Context) {
 	}
 	deviceID := "web"
 
-	// Get the shift
-	shift, err := h.cashierShiftService.GetCashierShift(c.Request.Context(), shiftObjID)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "shift not found"})
-		return
-	}
-
-	// Validate state transition using state machine (includes full workflow validation)
-	err = h.stateMachineManager.ValidateCashierShiftTransition(shift, cashier.EventCloseShift)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":     err.Error(),
-			"next_step": h.stateMachineManager.GetCashierShiftNextStep(shift),
-		})
-		return
-	}
-
-	// Check if all waiter shifts are closed
-	canClose, err := h.cashierShiftService.CanCloseCashierShift(c.Request.Context(), shiftObjID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if !canClose {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot close cashier shift: waiter shifts are still open"})
-		return
-	}
-
-	// Close the shift
-	err = shift.Close(userID, deviceID, time.Now())
+	// Use transaction-wrapped method
+	shift, err := h.cashierShiftService.CloseShiftWithTransaction(
+		c.Request.Context(),
+		shiftObjID,
+		userID,
+		deviceID,
+	)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Save the shift
-	err = h.cashierShiftService.SaveCashierShift(c.Request.Context(), shift)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save shift"})
 		return
 	}
 
 	c.JSON(http.StatusOK, shift)
 }
 
+
+// CancelClosure cancels the shift closure process and returns to OPEN status
+func (h *CashierShiftClosureHandler) CancelClosure(c *gin.Context) {
+	shiftID := c.Param("id")
+	
+	shiftObjID, err := primitive.ObjectIDFromHex(shiftID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid shift ID"})
+		return
+	}
+
+	// Get user_id from JWT token
+	userID := c.GetString("user_id")
+	if userID == "" {
+		userID = "system"
+	}
+	deviceID := "web"
+
+	// Use transaction-wrapped method
+	shift, err := h.cashierShiftService.CancelClosureWithTransaction(
+		c.Request.Context(),
+		shiftObjID,
+		userID,
+		deviceID,
+	)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, shift)
+}
 
 // CheckWaiterShifts checks if there are any open waiter shifts
 func (h *CashierShiftClosureHandler) CheckWaiterShifts(c *gin.Context) {
@@ -369,5 +326,154 @@ func (h *CashierShiftClosureHandler) CheckWaiterShifts(c *gin.Context) {
 		"open_shifts":  openShiftDetails,
 		"open_count":   len(openShifts),
 		"can_close":    allClosed,
+	})
+}
+
+
+// CompleteClosure completes the entire closure workflow in one transaction
+// This is a frontend-driven approach where all data is collected on the client
+func (h *CashierShiftClosureHandler) CompleteClosure(c *gin.Context) {
+	shiftID := c.Param("id")
+	
+	shiftObjID, err := primitive.ObjectIDFromHex(shiftID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid shift ID"})
+		return
+	}
+
+	var req CompleteClosureRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user_id from JWT token
+	userID := c.GetString("user_id")
+	if userID == "" {
+		userID = "system"
+	}
+	deviceID := "web"
+
+	// Convert variance reason if provided
+	var varianceReason *cashier.VarianceReason
+	if req.VarianceReason != nil {
+		reason := cashier.VarianceReason(*req.VarianceReason)
+		varianceReason = &reason
+	}
+
+	// Use complete closure method
+	shift, err := h.cashierShiftService.CompleteClosure(
+		c.Request.Context(),
+		shiftObjID,
+		req.ActualCash,
+		varianceReason,
+		req.VarianceNotes,
+		userID,
+		deviceID,
+	)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, shift)
+}
+
+// ============================================================================
+// FUND HANDOVER - NEW ENDPOINTS
+// ============================================================================
+
+// GetManagedFunds returns the current managed funds for a cashier shift
+// GET /api/v1/cashier-shifts/:id/managed-funds
+func (h *CashierShiftClosureHandler) GetManagedFunds(c *gin.Context) {
+	shiftID := c.Param("id")
+	
+	shiftObjID, err := primitive.ObjectIDFromHex(shiftID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid shift ID"})
+		return
+	}
+
+	// Get managed funds summary
+	summary, err := h.cashierShiftService.GetManagedFunds(c.Request.Context(), shiftObjID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, summary)
+}
+
+// CloseShiftWithFundHandoverRequest represents the request to close shift with fund handover
+type CloseShiftWithFundHandoverRequest struct {
+	ActualCash     float64  `json:"actual_cash" binding:"required,min=0"`
+	VarianceReason *string  `json:"variance_reason"`
+	VarianceNotes  *string  `json:"variance_notes"`
+	ReceiverID     *string  `json:"receiver_id"` // Optional, for future use
+	UserID         string   `json:"user_id"`
+	DeviceID       string   `json:"device_id"`
+}
+
+// CloseShiftWithFundHandover closes a cashier shift and creates a fund handover record
+// POST /api/v1/cashier-shifts/:id/close-with-fund-handover
+func (h *CashierShiftClosureHandler) CloseShiftWithFundHandover(c *gin.Context) {
+	shiftID := c.Param("id")
+	
+	shiftObjID, err := primitive.ObjectIDFromHex(shiftID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid shift ID"})
+		return
+	}
+
+	var req CloseShiftWithFundHandoverRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user_id from JWT token
+	userID := c.GetString("user_id")
+	if userID == "" {
+		userID = "system"
+	}
+	deviceID := "web"
+
+	// Convert variance reason if provided
+	var varianceReason *cashier.VarianceReason
+	if req.VarianceReason != nil {
+		reason := cashier.VarianceReason(*req.VarianceReason)
+		varianceReason = &reason
+	}
+
+	// Convert receiver ID if provided
+	var receiverObjID *primitive.ObjectID
+	if req.ReceiverID != nil && *req.ReceiverID != "" {
+		receiverID, err := primitive.ObjectIDFromHex(*req.ReceiverID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid receiver ID"})
+			return
+		}
+		receiverObjID = &receiverID
+	}
+
+	// Close shift with fund handover
+	shift, fundHandover, err := h.cashierShiftService.CloseShiftWithFundHandover(
+		c.Request.Context(),
+		shiftObjID,
+		req.ActualCash,
+		varianceReason,
+		req.VarianceNotes,
+		receiverObjID,
+		userID,
+		deviceID,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"shift":         shift,
+		"fund_handover": fundHandover,
 	})
 }

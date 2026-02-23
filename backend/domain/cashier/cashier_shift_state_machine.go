@@ -110,10 +110,7 @@ func (sm *ShiftStateMachine) ValidateShiftWorkflow(shift *CashierShift) error {
 			}
 		}
 		
-		// Responsibility must be confirmed
-		if shift.Confirmation == nil {
-			return errors.New("responsibility must be confirmed before closing")
-		}
+		// No longer require confirmation - removed for simplified workflow
 		
 		return nil
 		
@@ -190,17 +187,9 @@ func (sm *ShiftStateMachine) ValidateConfirmResponsibility(shift *CashierShift) 
 
 // CanCancelClosure checks if closure can be cancelled
 func (sm *ShiftStateMachine) CanCancelClosure(shift *CashierShift) bool {
-	// Can only cancel if in CLOSURE_INITIATED state and no critical steps completed
-	if shift.Status != CashierShiftClosureInitiated {
-		return false
-	}
-	
-	// Cannot cancel if actual cash has been recorded
-	if shift.ActualCash != nil {
-		return false
-	}
-	
-	return true
+	// Can cancel anytime during CLOSURE_INITIATED state
+	// Will rollback actual_cash and variance if they exist
+	return shift.Status == CashierShiftClosureInitiated
 }
 
 // IsTerminalState checks if a state is terminal (no further transitions)

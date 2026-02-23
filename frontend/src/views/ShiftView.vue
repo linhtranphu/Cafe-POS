@@ -8,24 +8,62 @@
     
     <!-- Mobile Header - Fixed -->
     <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
-      <div class="px-4 py-3" style="padding-top: max(0.75rem, env(safe-area-inset-top))">
-        <h1 class="text-xl font-bold text-gray-800">⏰ Ca làm việc</h1>
+      <div class="px-4 py-4" style="padding-top: max(1rem, env(safe-area-inset-top))">
+        <h1 class="text-2xl font-bold text-gray-900 mb-4">⏰ Ca làm việc</h1>
+        
+        <!-- Shift Tabs (always show for waiter/barista) -->
+        <div v-if="!isCashier" class="flex gap-2">
+          <button 
+            @click="shiftFilter = 'current'"
+            :class="[
+              'flex-1 py-3 px-4 rounded-xl font-semibold text-sm transition-all touch-manipulation active:scale-98',
+              shiftFilter === 'current' 
+                ? 'bg-blue-500 text-white shadow-lg' 
+                : 'bg-gray-100 text-gray-700 active:bg-gray-200'
+            ]">
+            <div class="flex items-center justify-center gap-1.5">
+              <span>🔵</span>
+              <span>Ca hiện tại</span>
+            </div>
+          </button>
+          <button 
+            @click="shiftFilter = 'history'"
+            :class="[
+              'flex-1 py-3 px-4 rounded-xl font-semibold text-sm transition-all touch-manipulation active:scale-98',
+              shiftFilter === 'history' 
+                ? 'bg-blue-500 text-white shadow-lg' 
+                : 'bg-gray-100 text-gray-700 active:bg-gray-200'
+            ]">
+            <div class="flex items-center justify-center gap-1.5">
+              <span>📂</span>
+              <span>Ca cũ</span>
+              <span class="text-xs opacity-80">({{ oldShiftsCount }})</span>
+            </div>
+          </button>
+        </div>
       </div>
     </div>
 
     <!-- Content -->
-    <div class="flex-1 overflow-y-auto px-4 py-4 pb-24">
-      <!-- Current Shift -->
-      <div v-if="currentShift" class="bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-2xl p-6 mb-4 shadow-lg">
+    <div class="flex-1 overflow-y-auto px-4 py-2 pb-24">
+      <!-- CASHIER VIEW (NEW COMPONENT) -->
+      <CashierShiftView v-if="isCashier" />
+
+      <!-- WAITER/BARISTA VIEW (UNCHANGED) -->
+      <div v-else>
+      <!-- Tab: Ca hiện tại -->
+      <div v-if="shiftFilter === 'current'">
+        <!-- Current Shift Info (when shift is open) -->
+        <div v-if="currentShift" class="bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-2xl p-5 mb-4 shadow-xl border border-blue-400">
         <div class="flex justify-between items-start mb-4">
           <div>
             <h3 class="text-2xl font-bold">Ca đang mở</h3>
-            <p class="text-blue-100">{{ getShiftTypeText(currentShift.type) }}</p>
+            <p class="text-blue-100 font-medium">{{ getShiftTypeText(currentShift.type) }}</p>
             <p v-if="currentShift.role_type" class="text-sm text-blue-100 mt-1">
               {{ getRoleTypeText(currentShift.role_type) }}
             </p>
           </div>
-          <span class="bg-white text-blue-600 px-4 py-2 rounded-full font-bold text-sm">ĐANG MỞ</span>
+          <span class="bg-white text-blue-600 px-4 py-2 rounded-full font-bold text-sm shadow-md">ĐANG MỞ</span>
         </div>
         
         <div class="grid grid-cols-2 gap-3 mb-4">
@@ -40,18 +78,50 @@
         </div>
 
         <!-- Cash Status for Waiter -->
-        <div v-if="isWaiter" class="grid grid-cols-3 gap-3 mb-4">
+        <div v-if="isWaiter" class="space-y-3 mb-4">
+          <!-- Revenue Section -->
           <div class="bg-white bg-opacity-20 rounded-xl p-3">
-            <p class="text-sm text-blue-100">Tiền hiện có</p>
-            <p class="font-bold">{{ formatPrice(currentShift.remaining_cash || currentShift.current_cash || 0) }}</p>
+            <p class="text-xs text-blue-100 mb-2">📊 Doanh thu</p>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <p class="text-xs text-blue-100">💵 Tiền mặt</p>
+                <p class="font-bold">{{ formatPrice(currentShift.current_cash || 0) }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-blue-100">💳 Tiền CK</p>
+                <p class="font-bold">{{ formatPrice(currentShift.transfer_revenue || 0) }}</p>
+              </div>
+            </div>
           </div>
+          
+          <!-- Remaining Section -->
           <div class="bg-white bg-opacity-20 rounded-xl p-3">
-            <p class="text-sm text-blue-100">Đã bàn giao</p>
-            <p class="font-bold">{{ formatPrice(currentShift.handed_over_cash || 0) }}</p>
+            <p class="text-xs text-blue-100 mb-2">💰 Còn lại (chưa bàn giao)</p>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <p class="text-xs text-blue-100">💵 Tiền mặt</p>
+                <p class="font-bold text-green-300">{{ formatPrice(currentShift.remaining_cash || 0) }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-blue-100">💳 Tiền CK</p>
+                <p class="font-bold text-blue-300">{{ formatPrice(currentShift.remaining_transfer || 0) }}</p>
+              </div>
+            </div>
           </div>
+          
+          <!-- Handed Over Section -->
           <div class="bg-white bg-opacity-20 rounded-xl p-3">
-            <p class="text-sm text-blue-100">Tổng thu</p>
-            <p class="font-bold">{{ formatPrice(currentShift.total_collected || 0) }}</p>
+            <p class="text-xs text-blue-100 mb-2">✅ Đã bàn giao</p>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <p class="text-xs text-blue-100">💵 Tiền mặt</p>
+                <p class="font-bold">{{ formatPrice(currentShift.handed_over_cash || 0) }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-blue-100">💳 Tiền CK</p>
+                <p class="font-bold">{{ formatPrice(currentShift.handed_over_transfer || 0) }}</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -71,30 +141,30 @@
         </div>
 
         <!-- Action Buttons for Waiter -->
-        <div v-if="isWaiter" class="space-y-2">
+        <div v-if="isWaiter" class="space-y-2.5">
           <!-- Partial Handover Button -->
-          <button v-if="(currentShift.remaining_cash || currentShift.current_cash || 0) > 0 && !pendingHandover" 
+          <button v-if="(currentShift.remaining_cash > 0 || currentShift.remaining_transfer > 0) && !pendingHandover" 
             @click="showPartialHandoverForm = true"
-            class="w-full bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-3 rounded-xl font-bold active:scale-95 transition-transform">
+            class="w-full bg-yellow-500 active:bg-yellow-600 text-white px-4 py-3.5 rounded-xl font-bold shadow-lg touch-manipulation active:scale-98 transition-all">
             💰 Bàn giao một phần
           </button>
           
           <!-- Handover and End Shift Button -->
-          <button v-if="(currentShift.remaining_cash || currentShift.current_cash || 0) > 0 && !pendingHandover"
+          <button v-if="(currentShift.remaining_cash > 0 || currentShift.remaining_transfer > 0) && !pendingHandover"
             @click="showHandoverEndShiftForm = true"
-            class="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-3 rounded-xl font-bold active:scale-95 transition-transform">
+            class="w-full bg-orange-500 active:bg-orange-600 text-white px-4 py-3.5 rounded-xl font-bold shadow-lg touch-manipulation active:scale-98 transition-all">
             🏁 Bàn giao và đóng ca
           </button>
           
-          <!-- Regular End Shift Button (only when no remaining cash) -->
-          <button v-if="(currentShift.remaining_cash || currentShift.current_cash || 0) === 0 && !pendingHandover"
+          <!-- Regular End Shift Button (only when no remaining cash/transfer) -->
+          <button v-if="currentShift.remaining_cash === 0 && currentShift.remaining_transfer === 0 && !pendingHandover"
             @click="showEndShiftForm = true" 
-            class="w-full bg-white text-blue-600 hover:bg-blue-50 px-4 py-3 rounded-xl font-bold active:scale-95 transition-transform">
+            class="w-full bg-white text-blue-600 active:bg-blue-50 px-4 py-3.5 rounded-xl font-bold shadow-lg touch-manipulation active:scale-98 transition-all">
             Kết thúc ca
           </button>
           
           <!-- Disabled state when pending -->
-          <div v-if="pendingHandover" class="w-full bg-gray-400 text-gray-200 px-4 py-3 rounded-xl font-bold text-center">
+          <div v-if="pendingHandover" class="w-full bg-gray-300 text-gray-500 px-4 py-3.5 rounded-xl font-bold text-center">
             Chờ cashier xác nhận...
           </div>
         </div>
@@ -102,21 +172,35 @@
         <!-- Action Buttons for Non-Waiter -->
         <div v-else>
           <button @click="showEndShiftForm = true" 
-            class="w-full bg-white text-blue-600 hover:bg-blue-50 px-4 py-3 rounded-xl font-bold active:scale-95 transition-transform">
+            class="w-full bg-white text-blue-600 active:bg-blue-50 px-4 py-3.5 rounded-xl font-bold shadow-lg touch-manipulation active:scale-98 transition-all">
             Kết thúc ca
           </button>
         </div>
       </div>
 
-      <!-- Handover History Section for Waiter -->
-      <div v-if="isWaiter && handoverHistory.length > 0" class="bg-white rounded-2xl p-6 shadow-sm mb-4">
+      <!-- Handover History Section for Waiter (in current tab) -->
+      <div v-if="isWaiter && handoverHistory.length > 0 && shiftFilter === 'current'" class="bg-white rounded-2xl p-6 shadow-sm mb-4">
         <h3 class="text-xl font-bold mb-4">📋 Lịch sử bàn giao</h3>
         <div class="space-y-3">
           <div v-for="handover in handoverHistory" :key="handover.id" 
             class="border rounded-xl p-4">
             <div class="flex justify-between items-start mb-2">
               <div>
-                <p class="font-bold">{{ formatPrice(handover.declared_amount) }}</p>
+                <!-- Display separate amounts if available -->
+                <div v-if="handover.cash_declared_amount > 0 || handover.transfer_declared_amount > 0" class="space-y-1">
+                  <p v-if="handover.cash_declared_amount > 0" class="font-bold text-green-600">
+                    💵 {{ formatPrice(handover.cash_declared_amount) }}
+                  </p>
+                  <p v-if="handover.transfer_declared_amount > 0" class="font-bold text-blue-600">
+                    💳 {{ formatPrice(handover.transfer_declared_amount) }}
+                  </p>
+                  <p v-if="handover.cash_declared_amount > 0 && handover.transfer_declared_amount > 0" class="text-sm text-gray-500">
+                    Tổng: {{ formatPrice(handover.cash_declared_amount + handover.transfer_declared_amount) }}
+                  </p>
+                </div>
+                <!-- Fallback to old format -->
+                <p v-else class="font-bold">{{ formatPrice(handover.declared_amount) }}</p>
+                
                 <p class="text-sm text-gray-500">{{ formatDate(handover.handover_at) }}</p>
                 <p class="text-xs text-blue-600">{{ getHandoverTypeText(handover.handover_type) }}</p>
               </div>
@@ -131,7 +215,22 @@
             <div v-if="handover.cashier_note" class="text-sm text-green-600">
               <strong>Phản hồi cashier:</strong> {{ handover.cashier_note }}
             </div>
-            <div v-if="handover.discrepancy && handover.discrepancy !== 0" class="text-sm mt-2 p-2 rounded" 
+            <!-- Display separate discrepancies -->
+            <div v-if="(handover.cash_discrepancy && handover.cash_discrepancy !== 0) || (handover.transfer_discrepancy && handover.transfer_discrepancy !== 0)" 
+              class="text-sm mt-2 space-y-1">
+              <div v-if="handover.cash_discrepancy && handover.cash_discrepancy !== 0" 
+                class="p-2 rounded" 
+                :class="handover.cash_discrepancy > 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'">
+                <strong>💵 Chênh lệch tiền mặt:</strong> {{ handover.cash_discrepancy > 0 ? '+' : '' }}{{ formatPrice(handover.cash_discrepancy) }}
+              </div>
+              <div v-if="handover.transfer_discrepancy && handover.transfer_discrepancy !== 0" 
+                class="p-2 rounded" 
+                :class="handover.transfer_discrepancy > 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'">
+                <strong>💳 Chênh lệch tiền CK:</strong> {{ handover.transfer_discrepancy > 0 ? '+' : '' }}{{ formatPrice(handover.transfer_discrepancy) }}
+              </div>
+            </div>
+            <!-- Fallback to old discrepancy format -->
+            <div v-else-if="handover.discrepancy && handover.discrepancy !== 0" class="text-sm mt-2 p-2 rounded" 
               :class="handover.discrepancy > 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'">
               <strong>Chênh lệch:</strong> {{ handover.discrepancy > 0 ? '+' : '' }}{{ formatPrice(handover.discrepancy) }}
             </div>
@@ -139,14 +238,14 @@
         </div>
       </div>
 
-      <!-- Start Shift (Hidden for Cashier) -->
-      <div v-else-if="!isCashier" class="bg-white rounded-2xl p-6 mb-4 shadow-sm">
-        <h3 class="text-xl font-bold mb-4">Mở ca làm việc</h3>
+      <!-- Start Shift Form (when no current shift, in current tab) -->
+      <div v-if="!currentShift && shiftFilter === 'current'" class="bg-white rounded-2xl p-5 mb-4 shadow-lg border border-gray-200">
+        <h3 class="text-xl font-bold mb-4 text-gray-900">Mở ca làm việc</h3>
         <form @submit.prevent="startShift" class="space-y-4">
           <div>
-            <label class="block text-sm font-medium mb-2">Chọn ca *</label>
+            <label class="block text-sm font-semibold mb-2 text-gray-700">Chọn ca *</label>
             <select v-model="startForm.type" required 
-              class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              class="w-full p-3.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base touch-manipulation">
               <option value="">-- Chọn ca --</option>
               <option value="MORNING">☀️ Ca sáng (7:00 - 12:00)</option>
               <option value="AFTERNOON">🌤️ Ca chiều (12:00 - 18:00)</option>
@@ -154,33 +253,36 @@
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium mb-2">Tiền đầu ca (VNĐ) *</label>
+            <label class="block text-sm font-semibold mb-2 text-gray-700">Tiền đầu ca (VNĐ) *</label>
             <input v-model.number="startForm.start_cash" type="number" min="0" step="1000" required 
-              class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              class="w-full p-3.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base touch-manipulation">
           </div>
           <button type="submit" 
-            class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-xl font-bold active:scale-95 transition-transform">
+            class="w-full bg-blue-500 active:bg-blue-600 text-white px-4 py-3.5 rounded-xl font-bold shadow-lg touch-manipulation active:scale-98 transition-all">
             Mở ca
           </button>
         </form>
       </div>
+      </div>
+      <!-- End of Tab: Ca hiện tại -->
 
-      <!-- Shift History -->
-      <div class="bg-white rounded-2xl p-6 shadow-sm">
-        <h3 class="text-xl font-bold mb-4">Lịch sử ca làm việc</h3>
+      <!-- Tab: Ca cũ (Shift History) -->
+      <div v-if="shiftFilter === 'history'" class="bg-white rounded-2xl p-5 shadow-lg border border-gray-200">
+        <h3 class="text-xl font-bold mb-4 text-gray-900">Lịch sử ca làm việc</h3>
         
-        <div v-if="loading" class="text-center py-10">
-          <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        <div v-if="loading" class="text-center py-16">
+          <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent"></div>
+          <p class="text-gray-500 text-sm mt-3">Đang tải...</p>
         </div>
         
-        <div v-else-if="shifts.length === 0" class="text-center py-10">
-          <div class="text-4xl mb-2">📭</div>
-          <p class="text-gray-500">Chưa có ca làm việc nào</p>
+        <div v-else-if="filteredShifts.length === 0" class="text-center py-16">
+          <div class="text-6xl mb-3">📭</div>
+          <p class="text-gray-500 font-medium">Chưa có ca làm việc cũ</p>
         </div>
         
         <div v-else class="space-y-3">
-          <div v-for="shift in shifts" :key="shift.id" 
-            class="border rounded-xl p-4 active:scale-98 transition-transform">
+          <div v-for="shift in filteredShifts" :key="shift.id" 
+            class="border-2 border-gray-100 rounded-xl p-4 active:scale-[0.98] active:shadow-md transition-all touch-manipulation">
             <div class="flex justify-between items-start mb-3">
               <div>
                 <h4 class="font-bold text-lg">{{ getShiftTypeText(shift.type) }}</h4>
@@ -222,6 +324,8 @@
           </div>
         </div>
       </div>
+      </div>
+      <!-- End of Waiter/Barista View -->
     </div>
 
     <!-- Bottom Navigation -->
@@ -287,28 +391,84 @@
     <!-- Partial Handover Modal -->
     <transition name="slide-up">
       <div v-if="showPartialHandoverForm" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
-        <div class="bg-white rounded-t-3xl w-full p-6">
-          <h3 class="text-xl font-bold mb-4">💰 Bàn giao một phần tiền</h3>
+        <div class="bg-white rounded-t-3xl w-full p-6 max-h-[90vh] overflow-y-auto">
+          <h3 class="text-xl font-bold mb-4">💰 Bàn giao tiền</h3>
           
-          <!-- Current Cash Info -->
+          <!-- Current Balance Info -->
           <div class="bg-blue-50 p-4 rounded-xl mb-4">
-            <div class="flex justify-between items-center">
-              <span class="text-sm text-gray-600">Tiền hiện có</span>
-              <span class="font-bold text-2xl text-blue-600">{{ formatPrice(currentShift?.remaining_cash || currentShift?.current_cash || 0) }}</span>
+            <p class="text-sm font-medium text-gray-700 mb-3">💰 Số dư hiện tại</p>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">💵 Tiền mặt còn lại</span>
+                <span class="font-bold text-lg text-green-600">{{ formatPrice(currentShift?.remaining_cash || 0) }}</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">💳 Tiền CK còn lại</span>
+                <span class="font-bold text-lg text-blue-600">{{ formatPrice(currentShift?.remaining_transfer || 0) }}</span>
+              </div>
             </div>
           </div>
           
           <form @submit.prevent="createPartialHandover" class="space-y-4">
-            <!-- Amount Input -->
+            <!-- Handover Type Selection -->
             <div>
-              <label class="block text-sm font-medium mb-2">Số tiền bàn giao (VNĐ) *</label>
-              <input v-model.number="partialHandoverForm.declared_amount" 
+              <label class="block text-sm font-medium mb-2">Chọn loại bàn giao *</label>
+              <div class="grid grid-cols-3 gap-2">
+                <button type="button" 
+                  @click="partialHandoverForm.handover_type = 'cash'"
+                  :class="partialHandoverForm.handover_type === 'cash' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700'"
+                  class="px-4 py-3 rounded-xl font-medium transition-colors">
+                  💵 Tiền mặt
+                </button>
+                <button type="button" 
+                  @click="partialHandoverForm.handover_type = 'transfer'"
+                  :class="partialHandoverForm.handover_type === 'transfer' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'"
+                  class="px-4 py-3 rounded-xl font-medium transition-colors">
+                  💳 Tiền CK
+                </button>
+                <button type="button" 
+                  @click="partialHandoverForm.handover_type = 'both'"
+                  :class="partialHandoverForm.handover_type === 'both' ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-700'"
+                  class="px-4 py-3 rounded-xl font-medium transition-colors">
+                  💰 Cả hai
+                </button>
+              </div>
+            </div>
+
+            <!-- Cash Amount Input -->
+            <div v-if="partialHandoverForm.handover_type === 'cash' || partialHandoverForm.handover_type === 'both'">
+              <label class="block text-sm font-medium mb-2">💵 Số tiền mặt bàn giao (VNĐ) *</label>
+              <input v-model.number="partialHandoverForm.cash_amount" 
                 type="number" 
-                :max="currentShift?.remaining_cash || currentShift?.current_cash || 0"
-                min="1000" 
+                :max="currentShift?.remaining_cash || 0"
+                min="0" 
                 step="1000" 
-                required 
-                class="w-full p-3 border rounded-xl text-lg font-bold focus:ring-2 focus:ring-yellow-500">
+                :required="partialHandoverForm.handover_type === 'cash' || partialHandoverForm.handover_type === 'both'"
+                class="w-full p-3 border rounded-xl text-lg font-bold focus:ring-2 focus:ring-green-500">
+              <p class="text-xs text-gray-500 mt-1">Tối đa: {{ formatPrice(currentShift?.remaining_cash || 0) }}</p>
+            </div>
+
+            <!-- Transfer Amount Input -->
+            <div v-if="partialHandoverForm.handover_type === 'transfer' || partialHandoverForm.handover_type === 'both'">
+              <label class="block text-sm font-medium mb-2">💳 Số tiền CK bàn giao (VNĐ) *</label>
+              <input v-model.number="partialHandoverForm.transfer_amount" 
+                type="number" 
+                :max="currentShift?.remaining_transfer || 0"
+                min="0" 
+                step="1000" 
+                :required="partialHandoverForm.handover_type === 'transfer' || partialHandoverForm.handover_type === 'both'"
+                class="w-full p-3 border rounded-xl text-lg font-bold focus:ring-2 focus:ring-blue-500">
+              <p class="text-xs text-gray-500 mt-1">Tối đa: {{ formatPrice(currentShift?.remaining_transfer || 0) }}</p>
+            </div>
+
+            <!-- Total Display -->
+            <div v-if="partialHandoverForm.handover_type === 'both'" class="bg-purple-50 p-4 rounded-xl">
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">Tổng bàn giao</span>
+                <span class="font-bold text-2xl text-purple-600">
+                  {{ formatPrice((partialHandoverForm.cash_amount || 0) + (partialHandoverForm.transfer_amount || 0)) }}
+                </span>
+              </div>
             </div>
             
             <!-- Note -->
@@ -352,20 +512,32 @@
               </div>
               <div class="ml-3">
                 <p class="text-sm text-orange-700">
-                  <strong>Lưu ý:</strong> Thao tác này sẽ bàn giao toàn bộ tiền còn lại và tự động đóng ca sau khi cashier xác nhận.
+                  <strong>Lưu ý:</strong> Thao tác này sẽ bàn giao toàn bộ tiền mặt và tiền CK còn lại, sau đó tự động đóng ca khi cashier xác nhận.
                 </p>
               </div>
             </div>
           </div>
           
-          <!-- Cash Summary -->
+          <!-- Money Summary -->
           <div class="bg-orange-50 p-4 rounded-xl mb-4">
+            <p class="text-sm font-medium text-gray-700 mb-3">💰 Số tiền sẽ bàn giao</p>
             <div class="space-y-2">
-              <div class="flex justify-between items-center">
-                <span class="text-sm text-gray-600">Tiền sẽ bàn giao</span>
-                <span class="font-bold text-2xl text-orange-600">{{ formatPrice(currentShift?.remaining_cash || currentShift?.current_cash || 0) }}</span>
+              <div v-if="(currentShift?.remaining_cash || 0) > 0" class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">💵 Tiền mặt</span>
+                <span class="font-bold text-lg text-green-600">{{ formatPrice(currentShift?.remaining_cash || 0) }}</span>
               </div>
-              <div class="flex justify-between items-center text-sm">
+              <div v-if="(currentShift?.remaining_transfer || 0) > 0" class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">💳 Tiền CK</span>
+                <span class="font-bold text-lg text-blue-600">{{ formatPrice(currentShift?.remaining_transfer || 0) }}</span>
+              </div>
+              <div v-if="(currentShift?.remaining_cash || 0) > 0 && (currentShift?.remaining_transfer || 0) > 0" 
+                class="flex justify-between items-center pt-2 border-t border-orange-200">
+                <span class="text-sm font-medium text-gray-700">Tổng cộng</span>
+                <span class="font-bold text-xl text-orange-600">
+                  {{ formatPrice((currentShift?.remaining_cash || 0) + (currentShift?.remaining_transfer || 0)) }}
+                </span>
+              </div>
+              <div class="flex justify-between items-center text-sm pt-2 border-t border-orange-200">
                 <span class="text-gray-500">Tiền cuối ca</span>
                 <span class="font-medium">{{ formatPrice(handoverEndShiftForm.end_cash) }}</span>
               </div>
@@ -418,6 +590,7 @@ import { useShiftStore } from '../stores/shift'
 import { useAuthStore } from '../stores/auth'
 import BottomNav from '../components/BottomNav.vue'
 import PullToRefresh from '../components/PullToRefresh.vue'
+import CashierShiftView from '../components/CashierShiftView.vue'
 import { usePullToRefresh } from '../composables/usePullToRefresh'
 import { USER_ROLES } from '../constants/user'
 import { SHIFT_STATUS } from '../constants/shift'
@@ -425,6 +598,8 @@ import { SHIFT_STATUS } from '../constants/shift'
 const shiftStore = useShiftStore()
 const authStore = useAuthStore()
 
+// State
+const shiftFilter = ref('current') // 'current' or 'history'
 const showEndShiftForm = ref(false)
 const showCloseForm = ref(false)
 const selectedShift = ref(null)
@@ -449,7 +624,9 @@ const closeForm = ref({
 })
 
 const partialHandoverForm = ref({
-  declared_amount: 0,
+  handover_type: 'both', // 'cash' | 'transfer' | 'both'
+  cash_amount: 0,
+  transfer_amount: 0,
   waiter_note: ''
 })
 
@@ -463,6 +640,29 @@ const currentShift = computed(() => shiftStore.currentShift)
 const shifts = computed(() => shiftStore.shifts)
 const isCashier = computed(() => authStore.user?.role === USER_ROLES.CASHIER || authStore.user?.role === USER_ROLES.MANAGER)
 const isWaiter = computed(() => authStore.user?.role === USER_ROLES.WAITER)
+
+// Filter shifts - exclude current shift from history
+const filteredShifts = computed(() => {
+  // When viewing history, show all shifts except current one
+  if (shiftFilter.value === 'history') {
+    if (!currentShift.value) {
+      // No current shift, show all shifts
+      return shifts.value
+    }
+    // Exclude the current shift from history
+    return shifts.value.filter(s => s.id !== currentShift.value.id)
+  }
+  
+  // When viewing current tab, don't show any shifts in the list
+  // (current shift is shown separately above)
+  return []
+})
+
+// Count old shifts (excluding current)
+const oldShiftsCount = computed(() => {
+  if (!currentShift.value) return shifts.value.length
+  return shifts.value.filter(s => s.id !== currentShift.value.id).length
+})
 
 // Refresh data function
 const refreshData = async () => {
@@ -536,20 +736,42 @@ const closeShift = async () => {
 const createPartialHandover = async () => {
   try {
     const handoverData = {
-      declared_amount: partialHandoverForm.value.declared_amount,
       handover_type: 'PARTIAL',
       waiter_note: partialHandoverForm.value.waiter_note
+    }
+
+    // Add amounts based on handover type
+    if (partialHandoverForm.value.handover_type === 'cash') {
+      handoverData.cash_amount = partialHandoverForm.value.cash_amount
+      handoverData.transfer_amount = 0
+    } else if (partialHandoverForm.value.handover_type === 'transfer') {
+      handoverData.cash_amount = 0
+      handoverData.transfer_amount = partialHandoverForm.value.transfer_amount
+    } else { // both
+      handoverData.cash_amount = partialHandoverForm.value.cash_amount || 0
+      handoverData.transfer_amount = partialHandoverForm.value.transfer_amount || 0
+    }
+
+    // Validate at least one amount
+    if (handoverData.cash_amount === 0 && handoverData.transfer_amount === 0) {
+      alert('Vui lòng nhập ít nhất một loại tiền để bàn giao')
+      return
     }
     
     await shiftStore.createCashHandover(currentShift.value.id, handoverData)
     showPartialHandoverForm.value = false
-    partialHandoverForm.value = { declared_amount: 0, waiter_note: '' }
+    partialHandoverForm.value = { 
+      handover_type: 'both',
+      cash_amount: 0,
+      transfer_amount: 0,
+      waiter_note: '' 
+    }
     
     // Refresh data
     await shiftStore.fetchCurrentShift()
     await fetchHandoverData()
     
-    alert('Đã gửi yêu cầu bàn giao một phần tiền. Chờ thu ngân xác nhận.')
+    alert('Đã gửi yêu cầu bàn giao. Chờ thu ngân xác nhận.')
   } catch (error) {
     alert('Lỗi: ' + (error.response?.data?.error || error.message))
   }
@@ -558,12 +780,19 @@ const createPartialHandover = async () => {
 const createHandoverAndEndShift = async () => {
   try {
     const handoverData = {
-      declared_amount: currentShift.value?.remaining_cash || currentShift.value?.current_cash || 0,
-      waiter_note: handoverEndShiftForm.value.waiter_note,
-      end_cash: handoverEndShiftForm.value.end_cash
+      cash_amount: currentShift.value?.remaining_cash || 0,
+      transfer_amount: currentShift.value?.remaining_transfer || 0,
+      handover_type: 'END_SHIFT',
+      waiter_note: handoverEndShiftForm.value.waiter_note
     }
     
-    await shiftStore.createHandoverAndEndShift(currentShift.value.id, handoverData)
+    // Validate at least one amount
+    if (handoverData.cash_amount === 0 && handoverData.transfer_amount === 0) {
+      alert('Không có tiền để bàn giao')
+      return
+    }
+    
+    await shiftStore.createCashHandover(currentShift.value.id, handoverData)
     showHandoverEndShiftForm.value = false
     handoverEndShiftForm.value = { end_cash: 0, waiter_note: '' }
     
@@ -666,11 +895,20 @@ const formatTime = (date) => {
 </script>
 
 <style scoped>
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
 .active\:scale-95:active {
   transform: scale(0.95);
 }
 
 .active\:scale-98:active {
+  transform: scale(0.98);
+}
+
+.active\:scale-\[0\.98\]:active {
   transform: scale(0.98);
 }
 
@@ -685,5 +923,15 @@ const formatTime = (date) => {
 
 .slide-up-leave-to {
   transform: translateY(100%);
+}
+
+/* Improve button press feedback */
+button:active {
+  transition: all 0.1s ease;
+}
+
+/* Smooth scrolling */
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
 }
 </style>

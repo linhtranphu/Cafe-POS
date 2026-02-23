@@ -41,72 +41,181 @@
         </div>
       </div>
 
-      <!-- Quick Access: Handover Management -->
-      <div class="bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-2xl p-6 shadow-lg mb-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-xl font-bold mb-2">💰 Quản lý bàn giao</h3>
-            <p class="text-sm opacity-90">Xác nhận bàn giao từ phục vụ</p>
+      <!-- Current Shift Info & Close Button -->
+      <div class="mb-4">
+        <!-- Loading State -->
+        <div v-if="cashierShiftStore.loading" class="text-center py-4 bg-white rounded-2xl">
+          <div class="animate-spin text-3xl">⏳</div>
+          <p class="text-sm text-gray-600 mt-2">Đang tải...</p>
+        </div>
+
+        <!-- No Shift - Show Start Button -->
+        <div v-else-if="!cashierShiftStore.hasOpenCashierShift" class="bg-white rounded-2xl p-4 shadow-sm">
+          <div class="bg-gray-50 rounded-xl p-4 text-center">
+            <div class="text-4xl mb-2">💼</div>
+            <p class="text-sm text-gray-600 mb-4">Chưa có ca thu ngân nào đang mở</p>
+            
+            <button
+              @click="showStartModal = true"
+              class="w-full py-3 bg-yellow-500 text-white rounded-xl font-bold text-base active:scale-95 transition-transform"
+            >
+              ➕ Bắt đầu ca thu ngân
+            </button>
           </div>
-          <button 
-            @click="$router.push('/cashier/handovers')"
-            class="bg-white text-orange-600 px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl active:scale-95 transition-all">
-            Xem ngay →
+        </div>
+
+        <!-- Has Open Shift - Show Current Shift Info -->
+        <div v-else class="space-y-3">
+          <!-- Current Shift Info with Managed Funds -->
+          <div class="bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-xl p-4 shadow-lg">
+            <!-- Shift Header -->
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <p class="text-xs opacity-90">Ca hiện tại</p>
+                <p class="text-lg font-bold">{{ cashierShiftStore.currentCashierShift?.cashier_name }}</p>
+              </div>
+              <div class="bg-white/20 rounded-lg px-3 py-1 backdrop-blur-sm">
+                <p class="text-xs font-medium">{{ getStatusText(cashierShiftStore.currentCashierShift?.status) }}</p>
+              </div>
+            </div>
+            
+            <!-- Shift Basic Info -->
+            <div class="grid grid-cols-2 gap-3 mb-4">
+              <div class="bg-white/20 rounded-lg p-2 backdrop-blur-sm">
+                <p class="text-xs opacity-90">Bắt đầu</p>
+                <p class="text-sm font-bold">{{ formatTime(cashierShiftStore.currentCashierShift?.start_time) }}</p>
+              </div>
+              <div class="bg-white/20 rounded-lg p-2 backdrop-blur-sm">
+                <p class="text-xs opacity-90">Tiền đầu ca</p>
+                <p class="text-sm font-bold">{{ formatPrice(cashierShiftStore.currentCashierShift?.starting_float) }}</p>
+              </div>
+            </div>
+
+            <!-- Managed Funds Section (Integrated) -->
+            <div v-if="managedFunds" class="border-t border-white/30 pt-3">
+              <div class="flex items-center gap-2 mb-3">
+                <span class="text-xl">💰</span>
+                <h3 class="text-sm font-bold opacity-90">Tiền đang quản lý</h3>
+              </div>
+              
+              <!-- Funds Grid -->
+              <div class="grid grid-cols-2 gap-2 mb-3">
+                <!-- Received Cash -->
+                <div class="bg-white/25 rounded-lg p-2 backdrop-blur-sm">
+                  <div class="flex items-center gap-1 mb-1">
+                    <span class="text-base">💵</span>
+                    <p class="text-xs opacity-90">Tiền mặt</p>
+                  </div>
+                  <p class="text-sm font-bold">{{ formatPrice(managedFunds.received_cash) }}</p>
+                  <p class="text-xs opacity-75">Đã nhận</p>
+                </div>
+                
+                <!-- Received Transfer -->
+                <div class="bg-white/25 rounded-lg p-2 backdrop-blur-sm">
+                  <div class="flex items-center gap-1 mb-1">
+                    <span class="text-base">💳</span>
+                    <p class="text-xs opacity-90">Tiền CK</p>
+                  </div>
+                  <p class="text-sm font-bold">{{ formatPrice(managedFunds.received_transfer) }}</p>
+                  <p class="text-xs opacity-75">Đã nhận</p>
+                </div>
+              </div>
+              
+              <!-- Total Managed Funds -->
+              <div class="bg-white/30 rounded-lg p-2 backdrop-blur-sm mb-2">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-1">
+                    <span class="text-base">📊</span>
+                    <p class="text-xs font-semibold">Tổng cộng</p>
+                  </div>
+                  <p class="text-lg font-bold">{{ formatPrice(managedFunds.total_managed_funds) }}</p>
+                </div>
+              </div>
+              
+              <!-- Responsibility Warning -->
+              <div class="bg-white/20 rounded-lg p-2 backdrop-blur-sm">
+                <div class="flex items-start gap-2">
+                  <span class="text-sm">⚠️</span>
+                  <div class="flex-1">
+                    <p class="text-xs font-semibold mb-0.5">Bạn chịu trách nhiệm số tiền này</p>
+                    <p class="text-xs opacity-90">Khi đóng ca, bạn cần bàn giao lại về quỹ</p>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Handover Count -->
+              <div v-if="managedFunds.handover_count > 0" class="mt-2 text-center">
+                <p class="text-xs opacity-75">
+                  Đã nhận {{ managedFunds.handover_count }} lần bàn giao
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Close Shift Button -->
+          <button
+            v-if="canCloseShift"
+            @click="goToShiftClosure"
+            class="w-full py-3 bg-red-500 text-white rounded-xl font-bold text-base active:scale-95 transition-transform flex items-center justify-center gap-2 shadow-lg"
+          >
+            <span>🔒</span>
+            <span>Đóng ca thu ngân</span>
           </button>
         </div>
       </div>
 
-      <!-- Cashier Shift Manager -->
-      <CashierShiftManager />
+      <!-- Start Shift Modal -->
+      <div v-if="showStartModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl p-6 max-w-md w-full">
+          <h3 class="text-xl font-bold text-gray-800 mb-4">Bắt đầu ca thu ngân</h3>
+          
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              Tiền đầu ca (VNĐ) <span class="text-red-500">*</span>
+            </label>
+            <input
+              v-model.number="startingFloat"
+              type="number"
+              step="1000"
+              min="0"
+              class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-yellow-500"
+              placeholder="Nhập số tiền đầu ca"
+              @keyup.enter="handleStartShift"
+            />
+            <p v-if="startingFloatError" class="text-xs text-red-500 mt-1">{{ startingFloatError }}</p>
+          </div>
 
-      <!-- Shift Selector - Waiter Shifts for Payment Monitoring -->
-      <div class="bg-white rounded-2xl p-4 shadow-sm mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-2">📅 Chọn ca phục vụ để xem thanh toán</label>
-        <p class="text-xs text-gray-500 mb-2">💡 Chọn ca của waiter để xem các thanh toán trong ca đó</p>
-        
-        <!-- Debug info -->
-        <p v-if="waiterShifts.length === 0" class="text-xs text-red-500 mb-2">
-          ⚠️ Không có ca phục vụ nào. Waiter cần mở ca trước.
-        </p>
-        
-        <select 
-          v-model="selectedShift" 
-          @change="loadPayments" 
-          class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-yellow-500"
-        >
-          <option value="">-- Chọn ca phục vụ --</option>
-          <option v-for="shift in waiterShifts" :key="shift.id" :value="shift.id">
-            {{ formatDate(shift.started_at) }} - 
-            {{ shift.user_name }} 
-            ({{ shift.role_type }}) - 
-            {{ getStatusText(shift.status) }}
-          </option>
-        </select>
-      </div>
-
-      <!-- Shift Status Card - Shows stats of selected waiter shift -->
-      <div v-if="shiftStatus" class="bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-2xl p-6 shadow-lg mb-4">
-        <h2 class="text-lg font-bold mb-4">📊 Tổng quan ca phục vụ</h2>
-        <p class="text-xs opacity-90 mb-3">Thống kê của ca đang xem</p>
-        <div class="grid grid-cols-2 gap-3">
-          <div class="bg-white/20 rounded-xl p-3 backdrop-blur-sm">
-            <div class="text-2xl font-bold">{{ shiftStatus.total_orders }}</div>
-            <div class="text-xs opacity-90">Tổng đơn</div>
-          </div>
-          <div class="bg-white/20 rounded-xl p-3 backdrop-blur-sm">
-            <div class="text-lg font-bold">{{ formatPrice(shiftStatus.total_revenue) }}</div>
-            <div class="text-xs opacity-90">Tổng doanh thu</div>
-          </div>
-          <div class="bg-white/20 rounded-xl p-3 backdrop-blur-sm">
-            <div class="text-lg font-bold">{{ formatPrice(shiftStatus.cash_revenue) }}</div>
-            <div class="text-xs opacity-90">💵 Tiền mặt</div>
-          </div>
-          <div class="bg-white/20 rounded-xl p-3 backdrop-blur-sm">
-            <div class="text-lg font-bold">{{ formatPrice(shiftStatus.transfer_revenue + shiftStatus.qr_revenue) }}</div>
-            <div class="text-xs opacity-90">💳 Chuyển khoản</div>
+          <div class="flex gap-3">
+            <button
+              @click="showStartModal = false"
+              class="flex-1 py-3 bg-gray-200 text-gray-800 rounded-xl font-medium active:scale-95 transition-transform"
+            >
+              Hủy
+            </button>
+            <button
+              @click="handleStartShift"
+              :disabled="startingLoading"
+              class="flex-1 py-3 bg-yellow-500 text-white rounded-xl font-bold active:scale-95 transition-transform disabled:opacity-50"
+            >
+              {{ startingLoading ? 'Đang xử lý...' : 'Bắt đầu' }}
+            </button>
           </div>
         </div>
       </div>
+
+      <!-- Handover Management Button -->
+      <button 
+        @click="$router.push('/cashier/handovers')"
+        class="w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-xl p-4 shadow-lg active:scale-95 transition-all text-left mb-4">
+        <div class="flex items-center gap-3">
+          <div class="text-3xl">💰</div>
+          <div class="flex-1">
+            <p class="text-base font-bold">Quản lý bàn giao</p>
+            <p class="text-xs opacity-90 mt-1">Xác nhận từ phục vụ</p>
+          </div>
+          <div class="text-2xl opacity-75">→</div>
+        </div>
+      </button>
 
       <!-- Pending Discrepancies Alert -->
       <div v-if="pendingDiscrepancies.length > 0" class="bg-yellow-50 border-2 border-yellow-300 rounded-2xl p-4 mb-4">
@@ -164,145 +273,7 @@
         2. Cashier cannot reconcile cash they don't physically hold
         3. Cash reconciliation happens in handover flow instead
       -->
-      <div v-if="false" class="bg-white rounded-2xl p-4 shadow-sm mb-4">
-        <h2 class="text-lg font-bold text-gray-800 mb-4">💰 Đối soát tiền mặt</h2>
-        
-        <div v-if="!hasReconciliation" class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Tiền mặt thực tế</label>
-            <input
-              v-model.number="reconciliationForm.actualCash"
-              type="number"
-              step="1000"
-              class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-yellow-500"
-              placeholder="Nhập số tiền thực tế"
-            />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Ghi chú (tùy chọn)</label>
-            <textarea
-              v-model="reconciliationForm.notes"
-              rows="2"
-              class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-yellow-500"
-              placeholder="Ghi chú về đối soát..."
-            ></textarea>
-          </div>
-          <button
-            @click="performReconciliation"
-            :disabled="!reconciliationForm.actualCash"
-            class="w-full py-4 bg-green-500 text-white rounded-xl font-bold text-base active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            ✓ Xác nhận đối soát
-          </button>
-        </div>
-
-        <div v-else class="bg-gray-50 rounded-xl p-4">
-          <div class="grid grid-cols-1 gap-3 mb-3">
-            <div class="flex justify-between items-center">
-              <span class="text-sm text-gray-600">Tiền mặt dự kiến:</span>
-              <span class="font-bold text-gray-800">{{ formatPrice(reconciliation.expected_cash) }}</span>
-            </div>
-            <div class="flex justify-between items-center">
-              <span class="text-sm text-gray-600">Tiền mặt thực tế:</span>
-              <span class="font-bold text-gray-800">{{ formatPrice(reconciliation.actual_cash) }}</span>
-            </div>
-            <div class="flex justify-between items-center pt-2 border-t-2 border-gray-200">
-              <span class="text-sm font-medium text-gray-700">Chênh lệch:</span>
-              <span :class="getDifferenceClass(reconciliation.difference)" class="font-bold text-lg">
-                {{ formatPrice(reconciliation.difference) }}
-              </span>
-            </div>
-          </div>
-          <div v-if="reconciliation.notes" class="text-sm text-gray-600 bg-white rounded-lg p-3">
-            <span class="font-medium">Ghi chú:</span> {{ reconciliation.notes }}
-          </div>
-          <div class="mt-3 flex items-center gap-2 text-sm text-green-600">
-            <span class="text-xl">✓</span>
-            <span class="font-medium">Đã đối soát</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Payment List -->
-      <div class="mb-4">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-lg font-bold text-gray-800">💳 Danh sách thanh toán</h2>
-          <span class="text-sm text-gray-600">{{ payments.length }} giao dịch</span>
-        </div>
-
-        <div v-if="payments.length === 0" class="text-center py-12 bg-white rounded-2xl">
-          <div class="text-5xl mb-3">📭</div>
-          <p class="text-gray-500">Chưa có thanh toán nào</p>
-          <p class="text-sm text-gray-400 mt-1">Chọn ca làm việc để xem</p>
-        </div>
-
-        <div v-else class="space-y-3">
-          <div
-            v-for="payment in payments"
-            :key="payment.order_id"
-            class="bg-white rounded-xl p-4 shadow-sm active:scale-98 transition-transform"
-          >
-            <!-- Header -->
-            <div class="flex justify-between items-start mb-3">
-              <div>
-                <h3 class="font-bold text-gray-800">{{ payment.customer_name || 'Khách lẻ' }}</h3>
-                <p class="text-xs text-gray-500">{{ formatDateTime(payment.paid_at) }}</p>
-              </div>
-              <div class="text-right">
-                <div class="text-lg font-bold text-green-600">{{ formatPrice(payment.amount) }}</div>
-                <span :class="getPaymentMethodBadge(payment.payment_method)">
-                  {{ getPaymentMethodText(payment.payment_method) }}
-                </span>
-              </div>
-            </div>
-
-            <!-- Status -->
-            <div class="mb-3">
-              <span :class="getStatusBadge(payment.status)">
-                {{ getStatusText(payment.status) }}
-              </span>
-            </div>
-
-            <!-- Actions -->
-            <div class="flex gap-2">
-              <button
-                @click="showOverrideModal(payment)"
-                class="flex-1 py-2 bg-orange-50 text-orange-600 rounded-lg text-sm font-medium active:scale-95 transition-transform border border-orange-200"
-              >
-                ✏️ Điều chỉnh
-              </button>
-              <button
-                @click="showDiscrepancyModal(payment)"
-                class="flex-1 py-2 bg-yellow-50 text-yellow-600 rounded-lg text-sm font-medium active:scale-95 transition-transform border border-yellow-200"
-              >
-                ⚠️ Báo lỗi
-              </button>
-              <button
-                @click="lockOrder(payment.order_id)"
-                class="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium active:scale-95 transition-transform border border-red-200"
-              >
-                🔒
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
-
-    <!-- Modals -->
-    <OverridePaymentModal
-      :show="showOverride"
-      :payment="selectedPayment"
-      @close="showOverride = false"
-      @confirm="handleOverridePayment"
-    />
-
-    <DiscrepancyModal
-      :show="showDiscrepancy"
-      :payment="selectedPayment"
-      @close="showDiscrepancy = false"
-      @confirm="handleReportDiscrepancy"
-    />
 
     <!-- Bottom Navigation -->
     <BottomNav />
@@ -317,104 +288,100 @@ import { useShiftStore } from '../stores/shift'
 import BottomNav from '../components/BottomNav.vue'
 import PullToRefresh from '../components/PullToRefresh.vue'
 import { usePullToRefresh } from '../composables/usePullToRefresh'
-import CashierShiftManager from '../components/CashierShiftManager.vue'
-import OverridePaymentModal from '../components/OverridePaymentModal.vue'
-import DiscrepancyModal from '../components/DiscrepancyModal.vue'
+import { printJobService } from '../services/printJob'
 import { SHIFT_STATUS, CASHIER_SHIFT_STATUS, SHIFT_TYPE } from '../constants/shift'
-import { ORDER_STATUS, PAYMENT_METHOD } from '../constants/order'
 
 const cashierStore = useCashierStore()
 const cashierShiftStore = useCashierShiftStore()
 const shiftStore = useShiftStore()
 
-const selectedShift = ref('')
-const showOverride = ref(false)
-const showDiscrepancy = ref(false)
 const showDiscrepancyList = ref(false)
-const selectedPayment = ref(null)
-const reconciliationForm = ref({
-  actualCash: null,
-  notes: ''
-})
+
+// Managed funds state
+const managedFunds = ref(null)
+const loadingManagedFunds = ref(false)
+
+// Cashier shift management state
+const showStartModal = ref(false)
+const startingFloat = ref(null)
+const startingFloatError = ref(null)
+const startingLoading = ref(false)
 
 // Computed
-const shiftStatus = computed(() => cashierStore.shiftStatus)
 const cashierShifts = computed(() => cashierShiftStore.cashierShifts)
-const waiterShifts = computed(() => shiftStore.shifts) // All shifts including waiter shifts
-const payments = computed(() => cashierStore.payments)
 const pendingDiscrepancies = computed(() => cashierStore.pendingDiscrepancies)
-const reconciliation = computed(() => cashierStore.reconciliation)
-const hasReconciliation = computed(() => cashierStore.hasReconciliation)
 const loading = computed(() => cashierStore.loading)
 const error = computed(() => cashierStore.error)
 
+const canCloseShift = computed(() => {
+  return cashierShiftStore.currentCashierShift && cashierShiftStore.currentCashierShift.status === 'OPEN'
+})
+
+// Reprint state
+const reprintingBill = ref(null) // stores order_id being reprinted
+const reprintingLabel = ref(null) // stores {orderId, itemIndex}
+
 // Methods - Define refreshData BEFORE using it in usePullToRefresh
 const refreshData = async () => {
-  if (selectedShift.value) {
-    await Promise.all([
-      cashierStore.getShiftStatus(selectedShift.value),
-      cashierStore.getPaymentsByShift(selectedShift.value)
-    ])
-  }
+  await cashierShiftStore.fetchMyCashierShifts()
   await cashierStore.getPendingDiscrepancies()
   await cashierStore.fetchPendingHandovers()
+  // Fetch managed funds if there's an open shift
+  if (cashierShiftStore.hasOpenCashierShift) {
+    await fetchManagedFunds()
+  }
+}
+
+// Fetch managed funds for current cashier shift
+const fetchManagedFunds = async () => {
+  if (!cashierShiftStore.currentCashierShift?.id) {
+    managedFunds.value = null
+    return
+  }
+  
+  loadingManagedFunds.value = true
+  try {
+    const response = await cashierShiftStore.getManagedFunds(cashierShiftStore.currentCashierShift.id)
+    managedFunds.value = response
+  } catch (error) {
+    console.error('Failed to fetch managed funds:', error)
+    // Don't show error to user, just log it
+    managedFunds.value = null
+  } finally {
+    loadingManagedFunds.value = false
+  }
+}
+
+// Cashier shift methods
+const handleStartShift = async () => {
+  startingFloatError.value = null
+  
+  if (!startingFloat.value || startingFloat.value < 0) {
+    startingFloatError.value = 'Vui lòng nhập số tiền hợp lệ'
+    return
+  }
+  
+  startingLoading.value = true
+  try {
+    await cashierShiftStore.startCashierShift(startingFloat.value)
+    showStartModal.value = false
+    startingFloat.value = null
+    await refreshData()
+  } catch (error) {
+    startingFloatError.value = error.response?.data?.error || 'Không thể bắt đầu ca'
+  } finally {
+    startingLoading.value = false
+  }
+}
+
+const goToShiftClosure = () => {
+  if (cashierShiftStore.currentCashierShift?.id) {
+    window.location.href = `/#/cashier/shift-closure/${cashierShiftStore.currentCashierShift.id}`
+  }
 }
 
 // Pull to refresh - Use refreshData AFTER it's defined
 const { pullDistance, isRefreshing } = usePullToRefresh(refreshData)
-
-const loadPayments = async () => {
-  if (selectedShift.value) {
-    await Promise.all([
-      cashierStore.getShiftStatus(selectedShift.value),
-      cashierStore.getPaymentsByShift(selectedShift.value)
-    ])
-  }
-}
-
-const showOverrideModal = (payment) => {
-  selectedPayment.value = payment
-  showOverride.value = true
-}
-
-const showDiscrepancyModal = (payment) => {
-  selectedPayment.value = payment
-  showDiscrepancy.value = true
-}
-
-const handleOverridePayment = async (reason) => {
-  try {
-    await cashierStore.overridePayment(selectedPayment.value.order_id, reason)
-    showOverride.value = false
-    await refreshData()
-  } catch (error) {
-    console.error('Override failed:', error)
-  }
-}
-
-const handleReportDiscrepancy = async (data) => {
-  try {
-    await cashierStore.reportDiscrepancy({
-      order_id: selectedPayment.value.order_id,
-      ...data
-    })
-    showDiscrepancy.value = false
-    await refreshData()
-  } catch (error) {
-    console.error('Report discrepancy failed:', error)
-  }
-}
-
-const lockOrder = async (orderId) => {
-  if (confirm('Bạn có chắc muốn khóa order này? Không thể hoàn tác!')) {
-    try {
-      await cashierStore.lockOrder(orderId)
-      await refreshData()
-    } catch (error) {
-      console.error('Lock order failed:', error)
-    }
-  }
-}
 
 const resolveDiscrepancy = async (discrepancyId) => {
   if (confirm('Xác nhận đã giải quyết sai lệch này?')) {
@@ -423,24 +390,6 @@ const resolveDiscrepancy = async (discrepancyId) => {
       await refreshData()
     } catch (error) {
       console.error('Resolve discrepancy failed:', error)
-    }
-  }
-}
-
-const performReconciliation = async () => {
-  if (!reconciliationForm.value.actualCash) return
-  
-  if (confirm('Xác nhận đối soát tiền mặt? Không thể thay đổi sau khi xác nhận.')) {
-    try {
-      await cashierStore.reconcileCash({
-        shift_id: selectedShift.value,
-        actual_cash: reconciliationForm.value.actualCash,
-        notes: reconciliationForm.value.notes
-      })
-      reconciliationForm.value = { actualCash: null, notes: '' }
-      await refreshData()
-    } catch (error) {
-      console.error('Reconciliation failed:', error)
     }
   }
 }
@@ -478,6 +427,14 @@ const formatDateTime = (date) => {
   })
 }
 
+const formatTime = (date) => {
+  if (!date) return 'N/A'
+  return new Date(date).toLocaleTimeString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
 const getStatusText = (status) => {
   // Handle both shift status and order status using constants
   const statusMap = {
@@ -487,14 +444,7 @@ const getStatusText = (status) => {
     // Cashier Shift statuses
     [CASHIER_SHIFT_STATUS.OPEN]: '🟢 Đang mở',
     [CASHIER_SHIFT_STATUS.CLOSURE_INITIATED]: '🟡 Đang đóng',
-    [CASHIER_SHIFT_STATUS.CLOSED]: '🔴 Đã đóng',
-    // Order statuses
-    [ORDER_STATUS.PAID]: '✓ Đã thu',
-    [ORDER_STATUS.QUEUED]: '⏳ Chờ pha',
-    [ORDER_STATUS.IN_PROGRESS]: '🍹 Đang pha',
-    [ORDER_STATUS.READY]: '✅ Sẵn sàng',
-    [ORDER_STATUS.SERVED]: '🎯 Hoàn tất',
-    [ORDER_STATUS.LOCKED]: '🔒 Đã khóa'
+    [CASHIER_SHIFT_STATUS.CLOSED]: '🔴 Đã đóng'
   }
   return statusMap[status] || status
 }
@@ -508,52 +458,48 @@ const getShiftTypeText = (type) => {
   return types[type] || type
 }
 
-const getPaymentMethodBadge = (method) => {
-  const badges = {
-    [PAYMENT_METHOD.CASH]: 'px-2 py-1 text-xs rounded-full bg-green-100 text-green-700 font-medium',
-    [PAYMENT_METHOD.TRANSFER]: 'px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-700 font-medium',
-    [PAYMENT_METHOD.QR]: 'px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 font-medium'
+// Reprint functions
+const handleReprintBill = async (orderId) => {
+  if (reprintingBill.value) return
+  
+  reprintingBill.value = orderId
+  try {
+    await printJobService.reprintBill(orderId)
+    alert('✅ Đã gửi lệnh in lại bill')
+  } catch (error) {
+    console.error('Reprint bill error:', error)
+    alert('❌ Lỗi in lại bill: ' + (error.response?.data?.error || error.message))
+  } finally {
+    reprintingBill.value = null
   }
-  return badges[method] || 'px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700 font-medium'
 }
 
-const getPaymentMethodText = (method) => {
-  const texts = {
-    [PAYMENT_METHOD.CASH]: '💵 Tiền mặt',
-    [PAYMENT_METHOD.TRANSFER]: '💳 CK',
-    [PAYMENT_METHOD.QR]: '📱 QR'
+const handleReprintLabel = async (orderId, itemIndex) => {
+  if (reprintingLabel.value) return
+  
+  reprintingLabel.value = { orderId, itemIndex }
+  try {
+    await printJobService.reprintLabel(orderId, itemIndex)
+    alert('✅ Đã gửi lệnh in lại tem')
+  } catch (error) {
+    console.error('Reprint label error:', error)
+    alert('❌ Lỗi in lại tem: ' + (error.response?.data?.error || error.message))
+  } finally {
+    reprintingLabel.value = null
   }
-  return texts[method] || method
-}
-
-const getStatusBadge = (status) => {
-  const badges = {
-    [ORDER_STATUS.PAID]: 'px-3 py-1 text-xs rounded-full bg-green-100 text-green-700 font-medium inline-block',
-    [ORDER_STATUS.QUEUED]: 'px-3 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700 font-medium inline-block',
-    [ORDER_STATUS.IN_PROGRESS]: 'px-3 py-1 text-xs rounded-full bg-blue-100 text-blue-700 font-medium inline-block',
-    [ORDER_STATUS.READY]: 'px-3 py-1 text-xs rounded-full bg-purple-100 text-purple-700 font-medium inline-block',
-    [ORDER_STATUS.SERVED]: 'px-3 py-1 text-xs rounded-full bg-green-100 text-green-700 font-medium inline-block',
-    [ORDER_STATUS.LOCKED]: 'px-3 py-1 text-xs rounded-full bg-red-100 text-red-700 font-medium inline-block'
-  }
-  return badges[status] || 'px-3 py-1 text-xs rounded-full bg-gray-100 text-gray-700 font-medium inline-block'
-}
-
-const getDifferenceClass = (difference) => {
-  if (difference > 0) return 'text-green-600'
-  if (difference < 0) return 'text-red-600'
-  return 'text-gray-600'
 }
 
 // Lifecycle
 onMounted(async () => {
   // Fetch cashier shifts for cashier shift manager
   await cashierShiftStore.fetchMyCashierShifts()
-  // Fetch all shifts (including waiter shifts) for payment monitoring
-  await shiftStore.fetchAllShifts()
-  console.log('DEBUG: Waiter shifts loaded:', shiftStore.shifts)
-  console.log('DEBUG: First shift structure:', shiftStore.shifts[0])
   await cashierStore.getPendingDiscrepancies()
   await cashierStore.fetchPendingHandovers()
+  
+  // Fetch managed funds if there's an open shift
+  if (cashierShiftStore.hasOpenCashierShift) {
+    await fetchManagedFunds()
+  }
 })
 </script>
 

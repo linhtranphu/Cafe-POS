@@ -77,6 +77,11 @@ type Shift struct {
 	TotalDiscrepancy float64 `bson:"total_discrepancy" json:"total_discrepancy"`
 	HandoverCount    int     `bson:"handover_count" json:"handover_count"`
 	
+	// Transfer tracking fields
+	TransferRevenue    float64 `bson:"transfer_revenue" json:"transfer_revenue"`
+	HandedOverTransfer float64 `bson:"handed_over_transfer" json:"handed_over_transfer"`
+	RemainingTransfer  float64 `bson:"remaining_transfer" json:"remaining_transfer"`
+	
 	StartedAt     time.Time          `bson:"started_at" json:"started_at"`
 	EndedAt       *time.Time         `bson:"ended_at,omitempty" json:"ended_at,omitempty"`
 	CreatedAt     time.Time          `bson:"created_at" json:"created_at"`

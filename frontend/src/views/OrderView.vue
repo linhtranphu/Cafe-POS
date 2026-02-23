@@ -8,65 +8,107 @@
     
     <!-- Mobile Header - Fixed -->
     <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
-      <div class="px-4 py-3" style="padding-top: max(0.75rem, env(safe-area-inset-top))">
-        <div class="flex items-center justify-between mb-3">
-          <h1 class="text-xl font-bold text-gray-800">📋 Orders</h1>
-          <div class="flex gap-2">
-            <button @click="refreshOrders" class="p-2 rounded-lg bg-gray-100 hover:bg-gray-200">
-              🔄
-            </button>
-          </div>
+      <div class="px-4 py-4" style="padding-top: max(1rem, env(safe-area-inset-top))">
+        <div class="flex items-center justify-between mb-4">
+          <h1 class="text-2xl font-bold text-gray-900">📋 Orders</h1>
+          <button 
+            @click="refreshOrders" 
+            class="p-2.5 rounded-xl bg-gray-100 active:bg-gray-200 transition-colors touch-manipulation">
+            <span class="text-xl">🔄</span>
+          </button>
+        </div>
+        
+        <!-- Shift Tabs -->
+        <div class="flex gap-2 mb-3">
+          <button 
+            @click="shiftFilter = 'current'"
+            :class="[
+              'flex-1 py-3 px-4 rounded-xl font-semibold text-sm transition-all touch-manipulation active:scale-98',
+              shiftFilter === 'current' 
+                ? 'bg-blue-500 text-white shadow-lg' 
+                : 'bg-gray-100 text-gray-700 active:bg-gray-200'
+            ]">
+            <div class="flex items-center justify-center gap-1.5">
+              <span>🔵</span>
+              <span>Ca hiện tại</span>
+              <span class="text-xs opacity-80">({{ currentShiftOrdersCount }})</span>
+            </div>
+          </button>
+          <button 
+            @click="shiftFilter = 'other'"
+            :class="[
+              'flex-1 py-3 px-4 rounded-xl font-semibold text-sm transition-all touch-manipulation active:scale-98',
+              shiftFilter === 'other' 
+                ? 'bg-blue-500 text-white shadow-lg' 
+                : 'bg-gray-100 text-gray-700 active:bg-gray-200'
+            ]">
+            <div class="flex items-center justify-center gap-1.5">
+              <span>📂</span>
+              <span>Ca khác</span>
+              <span class="text-xs opacity-80">({{ otherShiftsOrdersCount }})</span>
+            </div>
+          </button>
         </div>
         
         <!-- Status Filter Pills -->
-        <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+        <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
           <button v-for="status in statuses" :key="status.value" 
             @click="filterStatus = status.value"
             :class="[
-              'px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all',
+              'px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-all touch-manipulation active:scale-95',
               filterStatus === status.value 
-                ? 'bg-blue-500 text-white shadow-md' 
-                : 'bg-gray-100 text-gray-700'
+                ? 'bg-green-500 text-white shadow-lg' 
+                : 'bg-gray-100 text-gray-700 active:bg-gray-200'
             ]">
-            {{ status.icon }} {{ status.label }} 
-            <span class="ml-1 text-xs opacity-75">({{ getOrderCountByStatus(status.value) }})</span>
+            <span class="mr-1">{{ status.icon }}</span>
+            <span>{{ status.label }}</span>
+            <span class="ml-1.5 text-xs opacity-80">({{ getOrderCountByStatus(status.value) }})</span>
           </button>
         </div>
       </div>
     </div>
 
     <!-- Shift Warning -->
-    <div v-if="!hasOpenShift" class="mx-4 mt-4 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg">
-      <p class="text-yellow-700 text-sm font-medium">⚠️ Chưa mở ca làm việc</p>
-      <button @click="$router.push('/shifts')" class="mt-2 bg-yellow-500 text-white px-4 py-2 rounded-lg text-sm font-medium">
+    <div v-if="!hasOpenShift" class="mx-4 mt-4 mb-4 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-xl shadow-sm">
+      <p class="text-yellow-800 text-sm font-semibold mb-2">⚠️ Chưa mở ca làm việc</p>
+      <button 
+        @click="$router.push('/shifts')" 
+        class="bg-yellow-500 active:bg-yellow-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md touch-manipulation active:scale-98 transition-transform">
         Mở ca ngay
       </button>
     </div>
 
     <!-- Orders List -->
-    <div class="flex-1 overflow-y-auto px-4 py-4 pb-24">
-      <div v-if="loading" class="text-center py-10">
-        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+    <div class="flex-1 overflow-y-auto px-4 py-2 pb-24">
+      <div v-if="loading" class="text-center py-16">
+        <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent"></div>
+        <p class="text-gray-500 text-sm mt-3">Đang tải...</p>
       </div>
       
-      <div v-else-if="filteredOrders.length === 0" class="text-center py-16">
-        <div class="text-6xl mb-4">📭</div>
-        <p class="text-gray-500">Không có order nào</p>
+      <div v-else-if="filteredOrders.length === 0" class="text-center py-20">
+        <div class="text-7xl mb-4">📭</div>
+        <p class="text-gray-500 text-base font-medium">
+          {{ shiftFilter === 'current' ? 'Chưa có order nào trong ca này' : 'Không có order từ ca khác' }}
+        </p>
       </div>
       
       <div v-else class="space-y-3">
         <div v-for="order in filteredOrders" :key="order.id" 
           @click="viewOrderDetail(order)"
-          class="bg-white rounded-2xl p-4 shadow-sm active:scale-98 transition-transform">
+          class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 active:scale-[0.98] active:shadow-md transition-all touch-manipulation">
           
           <!-- Order Header -->
           <div class="flex justify-between items-start mb-3">
-            <div>
-              <h3 class="font-bold text-lg">{{ order.order_number }}</h3>
-              <p class="text-sm text-gray-600">{{ order.customer_name || 'Khách lẻ' }}</p>
-              <p class="text-xs text-gray-400">{{ formatTime(order.created_at) }}</p>
+            <div class="flex-1 min-w-0">
+              <h3 class="font-bold text-lg text-gray-900 truncate">{{ order.order_number }}</h3>
+              <p class="text-sm text-gray-600 font-medium">{{ order.customer_name || 'Khách lẻ' }}</p>
+              <p class="text-xs text-gray-400 mt-0.5">{{ formatTime(order.created_at) }}</p>
+              <!-- Show shift info when viewing "other shifts" -->
+              <p v-if="shiftFilter === 'other' && order.shift_id" class="text-xs text-purple-600 font-medium mt-1">
+                📋 Ca: {{ order.shift_id.substring(0, 8) }}...
+              </p>
             </div>
-            <span :class="getStatusBadge(order.status)" class="px-3 py-1 rounded-full text-xs font-medium">
+            <span :class="getStatusBadge(order.status)" class="px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap ml-2">
               {{ getStatusText(order.status) }}
             </span>
           </div>
@@ -88,30 +130,43 @@
           </div>
 
           <!-- Total -->
-          <div class="flex justify-between items-center pt-3 border-t">
-            <span class="text-sm font-medium text-gray-600">Tổng cộng</span>
-            <span class="text-lg font-bold text-green-600">{{ formatPrice(order.total) }}</span>
+          <div class="pt-3 border-t space-y-2">
+            <div class="flex justify-between items-center">
+              <span class="text-sm font-medium text-gray-600">Tổng cộng</span>
+              <span class="text-lg font-bold text-green-600">{{ formatPrice(order.total) }}</span>
+            </div>
+            
+            <!-- Payment Method -->
+            <div v-if="order.payment_method" class="flex items-center justify-between">
+              <span class="text-xs text-gray-500">Thanh toán:</span>
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
+                :class="order.payment_method === 'cash' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'">
+                <span v-if="order.payment_method === 'cash'">💵 Tiền mặt</span>
+                <span v-else-if="order.payment_method === 'transfer'">💳 CK</span>
+                <span v-else>{{ order.payment_method }}</span>
+              </span>
+            </div>
           </div>
 
           <!-- Quick Actions -->
           <div class="mt-3 flex gap-2">
             <button v-if="isStatus(order, ORDER_STATUS.CREATED)" 
               @click.stop="quickPayment(order)"
-              class="flex-1 bg-green-500 text-white py-2 rounded-lg text-sm font-medium active:bg-green-600">
+              class="flex-1 bg-green-500 active:bg-green-600 text-white py-3 rounded-xl text-sm font-semibold shadow-md touch-manipulation active:scale-98 transition-all">
               💰 Thu tiền
             </button>
             <button v-if="isStatus(order, ORDER_STATUS.PAID) && order.amount_due <= 0" 
               @click.stop="sendToBar(order.id)"
-              class="flex-1 bg-blue-500 text-white py-2 rounded-lg text-sm font-medium active:bg-blue-600">
+              class="flex-1 bg-blue-500 active:bg-blue-600 text-white py-3 rounded-xl text-sm font-semibold shadow-md touch-manipulation active:scale-98 transition-all">
               🍹 Gửi bar
             </button>
             <button v-if="isStatus(order, ORDER_STATUS.READY)" 
               @click.stop="serveOrder(order.id)"
-              class="flex-1 bg-purple-500 text-white py-2 rounded-lg text-sm font-medium active:bg-purple-600">
+              class="flex-1 bg-purple-500 active:bg-purple-600 text-white py-3 rounded-xl text-sm font-semibold shadow-md touch-manipulation active:scale-98 transition-all">
               🎉 Giao khách
             </button>
             <button v-if="isAnyStatus(order, [ORDER_STATUS.QUEUED, ORDER_STATUS.IN_PROGRESS])" 
-              class="flex-1 bg-gray-300 text-gray-600 py-2 rounded-lg text-sm font-medium cursor-not-allowed">
+              class="flex-1 bg-gray-200 text-gray-500 py-3 rounded-xl text-sm font-semibold cursor-not-allowed">
               ⏳ Đang pha...
             </button>
           </div>
@@ -122,7 +177,7 @@
     <!-- Floating Action Button -->
     <button v-if="hasOpenShift" 
       @click="startNewOrder"
-      class="fixed bottom-20 right-4 w-16 h-16 bg-blue-500 text-white rounded-full shadow-lg flex items-center justify-center text-2xl active:scale-95 transition-transform z-30">
+      class="fixed bottom-24 right-5 w-16 h-16 bg-blue-500 active:bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center text-3xl touch-manipulation active:scale-95 transition-all z-30">
       ➕
     </button>
 
@@ -133,70 +188,68 @@
     <transition name="slide-up">
       <div v-if="showCreateOrder" class="fixed inset-0 bg-white z-50 overflow-hidden flex flex-col">
         <!-- Header -->
-        <div class="bg-blue-500 text-white px-4 py-4 flex items-center justify-between">
-          <button @click="cancelCreateOrder" class="text-2xl">←</button>
-          <h2 class="text-lg font-bold">Tạo Order Mới</h2>
+        <div class="bg-blue-500 text-white px-4 py-4 flex items-center justify-between shadow-lg" style="padding-top: max(1rem, env(safe-area-inset-top))">
+          <button @click="cancelCreateOrder" class="text-2xl p-2 active:bg-blue-600 rounded-lg touch-manipulation">←</button>
+          <h2 class="text-xl font-bold">Tạo Order Mới</h2>
           <button @click="confirmOrder" :disabled="cart.length === 0" 
-            class="text-sm font-medium px-4 py-2 bg-white text-blue-500 rounded-lg disabled:opacity-50">
+            class="text-sm font-semibold px-4 py-2.5 bg-white text-blue-500 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all touch-manipulation shadow-md">
             Xác nhận
           </button>
         </div>
 
-        <!-- Customer Name -->
-        <div class="px-4 py-3 bg-gray-50 border-b">
-          <input v-model="customerName" 
-            type="text" 
-            placeholder="Tên khách hàng (tùy chọn)"
-            class="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-        </div>
-
         <!-- Category Tabs -->
-        <div class="flex gap-2 px-4 py-3 overflow-x-auto bg-white border-b scrollbar-hide">
+        <div class="flex gap-2 px-4 py-3 overflow-x-auto bg-white border-b scrollbar-hide -mx-4 px-4">
           <button v-for="cat in categories" :key="cat.id"
             @click="selectedCategory = cat.id"
             :class="[
-              'px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap',
+              'px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap touch-manipulation active:scale-95 transition-all',
               selectedCategory === cat.id 
-                ? 'bg-blue-500 text-white' 
-                : 'bg-gray-100 text-gray-700'
+                ? 'bg-blue-500 text-white shadow-lg' 
+                : 'bg-gray-100 text-gray-700 active:bg-gray-200'
             ]">
-            {{ cat.icon }} {{ cat.name }}
+            <span class="mr-1">{{ cat.icon }}</span>
+            <span>{{ cat.name }}</span>
           </button>
         </div>
 
         <!-- Menu Items Grid -->
-        <div class="flex-1 overflow-y-auto px-4 py-4">
+        <div class="flex-1 overflow-y-auto px-4 py-4 bg-gray-50">
           <div class="grid grid-cols-2 gap-3">
-            <div v-for="item in filteredMenuItems" :key="item.id">
+            <template v-for="item in filteredMenuItems" :key="item.id">
               <!-- Single-size item - direct add -->
               <button v-if="!item.has_variants"
                 @click="addToCart(item)"
-                class="bg-white rounded-xl p-4 shadow-sm active:scale-95 transition-transform text-left">
-                <div class="font-medium text-gray-900 mb-1">{{ item.name }}</div>
-                <div class="text-sm font-bold text-blue-600">{{ formatPrice(item.price) }}</div>
+                class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 active:scale-95 active:shadow-md transition-all text-left touch-manipulation h-full flex flex-col">
+                <div class="flex-1">
+                  <div class="font-semibold text-gray-900 mb-2 line-clamp-2 min-h-[2.5rem]">{{ item.name }}</div>
+                  <div class="text-base font-bold text-blue-600">{{ formatPrice(item.price) }}</div>
+                </div>
                 <div v-if="getCartItemQty(item.id) > 0" 
-                  class="mt-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full inline-block">
-                  {{ getCartItemQty(item.id) }} món
+                  class="mt-3 bg-blue-500 text-white text-xs font-semibold px-3 py-1.5 rounded-full inline-flex items-center justify-center gap-1 shadow-md">
+                  <span>🛒</span>
+                  <span>{{ getCartItemQty(item.id) }} món</span>
                 </div>
               </button>
 
               <!-- Multi-size item - show variants -->
-              <div v-else class="bg-white rounded-xl p-4 shadow-sm text-left">
-                <div class="font-medium text-gray-900 mb-2">{{ item.name }}</div>
-                <div class="space-y-1">
+              <div v-else
+                class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 text-left flex flex-col h-full">
+                <div class="font-semibold text-gray-900 mb-3 line-clamp-2 min-h-[2.5rem]">{{ item.name }}</div>
+                <div class="space-y-2 flex-1">
                   <button v-for="variant in item.variants" :key="variant.id"
                     @click="addToCart(item, variant)"
-                    class="w-full flex justify-between items-center p-2 bg-gray-50 rounded-lg hover:bg-blue-50 active:scale-95 transition-all">
-                    <span class="text-xs font-medium text-gray-700">{{ variant.name }}</span>
+                    class="w-full flex justify-between items-center px-3 py-2.5 bg-gray-50 rounded-xl active:bg-blue-50 active:scale-95 transition-all touch-manipulation border border-gray-100">
+                    <span class="text-xs font-semibold text-gray-700">{{ variant.name }}</span>
                     <span class="text-sm font-bold text-blue-600">{{ formatPrice(variant.price) }}</span>
                   </button>
                 </div>
                 <div v-if="getCartItemQtyWithVariants(item.id) > 0" 
-                  class="mt-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full inline-block">
-                  {{ getCartItemQtyWithVariants(item.id) }} món
+                  class="mt-3 bg-blue-500 text-white text-xs font-semibold px-3 py-1.5 rounded-full inline-flex items-center justify-center gap-1 shadow-md">
+                  <span>🛒</span>
+                  <span>{{ getCartItemQtyWithVariants(item.id) }} món</span>
                 </div>
               </div>
-            </div>
+            </template>
           </div>
         </div>
 
@@ -290,6 +343,19 @@
                 <span>Đã thu</span>
                 <span>{{ formatPrice(selectedOrder.amount_paid) }}</span>
               </div>
+              
+              <!-- Payment Method -->
+              <div v-if="selectedOrder.payment_method" class="mt-3 pt-3 border-t border-gray-200">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm text-gray-600">Phương thức thanh toán:</span>
+                  <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-sm font-medium"
+                    :class="selectedOrder.payment_method === 'cash' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'">
+                    <span v-if="selectedOrder.payment_method === 'cash'">💵 Tiền mặt</span>
+                    <span v-else-if="selectedOrder.payment_method === 'transfer'">💳 Chuyển khoản</span>
+                    <span v-else>{{ selectedOrder.payment_method }}</span>
+                  </span>
+                </div>
+              </div>
             </div>
 
             <!-- Actions -->
@@ -320,8 +386,8 @@
               </div>
             </div>
 
-            <!-- Reprint Section -->
-            <div class="mt-6 pt-4 border-t">
+            <!-- Reprint Section (Only for Cashier and Manager) -->
+            <div v-if="canReprint" class="mt-6 pt-4 border-t">
               <h5 class="font-bold mb-3 text-gray-700">🖨️ In lại</h5>
               <div class="space-y-2">
                 <!-- Reprint Bill Button -->
@@ -414,6 +480,53 @@
         </div>
       </div>
     </transition>
+
+    <!-- Customer Name Modal -->
+    <transition name="slide-up">
+      <div v-if="showCustomerNameModal" class="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-end">
+        <div class="bg-white rounded-t-3xl w-full p-6 pb-8">
+          <h3 class="text-xl font-bold mb-2 text-gray-900">Tên khách hàng</h3>
+          <p class="text-sm text-gray-600 mb-4">Nhập tên khách hàng để dễ dàng quản lý order (tùy chọn)</p>
+          
+          <!-- Prominent Customer Name Input -->
+          <div class="mb-6 p-4 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 rounded-2xl border-2 border-amber-200 shadow-sm">
+            <label class="block text-sm font-bold text-amber-900 mb-3 flex items-center gap-2">
+              <span class="text-2xl">👤</span>
+              <span>Tên khách hàng</span>
+            </label>
+            <input v-model="customerName" 
+              type="text" 
+              placeholder="Nhập tên khách hàng..."
+              autofocus
+              class="w-full px-4 py-4 rounded-xl border-2 border-amber-300 bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-lg font-medium placeholder-amber-400 touch-manipulation transition-all shadow-sm">
+          </div>
+
+          <!-- Order Summary -->
+          <div class="mb-6 p-4 bg-gray-50 rounded-xl">
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-sm text-gray-600">Số món</span>
+              <span class="font-semibold text-gray-900">{{ cart.length }} món</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-gray-600">Tổng tiền</span>
+              <span class="text-xl font-bold text-green-600">{{ formatPrice(cartTotal) }}</span>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex gap-3">
+            <button @click="showCustomerNameModal = false" 
+              class="flex-1 bg-gray-200 text-gray-700 py-4 rounded-xl font-semibold touch-manipulation active:scale-98 transition-all">
+              Quay lại
+            </button>
+            <button @click="finalizeOrder" 
+              class="flex-1 bg-blue-500 active:bg-blue-600 text-white py-4 rounded-xl font-semibold shadow-lg touch-manipulation active:scale-98 transition-all">
+              Tạo Order
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -422,6 +535,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useOrderStore, cartHelpers } from '../stores/order'
 import { useShiftStore } from '../stores/shift'
 import { useMenuStore } from '../stores/menu'
+import { useAuthStore } from '../stores/auth'
 import { useRouter } from 'vue-router'
 import BottomNav from '../components/BottomNav.vue'
 import PullToRefresh from '../components/PullToRefresh.vue'
@@ -439,10 +553,13 @@ const router = useRouter()
 const orderStore = useOrderStore()
 const shiftStore = useShiftStore()
 const menuStore = useMenuStore()
+const authStore = useAuthStore()
 
 // State
+const shiftFilter = ref('current') // 'current' or 'other'
 const filterStatus = ref('ALL')
 const showCreateOrder = ref(false)
+const showCustomerNameModal = ref(false) // Modal for customer name
 const selectedOrder = ref(null)
 const showPayment = ref(false)
 const paymentOrder = ref(null)
@@ -452,6 +569,12 @@ const paymentMethod = ref(PAYMENT_METHOD.CASH)
 // Reprint State
 const reprintingBill = ref(false)
 const reprintingLabel = ref(null)
+
+// Check if user can reprint (only cashier and manager)
+const canReprint = computed(() => {
+  const role = authStore.user?.role
+  return role === 'cashier' || role === 'manager'
+})
 
 // Create Order State
 const customerName = ref('')
@@ -500,9 +623,38 @@ const orders = computed(() => orderStore.orders)
 const menuItems = computed(() => menuStore.items)
 const hasOpenShift = computed(() => shiftStore.hasOpenShift)
 
+// Filter orders by shift first
+const ordersByShift = computed(() => {
+  const currentShiftId = shiftStore.currentShift?.id
+  
+  if (shiftFilter.value === 'current') {
+    // Show orders from current shift only
+    if (!currentShiftId) return []
+    return orders.value.filter(o => o.shift_id === currentShiftId)
+  } else {
+    // Show orders from other shifts (not current shift)
+    if (!currentShiftId) return orders.value // If no current shift, show all
+    return orders.value.filter(o => o.shift_id !== currentShiftId)
+  }
+})
+
+// Then filter by status
 const filteredOrders = computed(() => {
-  if (filterStatus.value === 'ALL') return orders.value
-  return orders.value.filter(o => o.status === filterStatus.value)
+  if (filterStatus.value === 'ALL') return ordersByShift.value
+  return ordersByShift.value.filter(o => o.status === filterStatus.value)
+})
+
+// Count orders for each tab
+const currentShiftOrdersCount = computed(() => {
+  const currentShiftId = shiftStore.currentShift?.id
+  if (!currentShiftId) return 0
+  return orders.value.filter(o => o.shift_id === currentShiftId).length
+})
+
+const otherShiftsOrdersCount = computed(() => {
+  const currentShiftId = shiftStore.currentShift?.id
+  if (!currentShiftId) return orders.value.length
+  return orders.value.filter(o => o.shift_id !== currentShiftId).length
 })
 
 const filteredMenuItems = computed(() => {
@@ -527,8 +679,8 @@ const refreshOrders = async () => {
 const { pullDistance, isRefreshing } = usePullToRefresh(refreshOrders)
 
 const getOrderCountByStatus = (status) => {
-  if (status === 'ALL') return orders.value.length
-  return orders.value.filter(o => o.status === status).length
+  if (status === 'ALL') return ordersByShift.value.length
+  return ordersByShift.value.filter(o => o.status === status).length
 }
 
 const getStatusBadge = (status) => {
@@ -613,7 +765,12 @@ const removeFromCart = (index) => {
   cart.value.splice(index, 1)
 }
 
-const confirmOrder = async () => {
+const confirmOrder = () => {
+  // Show customer name modal before creating order
+  showCustomerNameModal.value = true
+}
+
+const finalizeOrder = async () => {
   try {
     const orderData = {
       customer_name: customerName.value || '',
@@ -622,6 +779,9 @@ const confirmOrder = async () => {
       shift_id: shiftStore.currentShift.id
     }
     await orderStore.createOrder(orderData)
+    
+    // Close all modals and reset
+    showCustomerNameModal.value = false
     showCreateOrder.value = false
     cart.value = []
     customerName.value = ''
@@ -724,6 +884,11 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
@@ -741,6 +906,10 @@ onMounted(async () => {
   transform: scale(0.98);
 }
 
+.active\:scale-\[0\.98\]:active {
+  transform: scale(0.98);
+}
+
 .slide-up-enter-active,
 .slide-up-leave-active {
   transition: transform 0.3s ease;
@@ -752,5 +921,24 @@ onMounted(async () => {
 
 .slide-up-leave-to {
   transform: translateY(100%);
+}
+
+/* Improve button press feedback */
+button:active {
+  transition: all 0.1s ease;
+}
+
+/* Smooth scrolling */
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Line clamp for menu item names */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.25rem;
 }
 </style>

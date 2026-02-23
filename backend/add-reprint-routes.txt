@@ -1,0 +1,7 @@
+		// Reprint routes (only for cashier and manager)
+		reprintGroup := protected.Group("/orders/:id")
+		reprintGroup.Use(http.RequireRole(user.RoleCashier, user.RoleManager))
+		{
+			reprintGroup.POST("/reprint-bill", orderHandler.ReprintBill)
+			reprintGroup.POST("/reprint-label", orderHandler.ReprintLabel)
+		}

@@ -51,6 +51,7 @@ func main() {
 	operatingExpenseRepo := mongodb.NewOperatingExpenseRepository(db)
 	// Cashier repositories
 	cashierShiftRepo := mongodb.NewCashierShiftRepository(db)
+	fundHandoverRepo := mongodb.NewFundHandoverRepository(db)
 	cashReconciliationRepo := mongodb.NewCashReconciliationRepository(db)
 	paymentDiscrepancyRepo := mongodb.NewPaymentDiscrepancyRepository(db)
 	paymentAuditRepo := mongodb.NewPaymentAuditRepository(db)
@@ -140,12 +141,12 @@ func main() {
 	orderService.SetSettingsRepository(shopSettingsRepo)
 	shiftService := services.NewShiftService(shiftRepo, orderRepo, smManager)
 	// Cashier services
-	cashierShiftService := services.NewCashierShiftService(cashierShiftRepo, shiftRepo, smManager)
+	cashierShiftService := services.NewCashierShiftService(cashierShiftRepo, fundHandoverRepo, shiftRepo, smManager, client)
 	cashReconciliationService := services.NewCashReconciliationService(cashReconciliationRepo, shiftRepo, orderRepo)
 	paymentOversightService := services.NewPaymentOversightService(orderRepo, paymentDiscrepancyRepo, paymentAuditRepo)
 	cashierReportService := services.NewCashierReportService(orderRepo, cashReconciliationRepo, shiftRepo, paymentAuditRepo)
 	// Handover service
-	cashHandoverService := services.NewCashHandoverService(cashHandoverRepo, cashDiscrepancyRepo, shiftRepo, cashierShiftRepo, orderRepo)
+	cashHandoverService := services.NewCashHandoverService(cashHandoverRepo, cashDiscrepancyRepo, shiftRepo, cashierShiftRepo, orderRepo, client)
 
 	// Create monitoring service for metrics and alerts
 	monitoringService := services.NewMonitoringService()
@@ -304,7 +305,7 @@ func main() {
 				
 				// Cash handover routes (waiter)
 				shifts.POST("/:id/handover", cashHandoverHandler.CreateHandover)
-				shifts.POST("/:id/handover-and-end", cashHandoverHandler.CreateHandoverAndEndShift)
+				// shifts.POST("/:id/handover-and-end", cashHandoverHandler.CreateHandoverAndEndShift) // Not needed - use regular handover
 				shifts.GET("/:id/pending-handover", cashHandoverHandler.GetPendingHandover)
 				shifts.GET("/:id/handovers", cashHandoverHandler.GetHandoverHistory)
 			}
@@ -317,15 +318,15 @@ func main() {
 				cashHandovers.GET("/all-pending", http.RequireRole(user.RoleCashier, user.RoleManager), cashHandoverHandler.GetAllPendingHandovers)
 				cashHandovers.GET("/today", http.RequireRole(user.RoleCashier, user.RoleManager), cashHandoverHandler.GetTodayHandovers)
 				cashHandovers.POST("/:id/confirm", http.RequireRole(user.RoleCashier, user.RoleManager), cashHandoverHandler.ConfirmHandover)
-				cashHandovers.POST("/:id/quick-confirm", http.RequireRole(user.RoleCashier, user.RoleManager), cashHandoverHandler.QuickConfirm)
+				// cashHandovers.POST("/:id/quick-confirm", http.RequireRole(user.RoleCashier, user.RoleManager), cashHandoverHandler.QuickConfirm) // Not needed
 				
 				// Waiter can cancel their own pending handover
 				cashHandovers.DELETE("/:id", cashHandoverHandler.CancelHandover)
 				
-				// Manager routes
-				cashHandovers.GET("/pending-approval", http.RequireRole(user.RoleManager), cashHandoverHandler.GetPendingApprovals)
-				cashHandovers.POST("/:id/approve", http.RequireRole(user.RoleManager), cashHandoverHandler.ApproveDiscrepancy)
-				cashHandovers.GET("/discrepancy-stats", http.RequireRole(user.RoleManager), cashHandoverHandler.GetDiscrepancyStats)
+				// Manager routes - TODO: implement later
+				// cashHandovers.GET("/pending-approval", http.RequireRole(user.RoleManager), cashHandoverHandler.GetPendingApprovals)
+				// cashHandovers.POST("/:id/approve", http.RequireRole(user.RoleManager), cashHandoverHandler.ApproveDiscrepancy)
+				// cashHandovers.GET("/discrepancy-stats", http.RequireRole(user.RoleManager), cashHandoverHandler.GetDiscrepancyStats)
 			}
 			
 			// Cashier shift management - separate from waiter/barista shifts
@@ -340,10 +341,17 @@ func main() {
 				// Shift closure workflow
 				cashierShifts.GET("/check-waiter-shifts", cashierShiftClosureHandler.CheckWaiterShifts)
 				cashierShifts.POST("/:id/initiate-closure", cashierShiftClosureHandler.InitiateClosure)
+				cashierShifts.POST("/:id/cancel-closure", cashierShiftClosureHandler.CancelClosure)
 				cashierShifts.POST("/:id/record-actual-cash", cashierShiftClosureHandler.RecordActualCash)
 				cashierShifts.POST("/:id/document-variance", cashierShiftClosureHandler.DocumentVariance)
 				cashierShifts.POST("/:id/confirm-responsibility", cashierShiftClosureHandler.ConfirmResponsibility)
 				cashierShifts.POST("/:id/close", cashierShiftClosureHandler.CloseShift)
+				// Frontend-driven: Complete entire closure in one transaction
+				cashierShifts.POST("/:id/complete-closure", cashierShiftClosureHandler.CompleteClosure)
+				
+				// Fund handover - NEW endpoints for Phase 4
+				cashierShifts.GET("/:id/managed-funds", cashierShiftClosureHandler.GetManagedFunds)
+				cashierShifts.POST("/:id/close-with-fund-handover", cashierShiftClosureHandler.CloseShiftWithFundHandover)
 			}
 			
 			// Cashier shift management - manager only
@@ -396,6 +404,14 @@ func main() {
 			protected.GET("/settings", settingsHandler.GetSettings)
 			protected.PATCH("/settings", settingsHandler.UpdateSettings)
 			
+			// Reprint routes (only for cashier and manager)
+			reprintGroup := protected.Group("/orders/:id")
+			reprintGroup.Use(http.RequireRole(user.RoleCashier, user.RoleManager))
+			{
+				reprintGroup.POST("/reprint-bill", orderHandler.ReprintBill)
+				reprintGroup.POST("/reprint-label", orderHandler.ReprintLabel)
+			}
+
 			// Waiter routes
 			waiter := protected.Group("/waiter")
 			waiter.Use(http.RequireRole(user.RoleWaiter, user.RoleCashier, user.RoleManager))
@@ -409,9 +425,6 @@ func main() {
 				waiter.GET("/orders", orderHandler.GetMyOrders)
 				waiter.GET("/orders/:id", orderHandler.GetOrder)
 				
-				// Reprint routes
-				waiter.POST("/orders/:id/reprint-bill", orderHandler.ReprintBill)
-				waiter.POST("/orders/:id/reprint-label", orderHandler.ReprintLabel)
 				
 				// Menu (read-only)
 				waiter.GET("/menu", menuHandler.GetAllMenuItems)
@@ -453,7 +466,6 @@ func main() {
 				cashier.POST("/orders/:id/cancel", orderHandler.CancelOrder)
 				cashier.POST("/orders/:id/refund", orderHandler.RefundPartial)
 				
-				// Reprint routes
 				cashier.POST("/orders/:id/reprint-bill", orderHandler.ReprintBill)
 				cashier.POST("/orders/:id/reprint-label", orderHandler.ReprintLabel)
 				
@@ -614,7 +626,6 @@ func main() {
 				manager.POST("/orders/:id/refund", orderHandler.RefundPartial)
 				manager.PUT("/orders/:id/edit", orderHandler.EditOrder)
 				
-				// Reprint routes
 				manager.POST("/orders/:id/reprint-bill", orderHandler.ReprintBill)
 				manager.POST("/orders/:id/reprint-label", orderHandler.ReprintLabel)
 				
@@ -688,3 +699,5 @@ func createDefaultUsers(authService *services.AuthService, userRepo *mongodb.Use
 	userRepo.Create(ctx, newUser)
 	log.Printf("Created user: admin (role: %s)", user.RoleManager)
 }
+
+// Reprint routes (only for cashier and manager)

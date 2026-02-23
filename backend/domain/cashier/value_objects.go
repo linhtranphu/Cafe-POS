@@ -36,8 +36,13 @@ func NewVariance(systemCash, actualCash float64) *Variance {
 }
 
 // RequiresDocumentation returns true if the variance is non-zero
+// Uses a tolerance of 0.01 (1 cent) to handle floating-point precision issues.
 func (v *Variance) RequiresDocumentation() bool {
-	return v.Amount != 0
+	const tolerance = 0.01
+	if v.Amount < 0 {
+		return -v.Amount >= tolerance
+	}
+	return v.Amount >= tolerance
 }
 
 // Document records the reason and notes for the variance

@@ -62,7 +62,7 @@ const navItems = computed(() => {
     return [
       { path: '/dashboard', icon: '🏠', label: 'Trang chủ' },
       { path: '/cashier', icon: '💰', label: 'Thu ngân', badge: pendingCount },
-      { path: '/orders', icon: '📋', label: 'Orders' },
+      { path: '/cashier/reports', icon: '📊', label: 'Báo cáo' },
       { path: '/shifts', icon: '⏰', label: 'Ca làm' },
       { path: '/profile', icon: '👤', label: 'Cá nhân' }
     ]
