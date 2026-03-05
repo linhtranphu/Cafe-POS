@@ -21,6 +21,9 @@ func NewOrderRepository(db *mongo.Database) *OrderRepository {
 }
 
 func (r *OrderRepository) Create(ctx context.Context, o *order.Order) error {
+	ctx, cancel := WithQueryTimeout(ctx)
+	defer cancel()
+	
 	o.CreatedAt = time.Now()
 	o.UpdatedAt = time.Now()
 	result, err := r.collection.InsertOne(ctx, o)
@@ -32,6 +35,9 @@ func (r *OrderRepository) Create(ctx context.Context, o *order.Order) error {
 }
 
 func (r *OrderRepository) FindByID(ctx context.Context, id primitive.ObjectID) (*order.Order, error) {
+	ctx, cancel := WithQueryTimeout(ctx)
+	defer cancel()
+	
 	var o order.Order
 	err := r.collection.FindOne(ctx, bson.M{"_id": id}).Decode(&o)
 	if err != nil {
@@ -41,72 +47,130 @@ func (r *OrderRepository) FindByID(ctx context.Context, id primitive.ObjectID) (
 }
 
 func (r *OrderRepository) Update(ctx context.Context, id primitive.ObjectID, o *order.Order) error {
+	ctx, cancel := WithQueryTimeout(ctx)
+	defer cancel()
+	
 	o.UpdatedAt = time.Now()
 	_, err := r.collection.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": o})
 	return err
 }
 
 func (r *OrderRepository) FindByShiftID(ctx context.Context, shiftID primitive.ObjectID) ([]*order.Order, error) {
+	ctx, cancel := WithQueryTimeout(ctx)
+	defer cancel()
+	
 	opts := options.Find().SetSort(bson.D{{"created_at", -1}})
 	cursor, err := r.collection.Find(ctx, bson.M{"shift_id": shiftID}, opts)
 	if err != nil {
+		if IsCollectionNotFoundError(err) {
+			return []*order.Order{}, nil
+		}
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
 	var orders []*order.Order
 	if err = cursor.All(ctx, &orders); err != nil {
+		if IsCollectionNotFoundError(err) {
+			return []*order.Order{}, nil
+		}
 		return nil, err
+	}
+	
+	if orders == nil {
+		orders = []*order.Order{}
 	}
 	return orders, nil
 }
 
 func (r *OrderRepository) FindByWaiterID(ctx context.Context, waiterID primitive.ObjectID) ([]*order.Order, error) {
+	ctx, cancel := WithQueryTimeout(ctx)
+	defer cancel()
+	
 	opts := options.Find().SetSort(bson.D{{"created_at", -1}})
 	cursor, err := r.collection.Find(ctx, bson.M{"waiter_id": waiterID}, opts)
 	if err != nil {
+		if IsCollectionNotFoundError(err) {
+			return []*order.Order{}, nil
+		}
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
 	var orders []*order.Order
 	if err = cursor.All(ctx, &orders); err != nil {
+		if IsCollectionNotFoundError(err) {
+			return []*order.Order{}, nil
+		}
 		return nil, err
+	}
+	
+	if orders == nil {
+		orders = []*order.Order{}
 	}
 	return orders, nil
 }
 
 func (r *OrderRepository) FindByStatus(ctx context.Context, status order.OrderStatus) ([]*order.Order, error) {
+	ctx, cancel := WithQueryTimeout(ctx)
+	defer cancel()
+	
 	opts := options.Find().SetSort(bson.D{{"created_at", -1}})
 	cursor, err := r.collection.Find(ctx, bson.M{"status": status}, opts)
 	if err != nil {
+		if IsCollectionNotFoundError(err) {
+			return []*order.Order{}, nil
+		}
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
 	var orders []*order.Order
 	if err = cursor.All(ctx, &orders); err != nil {
+		if IsCollectionNotFoundError(err) {
+			return []*order.Order{}, nil
+		}
 		return nil, err
+	}
+	
+	if orders == nil {
+		orders = []*order.Order{}
 	}
 	return orders, nil
 }
 
 func (r *OrderRepository) FindAll(ctx context.Context) ([]*order.Order, error) {
+	ctx, cancel := WithQueryTimeout(ctx)
+	defer cancel()
+	
 	opts := options.Find().SetSort(bson.D{{"created_at", -1}})
 	cursor, err := r.collection.Find(ctx, bson.M{}, opts)
 	if err != nil {
+		if IsCollectionNotFoundError(err) {
+			return []*order.Order{}, nil
+		}
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
 	var orders []*order.Order
 	if err = cursor.All(ctx, &orders); err != nil {
+		if IsCollectionNotFoundError(err) {
+			return []*order.Order{}, nil
+		}
 		return nil, err
+	}
+	
+	if orders == nil {
+		orders = []*order.Order{}
 	}
 	return orders, nil
 }
 
 func (r *OrderRepository) FindByOrderNumber(ctx context.Context, orderNumber string) (*order.Order, error) {
+	ctx, cancel := WithQueryTimeout(ctx)
+	defer cancel()
+	
 	var o order.Order
 	err := r.collection.FindOne(ctx, bson.M{"order_number": orderNumber}).Decode(&o)
 	if err != nil {
@@ -116,6 +180,9 @@ func (r *OrderRepository) FindByOrderNumber(ctx context.Context, orderNumber str
 }
 
 func (r *OrderRepository) Delete(ctx context.Context, id primitive.ObjectID) error {
+	ctx, cancel := WithQueryTimeout(ctx)
+	defer cancel()
+	
 	_, err := r.collection.DeleteOne(ctx, bson.M{"_id": id})
 	return err
 }

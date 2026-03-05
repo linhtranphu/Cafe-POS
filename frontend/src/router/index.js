@@ -219,6 +219,12 @@ const routes = [
     name: 'PrintManagement',
     component: PrintManagementView,
     meta: { requiresAuth: true, requiresManager: true }
+  },
+  {
+    path: '/manager/fund',
+    name: 'FundManagement',
+    component: () => import('../views/FundManagementView.vue'),
+    meta: { requiresAuth: true, requiresManager: true }
   }
 ]
 

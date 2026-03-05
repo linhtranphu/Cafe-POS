@@ -121,6 +121,12 @@
             <span>Chi phí & Tài sản</span>
           </h2>
           <div class="grid grid-cols-2 gap-3">
+            <button @click="$router.push('/manager/fund')" 
+              class="bg-gradient-to-br from-orange-500 to-yellow-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+              <div class="text-4xl mb-2">💰</div>
+              <div class="font-bold text-base">Quỹ tiền</div>
+              <div class="text-xs opacity-80 mt-1">Quản lý quỹ tiền mặt</div>
+            </button>
             <button @click="$router.push('/expenses')" 
               class="bg-gradient-to-br from-pink-500 to-rose-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
               <div class="text-4xl mb-2">💸</div>
@@ -365,6 +371,11 @@
                   class="bg-gradient-to-br from-pink-500 to-purple-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
                   <div class="text-4xl mb-2">💸</div>
                   <div class="font-bold">Chi phí</div>
+                </button>
+                <button v-if="user?.role === USER_ROLES.MANAGER" @click="$router.push('/manager/fund')" 
+                  class="bg-gradient-to-br from-orange-500 to-yellow-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+                  <div class="text-4xl mb-2">💰</div>
+                  <div class="font-bold">Quỹ tiền</div>
                 </button>
                 
                 <!-- Cashier Actions -->

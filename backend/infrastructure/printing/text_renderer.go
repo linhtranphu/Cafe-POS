@@ -11,11 +11,18 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
+// FontPair holds normal and bold font faces for a specific size
+type FontPair struct {
+	Normal font.Face
+	Bold   font.Face
+}
+
 // TextRenderer renders formatted text lines to a bitmap image
 type TextRenderer struct {
 	pixelWidth  int
-	normalFont  font.Face
-	boldFont    font.Face
+	normalFont  font.Face // Default normal font (for backward compatibility)
+	boldFont    font.Face // Default bold font (for backward compatibility)
+	fonts       map[float64]FontPair // Multiple font sizes with normal and bold variants
 	fontSize    float64
 	lineSpacing int
 	margin      int
@@ -48,10 +55,39 @@ func NewTextRenderer(config *RendererConfig) (*TextRenderer, error) {
 		return nil, fmt.Errorf("text renderer initialization error: %w", err)
 	}
 
+	// Load multiple font sizes if FontSizes map is provided
+	fonts := make(map[float64]FontPair)
+	if config.FontSizes != nil && len(config.FontSizes) > 0 {
+		// Extract unique font sizes from the map
+		uniqueSizes := make(map[float64]bool)
+		for _, size := range config.FontSizes {
+			uniqueSizes[size] = true
+		}
+
+		// Load each font size
+		for size := range uniqueSizes {
+			fontConfig := &FontConfig{
+				FontPaths:  []string{config.FontPath},
+				NormalSize: size,
+				BoldSize:   size * 1.2, // Bold is 20% larger
+			}
+			fm := NewFontManager(fontConfig)
+			normal, bold, err := fm.LoadFonts()
+			if err != nil {
+				return nil, fmt.Errorf("text renderer initialization error: failed to load font size %.1fpt: %w", size, err)
+			}
+			fonts[size] = FontPair{Normal: normal, Bold: bold}
+		}
+	} else {
+		// If no FontSizes map provided, use default font size for backward compatibility
+		fonts[config.FontSize] = FontPair{Normal: normalFont, Bold: boldFont}
+	}
+
 	return &TextRenderer{
 		pixelWidth:  config.PixelWidth,
 		normalFont:  normalFont,
 		boldFont:    boldFont,
+		fonts:       fonts,
 		fontSize:    config.FontSize,
 		lineSpacing: config.LineSpacing,
 		margin:      config.Margin,
@@ -122,10 +158,30 @@ func (r *TextRenderer) calculateImageHeight(lines []LineFormat) int {
 			height += 2 // Separator line height
 			height += r.lineSpacing / 2
 		} else {
-			// Regular text line: calculate actual text height
-			fontFace := r.normalFont
-			if line.Bold {
-				fontFace = r.boldFont
+			// Regular text line: calculate actual text height based on font size
+			fontSize := line.FontSize
+			if fontSize <= 0 {
+				// If no font size specified, use default
+				fontSize = r.fontSize
+			}
+
+			// Get the appropriate font face for this line
+			var fontFace font.Face
+			fontPair, exists := r.fonts[fontSize]
+			if !exists {
+				// Fallback to default fonts if size not found
+				if line.Bold {
+					fontFace = r.boldFont
+				} else {
+					fontFace = r.normalFont
+				}
+			} else {
+				// Use the font pair for the specified size
+				if line.Bold {
+					fontFace = fontPair.Bold
+				} else {
+					fontFace = fontPair.Normal
+				}
 			}
 
 			metrics := fontFace.Metrics()
@@ -164,10 +220,30 @@ func (r *TextRenderer) drawLine(img *image.Gray, line LineFormat, y int) int {
 		return y + 2 + r.lineSpacing/2
 	}
 
-	// Select font based on bold flag
-	fontFace := r.normalFont
-	if line.Bold {
-		fontFace = r.boldFont
+	// Select font based on line.FontSize and bold flag
+	var fontFace font.Face
+	fontSize := line.FontSize
+	if fontSize <= 0 {
+		// If no font size specified, use default
+		fontSize = r.fontSize
+	}
+
+	// Try to get font pair for the specified size
+	fontPair, exists := r.fonts[fontSize]
+	if !exists {
+		// Fallback to default fonts if size not found
+		if line.Bold {
+			fontFace = r.boldFont
+		} else {
+			fontFace = r.normalFont
+		}
+	} else {
+		// Use the font pair for the specified size
+		if line.Bold {
+			fontFace = fontPair.Bold
+		} else {
+			fontFace = fontPair.Normal
+		}
 	}
 
 	// Handle text wrapping

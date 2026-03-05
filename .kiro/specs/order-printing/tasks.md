@@ -481,7 +481,7 @@ Triển khai hệ thống in tự động bill và tem cho đơn hàng, sử d�
   - **Property 19: Template configuration affects rendering**
   - **Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7**
 
-- [~] 19. Checkpoint - Đảm bảo frontend hoàn chỉnh
+- [ ] 19. Checkpoint - Đảm bảo frontend hoàn chỉnh
   - Test tất cả components
   - Test integration với backend APIs
   - Test real-time updates
@@ -489,51 +489,51 @@ Triển khai hệ thống in tự động bill và tem cho đơn hàng, sử d�
   - Hỏi user nếu có vấn đề
 
 - [ ] 20. Testing và bug fixes
-  - [~] 20.1 Chạy tất cả property tests (100 iterations)
+  - [ ] 20.1 Chạy tất cả property tests (100 iterations)
     - Verify tất cả 24 properties pass
     - Fix any failing tests
     - _Requirements: All_
 
-  - [~] 20.2 Chạy tất cả unit tests
+  - [ ] 20.2 Chạy tất cả unit tests
     - Verify coverage >80%
     - Fix any failing tests
     - _Requirements: All_
 
-  - [~] 20.3 Chạy integration tests
+  - [ ] 20.3 Chạy integration tests
     - Test end-to-end flows
     - Test error scenarios
     - _Requirements: All_
 
-  - [~] 20.4 Manual testing
+  - [ ] 20.4 Manual testing
     - Test với real printer (nếu có)
     - Test tất cả user flows
     - Test error handling
     - _Requirements: All_
 
 - [ ] 21. Documentation và deployment
-  - [~] 21.1 Viết API documentation
+  - [ ] 21.1 Viết API documentation
     - Document tất cả endpoints
     - Include request/response examples
     - Document error codes
 
-  - [~] 21.2 Viết user guide
+  - [ ] 21.2 Viết user guide
     - Hướng dẫn cấu hình máy in
     - Hướng dẫn tùy chỉnh templates
     - Hướng dẫn xử lý lỗi thường gặp
     - _Requirements: 7.6_
 
-  - [~] 21.3 Setup monitoring và alerts
+  - [ ] 21.3 Setup monitoring và alerts
     - Monitor print job failure rate
     - Monitor printer status
     - Alert khi failure rate cao
 
-  - [~] 21.4 Deploy to production
+  - [ ] 21.4 Deploy to production
     - Run migrations
     - Deploy backend
     - Deploy frontend
     - Verify functionality
 
-- [~] 22. Final checkpoint - Hoàn thành feature
+- [ ] 22. Final checkpoint - Hoàn thành feature
   - Verify tất cả requirements được implement
   - Verify tất cả tests pass
   - Verify documentation đầy đủ

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            width: 576px;
+            background: white;
+            color: black;
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        
+        .header {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+        
+        .logo {
+            width: 200px;
+            margin-right: 20px;
+        }
+        
+        .logo img {
+            width: 100%;
+            height: auto;
+        }
+        
+        .shop-info {
+            flex: 1;
+        }
+        
+        .shop-name {
+            font-size: 25px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        
+        .shop-address,
+        .shop-phone {
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+        
+        .bill-title {
+            text-align: center;
+            font-size: 34px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        
+        .order-info {
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+        
+        .divider {
+            border-top: 2px solid black;
+            margin: 15px 0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        
+        th {
+            font-size: 17px;
+            text-align: left;
+            padding: 8px 0;
+            border-bottom: 2px solid black;
+        }
+        
+        th.right,
+        td.right {
+            text-align: right;
+        }
+        
+        td {
+            font-size: 17px;
+            padding: 10px 0;
+        }
+        
+        .total-row {
+            border-top: 2px solid black;
+            padding-top: 15px;
+        }
+        
+        .total-label {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .total-amount {
+            font-size: 24px;
+            font-weight: bold;
+            text-align: right;
+        }
+        
+        .thanks {
+            text-align: center;
+            font-size: 22px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        {{if .ShowLogo}}
+        <div class="logo">
+            <img src="{{.LogoBase64}}" alt="Logo">
+        </div>
+        {{end}}
+        <div class="shop-info">
+            <div class="shop-name">{{.ShopName}}</div>
+            {{if .ShowAddress}}
+            <div class="shop-address">{{.ShopAddress}}</div>
+            {{end}}
+            {{if .ShowPhone}}
+            <div class="shop-phone">Hotline: {{.ShopPhone}}</div>
+            {{end}}
+        </div>
+    </div>
+    
+    <div class="bill-title">HÓA ĐƠN THANH TOÁN</div>
+    
+    <div class="order-info">Order: {{.OrderNumber}}</div>
+    {{if .CustomerName}}
+    <div class="order-info">Khách hàng: {{.CustomerName}}</div>
+    {{end}}
+    <div class="order-info">Waiter: {{.WaiterName}}</div>
+    <div class="order-info">Thanh Toán: {{.PaymentMethod}}</div>
+    <div class="order-info">Ngày tạo: {{.CreatedDate}}</div>
+    
+    <div class="divider"></div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 40px;">STT</th>
+                <th style="width: 240px;">Tên món</th>
+                <th style="width: 50px;">SL</th>
+                <th style="width: 100px;">Đơn giá</th>
+                <th class="right" style="width: 110px;">Thành tiền</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Items}}
+            <tr>
+                <td>{{.STT}}</td>
+                <td>{{.Name}}</td>
+                <td>{{.Quantity}}</td>
+                <td>{{.UnitPrice}}</td>
+                <td class="right">{{.Total}}</td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+    
+    <div class="divider"></div>
+    
+    <table class="total-row">
+        <tr>
+            <td class="total-label">TỔNG TIỀN:</td>
+            <td class="total-amount">{{.Total}}</td>
+        </tr>
+    </table>
+    
+    <div class="divider"></div>
+    
+    {{if .ShowCustomMsg}}
+    <div class="thanks">{{.CustomMessage}}</div>
+    {{end}}
+</body>
+</html>

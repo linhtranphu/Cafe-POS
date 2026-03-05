@@ -628,3 +628,336 @@ Line 5`
 		}
 	}
 }
+
+// Tests for new FontSize and IsTableRow functionality
+
+func TestDetectFontSize_Headers(t *testing.T) {
+	parser := NewFormatParser(384)
+	
+	tests := []struct {
+		line     string
+		expected float64
+	}{
+		{"HÓA ĐƠN BÁN HÀNG", 22.0},
+		{"INVOICE", 22.0},
+		{"RECEIPT", 22.0},
+		{"MY SHOP", 22.0},
+		{"Cửa hàng ABC", 22.0},
+	}
+	
+	for _, tt := range tests {
+		result := parser.detectFontSize(tt.line)
+		if result != tt.expected {
+			t.Errorf("detectFontSize(%q) = %v, want %v", tt.line, result, tt.expected)
+		}
+	}
+}
+
+func TestDetectFontSize_Totals(t *testing.T) {
+	parser := NewFormatParser(384)
+	
+	tests := []struct {
+		line     string
+		expected float64
+	}{
+		{"TỔNG CỘNG: 100,000đ", 20.0},
+		{"GRAND TOTAL: $50.00", 20.0},
+		{"TOTAL: 100,000đ", 20.0},
+	}
+	
+	for _, tt := range tests {
+		result := parser.detectFontSize(tt.line)
+		if result != tt.expected {
+			t.Errorf("detectFontSize(%q) = %v, want %v", tt.line, result, tt.expected)
+		}
+	}
+}
+
+func TestDetectFontSize_RegularContent(t *testing.T) {
+	parser := NewFormatParser(384)
+	
+	tests := []struct {
+		line     string
+		expected float64
+	}{
+		{"Coffee: 50,000đ", 18.0},
+		{"Order: #12345", 18.0},
+		{"Ngày: 01/01/2024", 18.0},
+		{"Bàn: 5", 18.0},
+		{"Cảm ơn quý khách!", 18.0},
+		{"", 18.0},
+	}
+	
+	for _, tt := range tests {
+		result := parser.detectFontSize(tt.line)
+		if result != tt.expected {
+			t.Errorf("detectFontSize(%q) = %v, want %v", tt.line, result, tt.expected)
+		}
+	}
+}
+
+func TestDetectFontSize_Separators(t *testing.T) {
+	parser := NewFormatParser(384)
+	
+	tests := []struct {
+		line     string
+		expected float64
+	}{
+		{"===", 18.0},
+		{"---", 18.0},
+		{"==========", 18.0},
+	}
+	
+	for _, tt := range tests {
+		result := parser.detectFontSize(tt.line)
+		if result != tt.expected {
+			t.Errorf("detectFontSize(%q) = %v, want %v", tt.line, result, tt.expected)
+		}
+	}
+}
+
+func TestIsTableRow_TableHeaders(t *testing.T) {
+	parser := NewFormatParser(384)
+	
+	tests := []struct {
+		line     string
+		expected bool
+	}{
+		{"Tên món              SL  Đơn giá    Thành tiền", true},
+		{"TÊN MÓN              SL  ĐƠN GIÁ    THÀNH TIỀN", true},
+		{"ITEM NAME            QTY PRICE      TOTAL", true},
+	}
+	
+	for _, tt := range tests {
+		result := parser.isTableRow(tt.line)
+		if result != tt.expected {
+			t.Errorf("isTableRow(%q) = %v, want %v", tt.line, result, tt.expected)
+		}
+	}
+}
+
+func TestIsTableRow_TableSeparators(t *testing.T) {
+	parser := NewFormatParser(384)
+	
+	tests := []struct {
+		line     string
+		expected bool
+	}{
+		{"------------------------------------------------", true},
+		{"---", true},
+		{"----------", true},
+	}
+	
+	for _, tt := range tests {
+		result := parser.isTableRow(tt.line)
+		if result != tt.expected {
+			t.Errorf("isTableRow(%q) = %v, want %v", tt.line, result, tt.expected)
+		}
+	}
+}
+
+func TestIsTableRow_ItemRows(t *testing.T) {
+	parser := NewFormatParser(384)
+	
+	tests := []struct {
+		line     string
+		expected bool
+	}{
+		{"Cafe Latte            2   45,000       90,000", true},
+		{"Banh Mi Thit          1   35,000       35,000", true},
+		{"Coffee  2  50000  100000", true},
+	}
+	
+	for _, tt := range tests {
+		result := parser.isTableRow(tt.line)
+		if result != tt.expected {
+			t.Errorf("isTableRow(%q) = %v, want %v", tt.line, result, tt.expected)
+		}
+	}
+}
+
+func TestIsTableRow_NonTableLines(t *testing.T) {
+	parser := NewFormatParser(384)
+	
+	tests := []struct {
+		line     string
+		expected bool
+	}{
+		{"HÓA ĐƠN BÁN HÀNG", false},
+		{"Order: #12345", false},
+		{"Ngày: 01/01/2024", false},
+		{"Cảm ơn quý khách!", false},
+		{"", false},
+		{"[TABLE_START]", false},
+		{"[TABLE_END]", false},
+		{"===", false},
+	}
+	
+	for _, tt := range tests {
+		result := parser.isTableRow(tt.line)
+		if result != tt.expected {
+			t.Errorf("isTableRow(%q) = %v, want %v", tt.line, result, tt.expected)
+		}
+	}
+}
+
+func TestParse_WithFontSizeAndTableRow(t *testing.T) {
+	parser := NewFormatParser(384)
+	content := `CỬA HÀNG CÀ PHÊ
+HÓA ĐƠN BÁN HÀNG
+===
+Order: #12345
+Ngày: 01/01/2024
+===
+Tên món              SL  Đơn giá    Thành tiền
+------------------------------------------------
+Cafe Latte            2   45,000       90,000
+Banh Mi Thit          1   35,000       35,000
+===
+TỔNG CỘNG: 125,000đ
+===
+Cảm ơn quý khách!`
+
+	result := parser.Parse(content)
+	
+	// Verify line count
+	expectedLines := 14
+	if len(result) != expectedLines {
+		t.Errorf("Expected %d lines, got %d", expectedLines, len(result))
+	}
+	
+	// Verify header font size (line 0 and 1)
+	if result[0].FontSize != 22.0 {
+		t.Errorf("Header line 0 should have font size 22.0, got %v", result[0].FontSize)
+	}
+	if result[1].FontSize != 22.0 {
+		t.Errorf("Header line 1 should have font size 22.0, got %v", result[1].FontSize)
+	}
+	
+	// Verify regular content font size (line 3, 4)
+	if result[3].FontSize != 18.0 {
+		t.Errorf("Regular line 3 should have font size 18.0, got %v", result[3].FontSize)
+	}
+	if result[4].FontSize != 18.0 {
+		t.Errorf("Regular line 4 should have font size 18.0, got %v", result[4].FontSize)
+	}
+	
+	// Verify table header (line 6)
+	if !result[6].IsTableRow {
+		t.Error("Line 6 should be identified as table row")
+	}
+	if result[6].FontSize != 18.0 {
+		t.Errorf("Table header should have font size 18.0, got %v", result[6].FontSize)
+	}
+	
+	// Verify table separator (line 7)
+	if !result[7].IsTableRow {
+		t.Error("Line 7 should be identified as table row")
+	}
+	
+	// Verify table item rows (line 8, 9)
+	if !result[8].IsTableRow {
+		t.Error("Line 8 should be identified as table row")
+	}
+	if !result[9].IsTableRow {
+		t.Error("Line 9 should be identified as table row")
+	}
+	
+	// Verify total line (line 11)
+	if result[11].FontSize != 20.0 {
+		t.Errorf("Total line should have font size 20.0, got %v", result[11].FontSize)
+	}
+	
+	// Verify footer (line 13)
+	if result[13].FontSize != 18.0 {
+		t.Errorf("Footer should have font size 18.0, got %v", result[13].FontSize)
+	}
+}
+
+// Property test: Font size consistency
+// For any line, font size should be one of the three defined sizes: 18pt, 20pt, or 22pt
+func TestProperty_FontSizeConsistency(t *testing.T) {
+	parser := NewFormatParser(384)
+	
+	testLines := []string{
+		"HÓA ĐƠN BÁN HÀNG",
+		"MY SHOP",
+		"TỔNG CỘNG: 100,000đ",
+		"GRAND TOTAL: $50.00",
+		"Coffee: 50,000đ",
+		"Order: #12345",
+		"Cảm ơn quý khách!",
+		"===",
+		"---",
+		"",
+		"Cafe Latte            2   45,000       90,000",
+		"Tên món              SL  Đơn giá    Thành tiền",
+	}
+	
+	validSizes := map[float64]bool{
+		18.0: true,
+		20.0: true,
+		22.0: true,
+	}
+	
+	for _, line := range testLines {
+		result := parser.Parse(line)
+		if len(result) != 1 {
+			t.Errorf("Expected 1 line for %q, got %d", line, len(result))
+			continue
+		}
+		
+		fontSize := result[0].FontSize
+		if !validSizes[fontSize] {
+			t.Errorf("Line %q has invalid font size %v, expected one of 18.0, 20.0, or 22.0", line, fontSize)
+		}
+	}
+}
+
+// Property test: Table row detection consistency
+// For any line identified as a table row, it should have specific characteristics
+func TestProperty_TableRowDetectionConsistency(t *testing.T) {
+	parser := NewFormatParser(384)
+	
+	// Lines that should be table rows
+	tableRows := []string{
+		"Tên món              SL  Đơn giá    Thành tiền",
+		"Cafe Latte            2   45,000       90,000",
+		"------------------------------------------------",
+		"Coffee  2  50000  100000",
+	}
+	
+	for _, line := range tableRows {
+		result := parser.Parse(line)
+		if len(result) != 1 {
+			t.Errorf("Expected 1 line for %q, got %d", line, len(result))
+			continue
+		}
+		
+		if !result[0].IsTableRow {
+			t.Errorf("Line %q should be identified as table row", line)
+		}
+	}
+	
+	// Lines that should NOT be table rows
+	nonTableRows := []string{
+		"HÓA ĐƠN BÁN HÀNG",
+		"Order: #12345",
+		"Cảm ơn quý khách!",
+		"[TABLE_START]",
+		"[TABLE_END]",
+		"===",
+	}
+	
+	for _, line := range nonTableRows {
+		result := parser.Parse(line)
+		if len(result) != 1 {
+			t.Errorf("Expected 1 line for %q, got %d", line, len(result))
+			continue
+		}
+		
+		if result[0].IsTableRow {
+			t.Errorf("Line %q should NOT be identified as table row", line)
+		}
+	}
+}

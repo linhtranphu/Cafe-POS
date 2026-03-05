@@ -6,43 +6,26 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: local-print-bridge
-    restart: unless-stopped
-    
-    # Network mode: host allows direct access to printers on local network
-    network_mode: host
-    
+    ports:
+      - "3001:3001"
     environment:
       - PORT=3001
-      - BACKEND_URL=${BACKEND_URL:-https://your-ec2-domain.com}
-      - PRINTER_TIMEOUT=${PRINTER_TIMEOUT:-5000}
-      - DEFAULT_BILL_PRINTER_IP=${DEFAULT_BILL_PRINTER_IP:-192.168.1.100}
-      - DEFAULT_LABEL_PRINTER_IP=${DEFAULT_LABEL_PRINTER_IP:-192.168.1.101}
-      - NODE_ENV=production
-    
-    # Alternative: Use bridge network if you don't want host mode
-    # ports:
-    #   - "3001:3001"
-    # networks:
-    #   - print-network
-    
-    volumes:
-      # Mount logs directory (optional)
-      - ./logs:/app/logs
-    
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    
+      - HOST=0.0.0.0
+      - DEFAULT_BILL_PRINTER_IP=${DEFAULT_BILL_PRINTER_IP:-192.168.1.115}
+      - DEFAULT_BILL_PRINTER_PORT=${DEFAULT_BILL_PRINTER_PORT:-9100}
+      - DEFAULT_LABEL_PRINTER_IP=${DEFAULT_LABEL_PRINTER_IP:-192.168.1.116}
+      - DEFAULT_LABEL_PRINTER_PORT=${DEFAULT_LABEL_PRINTER_PORT:-9100}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - PRINTER_TIMEOUT=${PRINTER_TIMEOUT:-5}
+    restart: unless-stopped
+    # Security options for Chromium
+    security_opt:
+      - seccomp:unconfined
+    # Shared memory for Chromium
+    shm_size: '256mb'
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/health"]
       interval: 30s
-      timeout: 3s
+      timeout: 10s
       retries: 3
-      start_period: 5s
-
-# Uncomment if not using host network mode
-# networks:
-#   print-network:
-#     driver: bridge
+      start_period: 10s

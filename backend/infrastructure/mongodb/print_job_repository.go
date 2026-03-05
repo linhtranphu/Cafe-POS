@@ -57,18 +57,35 @@ func (r *PrintJobRepository) FindByID(ctx context.Context, id primitive.ObjectID
 
 // FindByOrderID retrieves all print jobs for a specific order
 func (r *PrintJobRepository) FindByOrderID(ctx context.Context, orderID primitive.ObjectID) ([]*printing.PrintJob, error) {
+	// Add timeout to prevent hanging
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	filter := bson.M{"order_id": orderID}
 	opts := options.Find().SetSort(bson.D{{"created_at", 1}})
 
 	cursor, err := r.collection.Find(ctx, filter, opts)
 	if err != nil {
+		// If collection doesn't exist, return empty array instead of error
+		if err == mongo.ErrNoDocuments {
+			return []*printing.PrintJob{}, nil
+		}
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
 	var jobs []*printing.PrintJob
 	if err = cursor.All(ctx, &jobs); err != nil {
+		// If collection doesn't exist, return empty array
+		if err == mongo.ErrNoDocuments {
+			return []*printing.PrintJob{}, nil
+		}
 		return nil, err
+	}
+
+	// Return empty array if nil
+	if jobs == nil {
+		jobs = []*printing.PrintJob{}
 	}
 
 	return jobs, nil
@@ -76,6 +93,10 @@ func (r *PrintJobRepository) FindByOrderID(ctx context.Context, orderID primitiv
 
 // FindPending retrieves pending print jobs ordered by created_at
 func (r *PrintJobRepository) FindPending(ctx context.Context, limit int) ([]*printing.PrintJob, error) {
+	// Add timeout to prevent hanging
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	filter := bson.M{"status": printing.PrintJobStatusPending}
 	opts := options.Find().SetSort(bson.D{{"created_at", 1}})
 
@@ -85,13 +106,26 @@ func (r *PrintJobRepository) FindPending(ctx context.Context, limit int) ([]*pri
 
 	cursor, err := r.collection.Find(ctx, filter, opts)
 	if err != nil {
+		// If collection doesn't exist, return empty array instead of error
+		if err == mongo.ErrNoDocuments || mongo.IsDuplicateKeyError(err) {
+			return []*printing.PrintJob{}, nil
+		}
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
 	var jobs []*printing.PrintJob
 	if err = cursor.All(ctx, &jobs); err != nil {
+		// If collection doesn't exist, return empty array
+		if err == mongo.ErrNoDocuments {
+			return []*printing.PrintJob{}, nil
+		}
 		return nil, err
+	}
+
+	// Return empty array if nil
+	if jobs == nil {
+		jobs = []*printing.PrintJob{}
 	}
 
 	return jobs, nil
@@ -99,18 +133,35 @@ func (r *PrintJobRepository) FindPending(ctx context.Context, limit int) ([]*pri
 
 // FindFailed retrieves all failed print jobs
 func (r *PrintJobRepository) FindFailed(ctx context.Context) ([]*printing.PrintJob, error) {
+	// Add timeout to prevent hanging
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	filter := bson.M{"status": printing.PrintJobStatusFailed}
 	opts := options.Find().SetSort(bson.D{{"created_at", -1}})
 
 	cursor, err := r.collection.Find(ctx, filter, opts)
 	if err != nil {
+		// If collection doesn't exist, return empty array instead of error
+		if err == mongo.ErrNoDocuments || mongo.IsDuplicateKeyError(err) {
+			return []*printing.PrintJob{}, nil
+		}
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
 	var jobs []*printing.PrintJob
 	if err = cursor.All(ctx, &jobs); err != nil {
+		// If collection doesn't exist, return empty array
+		if err == mongo.ErrNoDocuments {
+			return []*printing.PrintJob{}, nil
+		}
 		return nil, err
+	}
+
+	// Return empty array if nil
+	if jobs == nil {
+		jobs = []*printing.PrintJob{}
 	}
 
 	return jobs, nil

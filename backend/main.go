@@ -9,6 +9,7 @@ import (
 	"cafe-pos/backend/domain"
 	"cafe-pos/backend/domain/user"
 	"cafe-pos/backend/infrastructure/mongodb"
+	"cafe-pos/backend/infrastructure/printbridge"
 	"cafe-pos/backend/infrastructure/websocket"
 	"cafe-pos/backend/interfaces/http"
 	"github.com/gin-gonic/gin"
@@ -69,6 +70,8 @@ func main() {
 	printerConfigRepo := mongodb.NewPrinterConfigRepository(db)
 	printTemplateRepo := mongodb.NewPrintTemplateRepository(db)
 	printNotificationRepo := mongodb.NewPrintNotificationRepository(db)
+	// Fund repositories
+	fundTransactionRepo := mongodb.NewFundTransactionRepository(db)
 
 	// State Machine Manager
 	smManager := domain.NewStateMachineManager()
@@ -110,6 +113,7 @@ func main() {
 	batchReportService := services.NewBatchReportService(batchRecordRepo, batchUsageLogRepo, batchDefinitionRepo)
 	// Print services - now with WebSocket broadcaster
 	templateRenderer := services.NewTemplateRenderer()
+	
 	printService := services.NewPrintService(services.PrintServiceConfig{
 		PrintJobRepo:      printJobRepo,
 		PrinterConfigRepo: printerConfigRepo,
@@ -120,6 +124,31 @@ func main() {
 		WSBroadcaster:     wsBroadcaster,
 	})
 	printerManager := services.NewPrinterManager()
+	
+	// Initialize print bridge client from shop settings
+	// This allows auto-print to work via print bridge on EC2
+	go func() {
+		// Wait a bit for services to initialize
+		time.Sleep(2 * time.Second)
+		
+		ctx := context.Background()
+		settings, err := shopSettingsRepo.GetSettings(ctx)
+		if err == nil && settings != nil && settings.PrintBridgeURL != "" {
+			log.Printf("[PRINT BRIDGE] Configuring print bridge: %s", settings.PrintBridgeURL)
+			bridgeClient := printbridge.NewClient(settings.PrintBridgeURL, 30*time.Second)
+			
+			// Test connection
+			if bridgeClient.IsAvailable() {
+				printerManager.SetPrintBridgeClient(bridgeClient)
+				log.Printf("[PRINT BRIDGE] ✅ Print bridge configured and available")
+			} else {
+				log.Printf("[PRINT BRIDGE] ⚠️  Print bridge configured but not available (will use direct connection)")
+			}
+		} else {
+			log.Printf("[PRINT BRIDGE] No print bridge URL configured (will use direct connection)")
+		}
+	}()
+	
 	printNotificationService := services.NewPrintNotificationService(printNotificationRepo)
 	printWorker := services.NewPrintWorker(services.PrintWorkerConfig{
 		PrintJobRepo:        printJobRepo,
@@ -140,8 +169,10 @@ func main() {
 	orderService.SetPrintService(printService)
 	orderService.SetSettingsRepository(shopSettingsRepo)
 	shiftService := services.NewShiftService(shiftRepo, orderRepo, smManager)
+	// Fund service (must be created before cashier shift service)
+	fundService := services.NewFundService(fundTransactionRepo, fundHandoverRepo, cashHandoverRepo, cashierShiftRepo, client)
 	// Cashier services
-	cashierShiftService := services.NewCashierShiftService(cashierShiftRepo, fundHandoverRepo, shiftRepo, smManager, client)
+	cashierShiftService := services.NewCashierShiftService(cashierShiftRepo, fundHandoverRepo, shiftRepo, smManager, fundService, client)
 	cashReconciliationService := services.NewCashReconciliationService(cashReconciliationRepo, shiftRepo, orderRepo)
 	paymentOversightService := services.NewPaymentOversightService(orderRepo, paymentDiscrepancyRepo, paymentAuditRepo)
 	cashierReportService := services.NewCashierReportService(orderRepo, cashReconciliationRepo, shiftRepo, paymentAuditRepo)
@@ -152,6 +183,9 @@ func main() {
 	monitoringService := services.NewMonitoringService()
 	
 	costCalculatorService := services.NewCostCalculatorService(menuRepo, ingredientRepo, orderRepo, orderItemRepo)
+	// Wire up batch repository for batch ingredient cost calculation
+	batchRecordCostAdapter := services.NewBatchRecordCostAdapter(batchRecordRepo)
+	costCalculatorService.SetBatchRecordRepository(batchRecordCostAdapter)
 	profitAnalyzerService := services.NewProfitAnalyzerService(menuRepo, orderItemRepo, shopSettingsRepo, operatingExpenseRepo)
 	costRecalculationService := services.NewCostRecalculationService(costCalculatorService, menuRepo, 4, 1000) // 4 workers, queue size 1000
 	operatingExpenseService := services.NewOperatingExpenseService(operatingExpenseRepo)
@@ -161,6 +195,11 @@ func main() {
 	costCalculatorService.SetCostRecalculationService(costRecalculationService)
 	costCalculatorService.SetMonitoringService(monitoringService)
 	costRecalculationService.SetMonitoringService(monitoringService)
+
+	// Wire up batch record service with cost recalculation and menu repo
+	// This enables auto-recalculation of menu costs when new batches are created
+	batchRecordService.SetCostRecalculationService(costRecalculationService)
+	batchRecordService.SetMenuRepository(menuRepo)
 
 	// Start cost recalculation worker pool
 	// Requirements: 9.1, 9.2, 9.3
@@ -206,6 +245,8 @@ func main() {
 	cashierHandler := http.NewCashierHandler(cashReconciliationService, paymentOversightService, cashierReportService)
 	// Handover handler
 	cashHandoverHandler := http.NewCashHandoverHandler(cashHandoverService)
+	// Fund handler
+	fundHandler := http.NewFundHandler(fundService)
 	// Batch handlers
 	batchDefinitionHandler := http.NewBatchDefinitionHandler(batchDefinitionService)
 	batchRecordHandler := http.NewBatchRecordHandler(batchRecordService)
@@ -217,6 +258,57 @@ func main() {
 	printerConfigHandler := http.NewPrinterConfigHandler(printerConfigRepo, printerManager)
 	printTemplateHandler := http.NewPrintTemplateHandler(printTemplateRepo, templateRenderer, shopSettingsRepo)
 	shopSettingsHandler := http.NewShopSettingsHandler(shopSettingsRepo)
+	logoUploadHandler := http.NewLogoUploadHandler(shopSettingsRepo, "./uploads/logos")
+	
+	// Visual print handler (DISABLED - moved to print bridge)
+	// var visualPrintHandler *http.VisualPrintHandler
+	
+	// Print Bridge Client (NEW - Dynamic from settings)
+	// Handler will fetch print_bridge_url from shop settings at runtime
+	var htmlTemplateHandlerBridge *http.HTMLTemplateHandlerBridge
+	templatePath := "./application/services/templates/bill_template_optimized.html"
+	htmlTemplateHandlerBridge = http.NewHTMLTemplateHandlerBridge(
+		orderRepo,
+		shopSettingsRepo,
+		templatePath,
+	)
+	log.Println("✅ HTML template handler (bridge) initialized - will use print_bridge_url from settings")
+	
+	// Chromedp print handler (DISABLED - Chromium removed from Docker image)
+	// Kept for reference only. Use print bridge instead.
+	/*
+	chromedpPrintHandler, err := http.NewChromedpPrintHandler(orderRepo, shopSettingsRepo)
+	if err != nil {
+		log.Printf("Warning: Failed to create Chromedp print handler: %v", err)
+		chromedpPrintHandler = nil
+	} else {
+		log.Println("✅ Chromedp print handler initialized (DEPRECATED)")
+		// Cleanup on exit
+		defer func() {
+			if chromedpPrintHandler != nil {
+				chromedpPrintHandler.Close()
+				log.Println("✅ Chromedp print handler closed")
+			}
+		}()
+	}
+	*/
+	log.Println("ℹ️  Chromedp disabled - using print bridge for HTML rendering")
+	
+	// HTML template handler (OLD - using chromedp, DISABLED)
+	/*
+	var htmlTemplateHandler *http.HTMLTemplateHandler
+	if chromedpPrintHandler != nil && htmlTemplateHandlerBridge == nil {
+		templatePath := "./application/services/templates/bill_template_optimized.html"
+		htmlTemplateHandler = http.NewHTMLTemplateHandler(
+			chromedpPrintHandler.GetRenderer(),
+			orderRepo,
+			shopSettingsRepo,
+			templatePath,
+		)
+		log.Println("✅ HTML template handler (chromedp fallback) initialized")
+	}
+	*/
+	
 	// State machine handler
 	stateMachineHandler := http.NewStateMachineHandler(smManager)
 	menuService := services.NewMenuService(menuRepo)
@@ -238,7 +330,7 @@ func main() {
 	expenseHandler := http.NewExpenseHandler(expenseService)
 
 	// Menu cost and profit analysis handlers
-	menuCostHandler := http.NewMenuCostHandler(profitAnalyzerService, costCalculatorService, costRecalculationService)
+	menuCostHandler := http.NewMenuCostHandler(profitAnalyzerService, costCalculatorService, costRecalculationService, menuRepo)
 	profitAnalysisHandler := http.NewProfitAnalysisHandler(profitAnalyzerService)
 	operatingExpenseHandler := http.NewOperatingExpenseHandler(operatingExpenseService)
 	settingsHandler := http.NewSettingsHandler(shopSettingsService)
@@ -267,6 +359,12 @@ func main() {
 		}
 		c.Next()
 	})
+
+	// Serve static files for uploads
+	r.Static("/uploads", "./uploads")
+	
+	// Serve templates directory for HTML template preview
+	r.Static("/templates", "./templates")
 
 	// Socket.IO endpoint (using standard library)
 	r.GET("/socket.io/*any", gin.WrapH(socketIOServer))
@@ -422,6 +520,7 @@ func main() {
 				waiter.PUT("/orders/:id/edit", orderHandler.EditOrder)
 				waiter.POST("/orders/:id/send", orderHandler.SendToBar)
 				waiter.POST("/orders/:id/serve", orderHandler.ServeOrder)
+				waiter.POST("/orders/:id/cancel", orderHandler.CancelOrder)
 				waiter.GET("/orders", orderHandler.GetMyOrders)
 				waiter.GET("/orders/:id", orderHandler.GetOrder)
 				
@@ -514,6 +613,7 @@ func main() {
 				manager.GET("/menu/costs", menuCostHandler.GetMenuCosts)
 				manager.GET("/menu/costs/:id", menuCostHandler.GetMenuCostDetail)
 				manager.GET("/menu/warnings", menuCostHandler.GetMenuWarnings)
+				manager.POST("/menu/costs/recalculate-all", menuCostHandler.RecalculateAllCosts)
 				
 				// Variant-aware cost analysis routes (Task 6.3)
 				manager.GET("/menu/:id/cost-breakdown", menuCostHandler.GetCostBreakdown)
@@ -598,6 +698,13 @@ func main() {
 				manager.PUT("/expenses/:id", expenseHandler.UpdateExpense)
 				manager.DELETE("/expenses/:id", expenseHandler.DeleteExpense)
 				manager.POST("/expense-categories", expenseHandler.CreateCategory)
+				
+				// Fund management routes
+				manager.GET("/fund/balance", fundHandler.GetBalance)
+				manager.GET("/fund/transactions", fundHandler.GetTransactions)
+				manager.POST("/fund/deposit", fundHandler.Deposit)
+				manager.POST("/fund/withdraw", fundHandler.Withdraw)
+				manager.GET("/fund/transactions/:id", fundHandler.GetTransactionDetail)
 				manager.GET("/expense-categories", expenseHandler.GetCategories)
 				manager.DELETE("/expense-categories/:id", expenseHandler.DeleteCategory)
 				manager.POST("/recurring-expenses", expenseHandler.CreateRecurring)
@@ -654,9 +761,39 @@ func main() {
 				manager.DELETE("/print-templates/:id", printTemplateHandler.DeleteTemplate)
 				manager.POST("/print-templates/:id/preview", printTemplateHandler.PreviewTemplate)
 				
+				// Visual print routes - DISABLED (moved to print bridge)
+				// if visualPrintHandler != nil {
+				// 	manager.POST("/visual-print/bill", visualPrintHandler.PrintVisualBill)
+				// 	manager.GET("/visual-print/preview/:order_id", visualPrintHandler.PreviewVisualBill)
+				// }
+				
+				// Chromedp print routes - DISABLED (UI removed)
+				// if chromedpPrintHandler != nil {
+				// 	manager.POST("/chromedp-print/bill", chromedpPrintHandler.PrintChromedpBill)
+				// 	manager.GET("/chromedp-print/preview/:order_id", chromedpPrintHandler.PreviewChromedpBill)
+				// }
+				
+				// HTML template management routes
+				// Using print bridge (URL from settings)
+				if htmlTemplateHandlerBridge != nil {
+					manager.GET("/html-templates/bill", htmlTemplateHandlerBridge.GetHTMLTemplate)
+					manager.PUT("/html-templates/bill", htmlTemplateHandlerBridge.UpdateHTMLTemplate)
+					manager.POST("/html-templates/test-print", htmlTemplateHandlerBridge.TestPrintHTMLTemplate)
+					manager.POST("/html-templates/preview", htmlTemplateHandlerBridge.PreviewHTMLTemplate)
+					log.Println("✅ HTML template routes registered (using print bridge from settings)")
+				}
+				
 				// Shop settings routes
 				manager.GET("/shop-settings", shopSettingsHandler.GetSettings)
+				manager.POST("/shop-settings", shopSettingsHandler.CreateSettings)
 				manager.PUT("/shop-settings/:id", shopSettingsHandler.UpdateSettings)
+				
+				// Print bridge test route
+				manager.POST("/print-bridge/test", shopSettingsHandler.TestPrintBridge)
+				
+				// Logo upload routes
+				manager.POST("/settings/logo", logoUploadHandler.UploadLogo)
+				manager.DELETE("/settings/logo", logoUploadHandler.DeleteLogo)
 				
 				// Shift management routes
 				manager.GET("/shifts", shiftHandler.GetAllShifts)

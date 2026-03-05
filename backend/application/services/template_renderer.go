@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"strings"
 	"text/template"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"cafe-pos/backend/domain/order"
 	"cafe-pos/backend/domain/printing"
 	"cafe-pos/backend/domain/settings"
+	printingInfra "cafe-pos/backend/infrastructure/printing"
 )
 
 // TemplateRenderer defines the interface for rendering print templates
@@ -22,13 +24,27 @@ type TemplateRenderer interface {
 type templateRenderer struct {
 	defaultBillTemplate  string
 	defaultLabelTemplate string
+	tableFormatter       *printingInfra.TableFormatter
+	formatParser         *printingInfra.FormatParser
 }
 
 // NewTemplateRenderer creates a new template renderer with default templates
 func NewTemplateRenderer() TemplateRenderer {
+	// Default paper width for 80mm paper (576 pixels)
+	paperWidth := 576
+	margin := 10
+	
+	// Initialize table formatter
+	tableFormatter := printingInfra.NewTableFormatter(paperWidth, margin, 1)
+	
+	// Initialize format parser
+	formatParser := printingInfra.NewFormatParser(paperWidth)
+	
 	return &templateRenderer{
 		defaultBillTemplate:  getDefaultBillTemplate(),
 		defaultLabelTemplate: getDefaultLabelTemplate(),
+		tableFormatter:       tableFormatter,
+		formatParser:         formatParser,
 	}
 }
 
@@ -71,12 +87,75 @@ func (r *templateRenderer) RenderBill(ord *order.Order, tmpl *printing.PrintTemp
 			if fallbackErr != nil {
 				return "", fmt.Errorf("template rendering failed and fallback failed: %w", err)
 			}
-			return content, nil
+			log.Printf("Template rendering failed: %v. Using fallback template.", err)
+			// Still process the fallback content
+			processedContent, processErr := r.processTemplateContent(content, ord, shopSettings)
+			if processErr != nil {
+				log.Printf("Template processing failed: %v. Using unprocessed content.", processErr)
+				return content, nil
+			}
+			return processedContent, nil
 		}
 		return "", fmt.Errorf("template rendering failed: %w", err)
 	}
 
+	// Process the rendered content with new modules
+	processedContent, err := r.processTemplateContent(content, ord, shopSettings)
+	if err != nil {
+		// If processing fails, log error and return original content as fallback
+		log.Printf("Template processing failed: %v. Using unprocessed content.", err)
+		return content, nil
+	}
+
+	return processedContent, nil
+}
+
+// processTemplateContent processes the template content (currently just removes markers)
+func (r *templateRenderer) processTemplateContent(content string, ord *order.Order, shopSettings *settings.ShopSettings) (string, error) {
+	// Remove [LOGO] marker if present (logo rendering not implemented)
+	content = strings.ReplaceAll(content, "[LOGO]", "")
+	
+	// Handle [TABLE_START] and [TABLE_END] markers
+	content = r.processTableMarkers(content, ord)
+
 	return content, nil
+}
+
+// processTableMarkers processes [TABLE_START] and [TABLE_END] markers and formats the table
+func (r *templateRenderer) processTableMarkers(content string, ord *order.Order) string {
+	// Find table markers
+	tableStartIdx := strings.Index(content, "[TABLE_START]")
+	tableEndIdx := strings.Index(content, "[TABLE_END]")
+
+	// If no table markers found, return content as-is
+	if tableStartIdx == -1 || tableEndIdx == -1 || tableEndIdx <= tableStartIdx {
+		return content
+	}
+
+	// Extract content before, inside, and after table markers
+	beforeTable := content[:tableStartIdx]
+	afterTable := content[tableEndIdx+len("[TABLE_END]"):]
+
+	// Format items table using table formatter
+	items := make([]printingInfra.OrderItem, len(ord.Items))
+	for i, item := range ord.Items {
+		items[i] = printingInfra.OrderItem{
+			Name:        item.Name,
+			VariantName: item.VariantName,
+			Quantity:    item.Quantity,
+			UnitPrice:   item.Price,
+			TotalPrice:  item.Subtotal,
+		}
+	}
+
+	paperWidth := 576 // Default 80mm paper width
+	tableLines := r.tableFormatter.FormatItemsTable(items, paperWidth)
+
+	// Join table lines
+	tableContent := strings.Join(tableLines, "\n")
+
+	// Reconstruct content with formatted table
+	return beforeTable + "\n" + tableContent + "\n" + afterTable
 }
 
 // RenderLabel renders a label template for a specific order item

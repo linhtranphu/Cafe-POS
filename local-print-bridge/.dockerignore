@@ -1,40 +1,26 @@
-# Node modules
-node_modules/
-npm-debug.log
-yarn-error.log
+# Binaries
+print-bridge
+print-bridge-*
 
 # Environment files
 .env
 .env.local
-.env.*.local
-
-# Logs
-logs/
-*.log
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
 
 # Git
-.git/
+.git
 .gitignore
 
 # Documentation
-README.md
 *.md
+!README.md
 
-# Docker files
-Dockerfile
-docker-compose.yml
-.dockerignore
+# IDE
+.vscode
+.idea
 
-# Test files
-test/
-*.test.js
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,21 @@
+{{.ShopName}}
+{{if .ShowAddress}}{{.ShopAddress}}
+{{end}}{{if .ShowPhone}}Tel: {{.ShopPhone}}
+{{end}}================================
+HÓA ĐƠN BÁN HÀNG
+================================
+Số HĐ: {{.Order.OrderNumber}}
+Ngày: {{formatTime .Order.CreatedAt "02/01/2006 15:04"}}
+{{if .Order.WaiterName}}Nhân viên: {{.Order.WaiterName}}
+{{end}}================================
+{{range .Order.Items}}{{.Name}}{{if .VariantName}} ({{.VariantName}}){{end}}
+  {{.Quantity}} x {{formatPrice .Price}} = {{formatPrice .Subtotal}}
+{{end}}================================
+Tạm tính: {{formatPrice .Order.Subtotal}} đ
+{{if gt .Order.Discount 0.0}}Giảm giá: -{{formatPrice .Order.Discount}} đ
+{{end}}--------------------------------
+TỔNG CỘNG: {{formatPrice .Order.Total}} đ
+================================
+{{if .ShowCustomMessage}}{{.CustomMessage}}
+{{end}}Cảm ơn quý khách!
+Hẹn gặp lại!

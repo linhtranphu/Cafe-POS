@@ -27,7 +27,7 @@ export const orderService = {
   },
 
   async cancelOrder(id, reason) {
-    const response = await api.post(`/cashier/orders/${id}/cancel`, { reason })
+    const response = await api.post(`/waiter/orders/${id}/cancel`, { reason })
     return response.data
   },
 

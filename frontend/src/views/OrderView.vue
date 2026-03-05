@@ -184,110 +184,13 @@
     <!-- Bottom Navigation -->
     <BottomNav />
 
-    <!-- Create Order - Full Screen -->
-    <transition name="slide-up">
-      <div v-if="showCreateOrder" class="fixed inset-0 bg-white z-50 overflow-hidden flex flex-col">
-        <!-- Header -->
-        <div class="bg-blue-500 text-white px-4 py-4 flex items-center justify-between shadow-lg" style="padding-top: max(1rem, env(safe-area-inset-top))">
-          <button @click="cancelCreateOrder" class="text-2xl p-2 active:bg-blue-600 rounded-lg touch-manipulation">←</button>
-          <h2 class="text-xl font-bold">Tạo Order Mới</h2>
-          <button @click="confirmOrder" :disabled="cart.length === 0" 
-            class="text-sm font-semibold px-4 py-2.5 bg-white text-blue-500 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all touch-manipulation shadow-md">
-            Xác nhận
-          </button>
-        </div>
-
-        <!-- Category Tabs -->
-        <div class="flex gap-2 px-4 py-3 overflow-x-auto bg-white border-b scrollbar-hide -mx-4 px-4">
-          <button v-for="cat in categories" :key="cat.id"
-            @click="selectedCategory = cat.id"
-            :class="[
-              'px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap touch-manipulation active:scale-95 transition-all',
-              selectedCategory === cat.id 
-                ? 'bg-blue-500 text-white shadow-lg' 
-                : 'bg-gray-100 text-gray-700 active:bg-gray-200'
-            ]">
-            <span class="mr-1">{{ cat.icon }}</span>
-            <span>{{ cat.name }}</span>
-          </button>
-        </div>
-
-        <!-- Menu Items Grid -->
-        <div class="flex-1 overflow-y-auto px-4 py-4 bg-gray-50">
-          <div class="grid grid-cols-2 gap-3">
-            <template v-for="item in filteredMenuItems" :key="item.id">
-              <!-- Single-size item - direct add -->
-              <button v-if="!item.has_variants"
-                @click="addToCart(item)"
-                class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 active:scale-95 active:shadow-md transition-all text-left touch-manipulation h-full flex flex-col">
-                <div class="flex-1">
-                  <div class="font-semibold text-gray-900 mb-2 line-clamp-2 min-h-[2.5rem]">{{ item.name }}</div>
-                  <div class="text-base font-bold text-blue-600">{{ formatPrice(item.price) }}</div>
-                </div>
-                <div v-if="getCartItemQty(item.id) > 0" 
-                  class="mt-3 bg-blue-500 text-white text-xs font-semibold px-3 py-1.5 rounded-full inline-flex items-center justify-center gap-1 shadow-md">
-                  <span>🛒</span>
-                  <span>{{ getCartItemQty(item.id) }} món</span>
-                </div>
-              </button>
-
-              <!-- Multi-size item - show variants -->
-              <div v-else
-                class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 text-left flex flex-col h-full">
-                <div class="font-semibold text-gray-900 mb-3 line-clamp-2 min-h-[2.5rem]">{{ item.name }}</div>
-                <div class="space-y-2 flex-1">
-                  <button v-for="variant in item.variants" :key="variant.id"
-                    @click="addToCart(item, variant)"
-                    class="w-full flex justify-between items-center px-3 py-2.5 bg-gray-50 rounded-xl active:bg-blue-50 active:scale-95 transition-all touch-manipulation border border-gray-100">
-                    <span class="text-xs font-semibold text-gray-700">{{ variant.name }}</span>
-                    <span class="text-sm font-bold text-blue-600">{{ formatPrice(variant.price) }}</span>
-                  </button>
-                </div>
-                <div v-if="getCartItemQtyWithVariants(item.id) > 0" 
-                  class="mt-3 bg-blue-500 text-white text-xs font-semibold px-3 py-1.5 rounded-full inline-flex items-center justify-center gap-1 shadow-md">
-                  <span>🛒</span>
-                  <span>{{ getCartItemQtyWithVariants(item.id) }} món</span>
-                </div>
-              </div>
-            </template>
-          </div>
-        </div>
-
-        <!-- Cart Summary - Fixed Bottom -->
-        <div v-if="cart.length > 0" class="bg-white border-t shadow-lg">
-          <div class="px-4 py-3">
-            <!-- Cart Items -->
-            <div class="max-h-32 overflow-y-auto mb-3 space-y-2">
-              <div v-for="(item, idx) in cart" :key="idx" 
-                class="flex items-center gap-3 bg-gray-50 rounded-lg p-2">
-                <span class="flex-1 text-sm font-medium">
-                  {{ item.name }}
-                  <span v-if="item.variant_name" class="text-gray-500">({{ item.variant_name }})</span>
-                </span>
-                <div class="flex items-center gap-2">
-                  <button @click="decreaseQty(idx)" 
-                    class="w-8 h-8 bg-gray-200 rounded-full text-lg font-bold active:bg-gray-300">
-                    −
-                  </button>
-                  <span class="w-8 text-center font-bold">{{ item.quantity }}</span>
-                  <button @click="increaseQty(idx)" 
-                    class="w-8 h-8 bg-blue-500 text-white rounded-full text-lg font-bold active:bg-blue-600">
-                    +
-                  </button>
-                </div>
-                <button @click="removeFromCart(idx)" class="text-red-500 text-xl">×</button>
-              </div>
-            </div>
-            
-            <!-- Total -->
-            <div class="flex justify-between items-center">
-              <span class="text-gray-600">Tổng cộng</span>
-              <span class="text-2xl font-bold text-green-600">{{ formatPrice(cartTotal) }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </transition>
+    <!-- Create Order Modal - New Component -->
+    <CreateOrderModal 
+      v-model="showCreateOrder"
+      :menu-items="menuItems"
+      :categories="categories"
+      @confirm="handleOrderConfirm"
+    />
 
     <!-- Order Detail Modal -->
     <transition name="slide-up">
@@ -369,6 +272,11 @@
                 @click="editOrder(selectedOrder)"
                 class="w-full bg-blue-500 text-white py-3 rounded-xl font-medium active:bg-blue-600">
                 ✏️ Chỉnh sửa
+              </button>
+              <button v-if="isStatus(selectedOrder, ORDER_STATUS.CREATED)" 
+                @click="confirmCancelOrder(selectedOrder)"
+                class="w-full bg-red-500 text-white py-3 rounded-xl font-medium active:bg-red-600">
+                ❌ Hủy order
               </button>
               <button v-if="isStatus(selectedOrder, ORDER_STATUS.PAID) && selectedOrder.amount_due <= 0" 
                 @click="sendToBar(selectedOrder.id)"
@@ -481,6 +389,51 @@
       </div>
     </transition>
 
+    <!-- Cancel Order Modal -->
+    <transition name="slide-up">
+      <div v-if="showCancelModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
+        <div class="bg-white rounded-t-3xl w-full p-6">
+          <h3 class="text-xl font-bold mb-4 text-red-600">❌ Hủy Order</h3>
+          
+          <div class="mb-4 p-4 bg-red-50 rounded-lg border border-red-200">
+            <p class="text-sm text-red-800 mb-2">
+              <strong>Cảnh báo:</strong> Bạn đang hủy order này. Hành động này không thể hoàn tác.
+            </p>
+            <div class="text-sm text-gray-700">
+              <p><strong>Order:</strong> {{ cancelingOrder?.order_number }}</p>
+              <p><strong>Khách:</strong> {{ cancelingOrder?.customer_name || 'Khách lẻ' }}</p>
+              <p><strong>Tổng tiền:</strong> {{ formatPrice(cancelingOrder?.total) }}</p>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="block text-sm font-medium mb-2 text-gray-700">
+              Lý do hủy <span class="text-red-500">*</span>
+            </label>
+            <textarea 
+              v-model="cancelReason" 
+              rows="3"
+              placeholder="Nhập lý do hủy order (bắt buộc)..."
+              class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 resize-none"
+            ></textarea>
+          </div>
+
+          <div class="flex gap-2">
+            <button @click="closeCancelModal" 
+              class="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-medium active:bg-gray-300">
+              Quay lại
+            </button>
+            <button 
+              @click="processCancelOrder" 
+              :disabled="!cancelReason.trim()"
+              class="flex-1 bg-red-500 text-white py-3 rounded-xl font-medium active:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed">
+              Xác nhận hủy
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
     <!-- Customer Name Modal -->
     <transition name="slide-up">
       <div v-if="showCustomerNameModal" class="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-end">
@@ -532,13 +485,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useOrderStore, cartHelpers } from '../stores/order'
+import { useOrderStore } from '../stores/order'
 import { useShiftStore } from '../stores/shift'
 import { useMenuStore } from '../stores/menu'
 import { useAuthStore } from '../stores/auth'
 import { useRouter } from 'vue-router'
 import BottomNav from '../components/BottomNav.vue'
 import PullToRefresh from '../components/PullToRefresh.vue'
+import CreateOrderModal from '../components/CreateOrderModal.vue'
 import { usePullToRefresh } from '../composables/usePullToRefresh'
 import { printJobService } from '../services/printJob'
 import { 
@@ -566,6 +520,11 @@ const paymentOrder = ref(null)
 const paymentAmount = ref(0)
 const paymentMethod = ref(PAYMENT_METHOD.CASH)
 
+// Cancel Order State
+const showCancelModal = ref(false)
+const cancelReason = ref('')
+const cancelingOrder = ref(null)
+
 // Reprint State
 const reprintingBill = ref(false)
 const reprintingLabel = ref(null)
@@ -578,8 +537,7 @@ const canReprint = computed(() => {
 
 // Create Order State
 const customerName = ref('')
-const selectedCategory = ref('all')
-const cart = ref([])
+const cart = ref([]) // Will receive data from CreateOrderModal
 
 // Data
 const statuses = STATUS_FILTER_OPTIONS
@@ -657,11 +615,6 @@ const otherShiftsOrdersCount = computed(() => {
   return orders.value.filter(o => o.shift_id !== currentShiftId).length
 })
 
-const filteredMenuItems = computed(() => {
-  if (selectedCategory.value === 'all') return menuItems.value
-  return menuItems.value.filter(item => item.category === selectedCategory.value)
-})
-
 const cartTotal = computed(() => {
   return cart.value.reduce((sum, item) => sum + (item.price * item.quantity), 0)
 })
@@ -709,64 +662,13 @@ const viewOrderDetail = (order) => {
 }
 
 const startNewOrder = () => {
-  cart.value = []
-  customerName.value = ''
-  selectedCategory.value = 'all'
   showCreateOrder.value = true
 }
 
-const cancelCreateOrder = () => {
-  if (cart.value.length > 0) {
-    if (!confirm('Bạn có chắc muốn hủy order này?')) return
-  }
+const handleOrderConfirm = (cartArray) => {
+  // Store cart data and show customer name modal
+  cart.value = cartArray
   showCreateOrder.value = false
-  cart.value = []
-  customerName.value = ''
-}
-
-const addToCart = (item, variant = null) => {
-  // Use cartHelpers to create cart item
-  const cartItem = cartHelpers.createCartItem(item, variant)
-  
-  // Check if item already exists in cart (considering variant)
-  const existing = cart.value.find(i => cartHelpers.isSameCartItem(i, cartItem))
-  
-  if (existing) {
-    existing.quantity++
-  } else {
-    cart.value.push(cartItem)
-  }
-}
-
-const getCartItemQty = (itemId) => {
-  const item = cart.value.find(i => i.menu_item_id === itemId && !i.variant_id)
-  return item ? item.quantity : 0
-}
-
-const getCartItemQtyWithVariants = (itemId) => {
-  return cart.value
-    .filter(i => i.menu_item_id === itemId)
-    .reduce((sum, i) => sum + i.quantity, 0)
-}
-
-const increaseQty = (index) => {
-  cart.value[index].quantity++
-}
-
-const decreaseQty = (index) => {
-  if (cart.value[index].quantity > 1) {
-    cart.value[index].quantity--
-  } else {
-    removeFromCart(index)
-  }
-}
-
-const removeFromCart = (index) => {
-  cart.value.splice(index, 1)
-}
-
-const confirmOrder = () => {
-  // Show customer name modal before creating order
   showCustomerNameModal.value = true
 }
 
@@ -840,6 +742,36 @@ const serveOrder = async (orderId) => {
 const editOrder = (order) => {
   // TODO: Implement edit order functionality
   alert('Chức năng chỉnh sửa order đang được phát triển')
+}
+
+const confirmCancelOrder = (order) => {
+  cancelingOrder.value = order
+  cancelReason.value = ''
+  showCancelModal.value = true
+  selectedOrder.value = null
+}
+
+const closeCancelModal = () => {
+  showCancelModal.value = false
+  cancelingOrder.value = null
+  cancelReason.value = ''
+}
+
+const processCancelOrder = async () => {
+  if (!cancelReason.value.trim()) {
+    alert('Vui lòng nhập lý do hủy order')
+    return
+  }
+
+  try {
+    await orderStore.cancelOrder(cancelingOrder.value.id, cancelReason.value.trim())
+    showCancelModal.value = false
+    cancelingOrder.value = null
+    cancelReason.value = ''
+    alert('✅ Đã hủy order thành công')
+  } catch (error) {
+    alert('❌ Lỗi: ' + (error.response?.data?.error || error.message))
+  }
 }
 
 // Reprint Functions

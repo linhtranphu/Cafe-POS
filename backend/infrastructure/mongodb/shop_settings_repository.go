@@ -80,6 +80,7 @@ func (r *ShopSettingsRepository) UpdateSettings(ctx context.Context, shopSetting
 			"shop_phone":           shopSettings.ShopPhone,
 			"logo_url":             shopSettings.LogoURL,
 			"custom_message":       shopSettings.CustomMessage,
+			"print_bridge_url":     shopSettings.PrintBridgeURL,
 			"show_logo":            shopSettings.ShowLogo,
 			"show_address":         shopSettings.ShowAddress,
 			"show_phone":           shopSettings.ShowPhone,

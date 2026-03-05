@@ -1,10 +1,41 @@
 /**
  * Local Print Bridge Service
  * Detects and communicates with the local print bridge running at the cafe
+ * 
+ * Architecture:
+ * - Frontend/Backend: EC2 (tacafe.store)
+ * - Print Bridge: Local machine at cafe (same network as printer)
+ * - Browser: Accesses from cafe, needs to connect to local print bridge
+ * 
+ * Configuration:
+ * - Loaded from shop_settings.print_bridge_url
+ * - Fallback to environment variable or localhost:3001
  */
 
-const LOCAL_BRIDGE_URL = 'http://localhost:3001'
+import { getPrintBridgeUrl } from '../utils/env'
+
 const HEALTH_CHECK_INTERVAL = 30000 // 30 seconds
+const STORAGE_KEY = 'print_bridge_url'
+
+/**
+ * Get print bridge URL from localStorage or environment
+ * @returns {string}
+ */
+function getBridgeUrl() {
+  // Priority 1: Configured URL from shop settings (stored in localStorage after fetch)
+  const savedUrl = localStorage.getItem(STORAGE_KEY)
+  if (savedUrl && savedUrl !== 'null' && savedUrl !== '') {
+    return savedUrl
+  }
+  
+  // Priority 2: Environment variable
+  return getPrintBridgeUrl()
+}
+
+let LOCAL_BRIDGE_URL = getBridgeUrl()
+
+// Log configuration for debugging
+console.log('[LocalPrint] Bridge URL:', LOCAL_BRIDGE_URL)
 
 class LocalPrintService {
   constructor() {
@@ -187,6 +218,31 @@ class LocalPrintService {
    */
   isAvailable() {
     return this.available
+  }
+
+  /**
+   * Update print bridge URL dynamically
+   * @param {string} newUrl - New print bridge URL
+   */
+  updateBridgeUrl(newUrl) {
+    if (!newUrl || newUrl === LOCAL_BRIDGE_URL) return
+    
+    LOCAL_BRIDGE_URL = newUrl
+    localStorage.setItem(STORAGE_KEY, newUrl)
+    
+    // Reset availability and recheck
+    this.available = false
+    this.checkAvailability()
+    
+    console.log('[LocalPrint] Bridge URL updated:', newUrl)
+  }
+
+  /**
+   * Get current bridge URL
+   * @returns {string}
+   */
+  getBridgeUrl() {
+    return LOCAL_BRIDGE_URL
   }
 }
 

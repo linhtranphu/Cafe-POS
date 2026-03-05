@@ -19,11 +19,12 @@ type FontConfig struct {
 
 // RendererConfig represents configuration for the text renderer
 type RendererConfig struct {
-	PixelWidth  int     // Width of the printable area in pixels (384 for 58mm, 576 for 80mm)
-	FontPath    string  // Path to the TrueType font file to use for rendering
-	FontSize    float64 // Font size in points for normal text
-	LineSpacing int     // Vertical spacing between lines in pixels
-	Margin      int     // Left and right margin in pixels
+	PixelWidth  int                // Width of the printable area in pixels (384 for 58mm, 576 for 80mm)
+	FontPath    string             // Path to the TrueType font file to use for rendering
+	FontSize    float64            // Font size in points for normal text (default size)
+	FontSizes   map[string]float64 // Map of font sizes for different content types (e.g., "normal": 18, "header": 22, "total": 20)
+	LineSpacing int                // Vertical spacing between lines in pixels
+	Margin      int                // Left and right margin in pixels
 }
 
 // FontManager manages font loading and provides font faces for rendering

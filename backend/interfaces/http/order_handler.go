@@ -43,6 +43,22 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		return
 	}
 
+	// DISABLED: Auto-create print jobs (bill + labels) if print service is available
+	// This was causing unwanted prints. User should manually print from UI.
+	/*
+	go func() {
+		if h.printService != nil {
+			// Create print jobs for the order (1 bill + N labels)
+			ctx := c.Request.Context()
+			if err := h.printService.CreatePrintJobsForOrder(ctx, o); err != nil {
+				// Log error but don't fail the order creation
+				// User can manually reprint if needed
+				// TODO: Add proper logging
+			}
+		}
+	}()
+	*/
+
 	c.JSON(http.StatusCreated, o)
 }
 

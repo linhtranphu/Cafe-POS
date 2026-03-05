@@ -1,30 +1,48 @@
-# Local Print Bridge Dockerfile
-FROM node:18-alpine
+# Build stage
+FROM golang:1.21-alpine AS builder
 
-# Set working directory
+# Install build dependencies
+RUN apk add --no-cache git
+
 WORKDIR /app
 
-# Install dependencies first (for better caching)
-COPY package*.json ./
-RUN npm ci --only=production
+# Copy go mod files
+COPY go.mod go.sum* ./
+RUN go mod download
 
-# Copy application code
-COPY src/ ./src/
+# Copy source code
+COPY . .
 
-# Create non-root user for security
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001 && \
-    chown -R nodejs:nodejs /app
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o print-bridge main.go
 
-# Switch to non-root user
-USER nodejs
+# Runtime stage
+FROM alpine:latest
+
+# Install Chromium and dependencies
+RUN apk --no-cache add \
+    chromium \
+    chromium-chromedriver \
+    font-noto \
+    font-noto-cjk \
+    ttf-dejavu \
+    fontconfig \
+    ca-certificates
+
+# Update font cache
+RUN fc-cache -f
+
+# Set Chrome binary path for chromedp
+ENV CHROME_BIN=/usr/bin/chromium-browser
+ENV CHROME_PATH=/usr/bin/chromium-browser
+
+WORKDIR /root/
+
+# Copy the binary from builder
+COPY --from=builder /app/print-bridge .
 
 # Expose port
 EXPOSE 3001
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3001/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
-
-# Start application
-CMD ["node", "src/index.js"]
+# Run the application
+CMD ["./print-bridge"]

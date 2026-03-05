@@ -3,7 +3,10 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import { useAuthStore } from './stores/auth'
-import { websocketService } from './services/websocket'
+import { useShopSettingsStore } from './stores/shopSettings'
+// WebSocket disabled - using HTTP only for print bridge
+// import { websocketService } from './services/websocket'
+import { localPrintService } from './services/localPrint'
 import './style.css'
 
 const app = createApp(App)
@@ -16,6 +19,22 @@ app.use(router)
 const authStore = useAuthStore()
 authStore.initAuth()
 
+// Initialize shop settings and print bridge URL
+const shopSettingsStore = useShopSettingsStore()
+if (authStore.isAuthenticated) {
+  // Load shop settings to get print bridge URL
+  shopSettingsStore.fetchSettings()
+    .then(() => {
+      const settings = shopSettingsStore.settings
+      if (settings?.print_bridge_url) {
+        localPrintService.updateBridgeUrl(settings.print_bridge_url)
+      }
+    })
+    .catch(err => {
+      console.warn('[App] Failed to load shop settings:', err)
+    })
+}
+
 // Validate token with backend on app load
 if (authStore.isAuthenticated) {
   authStore.validateToken().catch(() => {
@@ -25,20 +44,20 @@ if (authStore.isAuthenticated) {
     router.push('/login')
   })
 
-  // Connect WebSocket after authentication
-  const token = localStorage.getItem('token')
-  if (token) {
-    websocketService.connect(token)
-  }
+  // WebSocket disabled - using HTTP only for print bridge
+  // const token = localStorage.getItem('token')
+  // if (token) {
+  //   websocketService.connect(token)
+  // }
 }
 
-// Watch for auth changes to connect/disconnect WebSocket
-authStore.$subscribe((mutation, state) => {
-  if (state.isAuthenticated && state.token) {
-    websocketService.connect(state.token)
-  } else {
-    websocketService.disconnect()
-  }
-})
+// WebSocket disabled - using HTTP only for print bridge
+// authStore.$subscribe((mutation, state) => {
+//   if (state.isAuthenticated && state.token) {
+//     websocketService.connect(state.token)
+//   } else {
+//     websocketService.disconnect()
+//   }
+// })
 
 app.mount('#app')

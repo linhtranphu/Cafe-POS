@@ -20,6 +20,8 @@ type BatchRecordService struct {
 	userRepo             UserRepository
 	batchCostCalculator  *BatchCostCalculator
 	mongoClient          *mongo.Client
+	costRecalcService    *CostRecalculationService
+	menuRepo             MenuRepository
 }
 
 // NewBatchRecordService creates a new batch record service
@@ -40,7 +42,21 @@ func NewBatchRecordService(
 		userRepo:            userRepo,
 		batchCostCalculator: batchCostCalculator,
 		mongoClient:         mongoClient,
+		costRecalcService:   nil,
+		menuRepo:            nil,
 	}
+}
+
+// SetCostRecalculationService sets the cost recalculation service for queuing background jobs
+// This is called after service initialization to avoid circular dependencies
+func (s *BatchRecordService) SetCostRecalculationService(costRecalcService *CostRecalculationService) {
+	s.costRecalcService = costRecalcService
+}
+
+// SetMenuRepository sets the menu repository for finding affected menu items
+// This is called after service initialization to avoid circular dependencies
+func (s *BatchRecordService) SetMenuRepository(menuRepo MenuRepository) {
+	s.menuRepo = menuRepo
 }
 
 // CreateBatchRequest represents a request to create a batch record
@@ -234,7 +250,38 @@ func (s *BatchRecordService) CreateBatch(ctx context.Context, req CreateBatchReq
 		return nil, err
 	}
 
+	// After successful batch creation, queue cost recalculation for affected menu items
+	// This runs asynchronously and doesn't block the batch creation
+	if s.costRecalcService != nil && s.menuRepo != nil {
+		go s.queueMenuCostRecalculation(context.Background(), req.BatchDefinitionID)
+	}
+
 	return batchRecord, nil
+}
+
+// queueMenuCostRecalculation finds all menu items using this batch and queues cost recalculation
+// This runs asynchronously after batch creation to update menu costs with new batch cost
+func (s *BatchRecordService) queueMenuCostRecalculation(ctx context.Context, batchDefID primitive.ObjectID) {
+	// Find all menu items that use this batch definition
+	menuItems, err := s.menuRepo.FindByBatchDefinitionID(ctx, batchDefID)
+	if err != nil {
+		// Log error but don't fail (this is background work)
+		fmt.Printf("Warning: failed to find menu items for batch definition %s: %v\n", batchDefID.Hex(), err)
+		return
+	}
+
+	// Queue recalculation for each menu item
+	for _, menuItem := range menuItems {
+		err := s.costRecalcService.QueueRecalculation(menuItem.ID)
+		if err != nil {
+			// Log warning but continue with other items
+			fmt.Printf("Warning: failed to queue recalculation for menu item %s: %v\n", menuItem.ID.Hex(), err)
+		}
+	}
+
+	if len(menuItems) > 0 {
+		fmt.Printf("Info: queued cost recalculation for %d menu items using batch definition %s\n", len(menuItems), batchDefID.Hex())
+	}
 }
 
 // GetByID retrieves a batch record by ID

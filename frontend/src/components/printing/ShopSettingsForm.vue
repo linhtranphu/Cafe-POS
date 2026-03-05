@@ -14,16 +14,95 @@
       </div>
     </div>
 
-    <!-- Error State -->
-    <div v-else-if="error && !settings" class="flex-1 flex items-center justify-center">
-      <div class="text-center">
-        <p class="text-red-600 mb-4">❌ {{ error }}</p>
-        <button
-          @click="loadSettings"
-          class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          Thử lại
-        </button>
+    <!-- Error State - Show Create Form -->
+    <div v-else-if="error && !settings" class="flex-1 overflow-y-auto">
+      <div class="max-w-4xl mx-auto p-6">
+        <!-- Info Banner -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div class="flex items-start gap-3">
+            <span class="text-2xl">ℹ️</span>
+            <div>
+              <h3 class="font-semibold text-blue-900 mb-1">Chưa có cài đặt</h3>
+              <p class="text-sm text-blue-700">
+                Hệ thống chưa có cài đặt in ấn. Vui lòng điền thông tin bên dưới để tạo cài đặt mới.
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Create Form -->
+        <form @submit.prevent="handleCreate" class="space-y-6">
+          <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">📋 Thông Tin Quán</h3>
+            
+            <div class="space-y-4">
+              <!-- Shop Name -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  Tên Quán <span class="text-red-500">*</span>
+                </label>
+                <input
+                  v-model="formData.shop_name"
+                  type="text"
+                  required
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Nhập tên quán"
+                />
+              </div>
+
+              <!-- Shop Address -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  Địa Chỉ
+                </label>
+                <input
+                  v-model="formData.shop_address"
+                  type="text"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Nhập địa chỉ quán"
+                />
+              </div>
+
+              <!-- Shop Phone -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  Số Điện Thoại
+                </label>
+                <input
+                  v-model="formData.shop_phone"
+                  type="tel"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Nhập số điện thoại"
+                />
+              </div>
+
+              <!-- Custom Message -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  Lời Cảm Ơn / Thông Điệp
+                </label>
+                <textarea
+                  v-model="formData.custom_message"
+                  rows="3"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Cảm ơn quý khách! Hẹn gặp lại..."
+                ></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex justify-end gap-3 bg-white rounded-lg shadow p-4">
+            <button
+              type="submit"
+              class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="loading"
+            >
+              <span v-if="loading">Đang tạo...</span>
+              <span v-else>✨ Tạo cài đặt</span>
+            </button>
+          </div>
+        </form>
       </div>
     </div>
 
@@ -150,46 +229,38 @@
             <h3 class="text-lg font-semibold text-gray-800 mb-4">🖨️ Cấu Hình In</h3>
             
             <div class="space-y-4">
-              <!-- Paper Width -->
+              <!-- Print Bridge URL -->
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">
-                  Khổ Giấy Bill <span class="text-red-500">*</span>
+                  Print Bridge URL <span class="text-red-500">*</span>
                 </label>
-                <select
-                  v-model.number="formData.paper_width"
+                <input
+                  v-model="formData.print_bridge_url"
+                  type="url"
                   required
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option
-                    v-for="option in paperWidthOptions"
-                    :key="option.value"
-                    :value="option.value"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                  placeholder="http://192.168.1.100:3001"
+                />
+                <p class="mt-1 text-xs text-gray-500">
+                  URL của Print Bridge chạy trên máy local (ví dụ: http://192.168.1.100:3001)
+                </p>
+                <div class="mt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    @click="testPrintBridge"
+                    class="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded border border-gray-300"
+                    :disabled="!formData.print_bridge_url || testingBridge"
                   >
-                    {{ option.label }}
-                  </option>
-                </select>
-                <p class="mt-1 text-xs text-gray-500">Chọn khổ giấy phù hợp với máy in bill</p>
-              </div>
-
-              <!-- Label Size -->
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">
-                  Kích Thước Tem <span class="text-red-500">*</span>
-                </label>
-                <select
-                  v-model="formData.label_size"
-                  required
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option
-                    v-for="option in labelSizeOptions"
-                    :key="option.value"
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </option>
-                </select>
-                <p class="mt-1 text-xs text-gray-500">Chọn kích thước tem phù hợp với máy in tem</p>
+                    <span v-if="testingBridge">⏳ Đang kiểm tra...</span>
+                    <span v-else>🔍 Kiểm tra kết nối</span>
+                  </button>
+                  <span v-if="bridgeStatus === 'success'" class="text-xs text-green-600">
+                    ✅ Kết nối thành công
+                  </span>
+                  <span v-else-if="bridgeStatus === 'error'" class="text-xs text-red-600">
+                    ❌ Không thể kết nối
+                  </span>
+                </div>
               </div>
 
               <!-- Auto Print -->
@@ -206,6 +277,22 @@
                 </label>
                 <p class="mt-1 ml-6 text-xs text-gray-500">
                   Nếu tắt, bạn có thể in thủ công từ chi tiết đơn hàng
+                </p>
+              </div>
+
+              <!-- Test Print Button -->
+              <div class="border-t pt-4">
+                <button
+                  type="button"
+                  @click="testPrintTemplate"
+                  class="w-full px-4 py-3 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg border-2 border-green-200 font-medium transition-colors"
+                  :disabled="!formData.print_bridge_url || testPrinting"
+                >
+                  <span v-if="testPrinting">⏳ Đang in thử...</span>
+                  <span v-else>🖨️ In Thử Bill Mẫu</span>
+                </button>
+                <p class="mt-2 text-xs text-gray-500 text-center">
+                  In một bill test để kiểm tra cấu hình
                 </p>
               </div>
             </div>
@@ -254,10 +341,12 @@ const store = useShopSettingsStore()
 const loading = computed(() => store.loading)
 const error = computed(() => store.error)
 const settings = computed(() => store.settings)
-const paperWidthOptions = computed(() => store.paperWidthOptions)
-const labelSizeOptions = computed(() => store.labelSizeOptions)
 
 const showSuccess = ref(false)
+const testingBridge = ref(false)
+const bridgeStatus = ref(null) // 'success', 'error', or null
+const testPrinting = ref(false)
+const testPrintResult = ref(null) // 'success', 'error', or null
 
 const formData = reactive({
   shop_name: '',
@@ -265,8 +354,7 @@ const formData = reactive({
   shop_phone: '',
   logo_url: '',
   custom_message: '',
-  paper_width: 80,
-  label_size: '60x40',
+  print_bridge_url: '',
   show_logo: true,
   show_address: true,
   show_phone: true,
@@ -288,8 +376,7 @@ async function loadSettings() {
         shop_phone: settings.value.shop_phone || '',
         logo_url: settings.value.logo_url || '',
         custom_message: settings.value.custom_message || '',
-        paper_width: settings.value.paper_width || 80,
-        label_size: settings.value.label_size || '60x40',
+        print_bridge_url: settings.value.print_bridge_url || '',
         show_logo: settings.value.show_logo !== false,
         show_address: settings.value.show_address !== false,
         show_phone: settings.value.show_phone !== false,
@@ -310,14 +397,92 @@ function resetForm() {
       shop_phone: settings.value.shop_phone || '',
       logo_url: settings.value.logo_url || '',
       custom_message: settings.value.custom_message || '',
-      paper_width: settings.value.paper_width || 80,
-      label_size: settings.value.label_size || '60x40',
+      print_bridge_url: settings.value.print_bridge_url || '',
       show_logo: settings.value.show_logo !== false,
       show_address: settings.value.show_address !== false,
       show_phone: settings.value.show_phone !== false,
       show_custom_message: settings.value.show_custom_message !== false,
       auto_print_enabled: settings.value.auto_print_enabled !== false
     })
+  }
+  bridgeStatus.value = null
+}
+
+async function testPrintBridge() {
+  if (!formData.print_bridge_url) return
+  
+  testingBridge.value = true
+  bridgeStatus.value = null
+  
+  try {
+    // Call backend API instead of direct fetch to avoid CORS
+    const token = localStorage.getItem('token')
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+    
+    const response = await fetch(`${apiUrl}/api/manager/print-bridge/test`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        bridge_url: formData.print_bridge_url
+      })
+    })
+    
+    const data = await response.json()
+    
+    if (response.ok && data.success) {
+      bridgeStatus.value = 'success'
+    } else {
+      bridgeStatus.value = 'error'
+    }
+  } catch (err) {
+    console.error('Print bridge test failed:', err)
+    bridgeStatus.value = 'error'
+  } finally {
+    testingBridge.value = false
+  }
+}
+
+async function testPrintTemplate() {
+  const printerIP = prompt('Nhập IP máy in (ví dụ: 192.168.1.100):')
+  if (!printerIP) return
+  
+  testPrinting.value = true
+  testPrintResult.value = null
+  
+  try {
+    const token = localStorage.getItem('token')
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+    
+    const response = await fetch(`${apiUrl}/api/manager/html-templates/test-print`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        use_test_data: true,
+        printer_ip: printerIP
+      })
+    })
+    
+    const data = await response.json()
+    
+    if (response.ok && data.success) {
+      testPrintResult.value = 'success'
+      alert('✅ In thử thành công!\n\nĐơn hàng test: ' + data.order_number)
+    } else {
+      testPrintResult.value = 'error'
+      alert('❌ Lỗi: ' + (data.error || 'Không thể in'))
+    }
+  } catch (err) {
+    console.error('Test print failed:', err)
+    testPrintResult.value = 'error'
+    alert('❌ Lỗi: ' + err.message)
+  } finally {
+    testPrinting.value = false
   }
 }
 
@@ -333,6 +498,24 @@ async function handleSubmit() {
   } catch (err) {
     console.error('Failed to update settings:', err)
     alert('Lỗi: ' + (err.response?.data?.error || 'Không thể lưu cài đặt'))
+  }
+}
+
+async function handleCreate() {
+  try {
+    await store.createSettings(formData)
+    
+    // Reload settings
+    await loadSettings()
+    
+    // Show success message
+    showSuccess.value = true
+    setTimeout(() => {
+      showSuccess.value = false
+    }, 3000)
+  } catch (err) {
+    console.error('Failed to create settings:', err)
+    alert('Lỗi: ' + (err.response?.data?.error || 'Không thể tạo cài đặt'))
   }
 }
 </script>

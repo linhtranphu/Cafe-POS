@@ -173,3 +173,26 @@ func (r *CashierShiftRepository) FindByDateRange(ctx context.Context, startDate,
 	}
 	return shifts, nil
 }
+
+// FindOpen retrieves all open cashier shifts (status = OPEN or CLOSURE_INITIATED).
+func (r *CashierShiftRepository) FindOpen(ctx context.Context) ([]*cashier.CashierShift, error) {
+	opts := options.Find().SetSort(bson.D{{Key: "start_time", Value: -1}})
+	cursor, err := r.collection.Find(ctx, bson.M{
+		"status": bson.M{
+			"$in": []string{
+				string(cashier.CashierShiftOpen),
+				string(cashier.CashierShiftClosureInitiated),
+			},
+		},
+	}, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var shifts []*cashier.CashierShift
+	if err = cursor.All(ctx, &shifts); err != nil {
+		return nil, err
+	}
+	return shifts, nil
+}

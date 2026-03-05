@@ -1,11 +1,16 @@
 package printing
 
 import (
+	"encoding/base64"
 	"fmt"
+	"log"
 	"net"
 	"time"
 
 	"cafe-pos/backend/domain/printing"
+	
+	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/transform"
 )
 
 // ESC/POS command constants
@@ -185,14 +190,29 @@ func (p *ESCPOSPrinter) Print(content string) error {
 		return fmt.Errorf("print error: printer not connected (call Connect() first)")
 	}
 
-	if p.textRenderer == nil {
-		return fmt.Errorf("print error: text renderer not initialized (font loading may have failed during initialization)")
-	}
+	var commands []byte
+	var err error
 
-	// Convert plain text to ESC/POS commands using image-based rendering
-	commands, err := p.convertToESCPOS(content)
-	if err != nil {
-		return fmt.Errorf("print error: failed to convert content to ESC/POS format: %w", err)
+	// Check if content is base64-encoded binary data
+	// Base64 strings are typically much longer and contain only alphanumeric + / =
+	if isBase64Content(content) {
+		// Decode base64 to get raw ESC/POS commands
+		commands, err = base64.StdEncoding.DecodeString(content)
+		if err != nil {
+			return fmt.Errorf("print error: failed to decode base64 content: %w", err)
+		}
+		log.Printf("[PRINTER] Using pre-rendered binary content (%d bytes)", len(commands))
+	} else {
+		// Plain text content - convert to ESC/POS
+		if p.textRenderer == nil {
+			return fmt.Errorf("print error: text renderer not initialized (font loading may have failed during initialization)")
+		}
+
+		commands, err = p.convertToESCPOS(content)
+		if err != nil {
+			return fmt.Errorf("print error: failed to convert content to ESC/POS format: %w", err)
+		}
+		log.Printf("[PRINTER] Converted text to ESC/POS (%d bytes)", len(commands))
 	}
 
 	// Send commands to printer
@@ -237,8 +257,50 @@ func (p *ESCPOSPrinter) GetStatus() (PrinterStatus, error) {
 	}, nil
 }
 
-// convertToESCPOS converts plain text template output to ESC/POS commands using image-based rendering
+// convertToESCPOS converts plain text template output to ESC/POS commands
+// IMAGE RENDERING DISABLED - Using simple text mode with Windows-1258 encoding
+// To re-enable image rendering, uncomment the code block below and comment out the simple text mode
 func (p *ESCPOSPrinter) convertToESCPOS(content string) ([]byte, error) {
+	// ============================================================================
+	// SIMPLE TEXT MODE WITH WINDOWS-1258 ENCODING (CURRENT)
+	// ============================================================================
+	var commands []byte
+	
+	// Initialize printer
+	commands = append(commands, ESC_INIT...)
+	
+	// Set code page to Vietnamese
+	// ESC t n - Select character code table
+	// For Zywell ZY303 and similar Vietnamese thermal printers:
+	//   n = 255: Internal Vietnamese code page (Zywell/Xprinter specific) - RECOMMENDED
+	//   n = 31: Windows-1258 (Vietnamese) - Standard
+	//   n = 30: Alternative internal Vietnamese code page
+	// Using n = 255 (0xFF) for Zywell internal Vietnamese code page
+	commands = append(commands, 0x1B, 0x74, 0xFF) // ESC t 255
+	
+	// Optional: Select Font A (12x24) for better clarity
+	// ESC M n - Select character font
+	// n = 0: Font A (12x24), n = 1: Font B (9x17)
+	commands = append(commands, 0x1B, 0x4D, 0x00) // ESC M 0 (Font A)
+	
+	// Encode content from UTF-8 to Windows-1258
+	encodedContent := encodeVietnamese(content)
+	commands = append(commands, encodedContent...)
+	
+	// Feed a few lines before cutting
+	commands = append(commands, ESC_FEED_LINES...)
+	commands = append(commands, 0x03) // Feed 3 lines
+	
+	// Cut paper
+	commands = append(commands, GS_CUT...)
+	
+	return commands, nil
+	
+	// ============================================================================
+	// IMAGE RENDERING MODE (DISABLED)
+	// Uncomment this section to re-enable Vietnamese font rendering via images
+	// ============================================================================
+	/*
 	// Check if text renderer is available
 	if p.textRenderer == nil {
 		return nil, fmt.Errorf("conversion error: text renderer not initialized (font loading may have failed)")
@@ -279,4 +341,13 @@ func (p *ESCPOSPrinter) convertToESCPOS(content string) ([]byte, error) {
 	commands = append(commands, GS_CUT...)
 
 	return commands, nil
+	*/
+}
+
+// encodeVietnamese converts UTF-8 string to Windows-1258 encoding for Vietnamese text
+func encodeVietnamese(input string) []byte {
+	// Chuyển đổi từ UTF-8 sang Windows-1258
+	encoder := charmap.Windows1258.NewEncoder()
+	output, _, _ := transform.String(encoder, input)
+	return []byte(output)
 }

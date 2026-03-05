@@ -13,6 +13,7 @@ type MenuRepository interface {
 	FindByID(ctx context.Context, id primitive.ObjectID) (*menu.MenuItem, error)
 	FindByCategory(ctx context.Context, category string) ([]*menu.MenuItem, error)
 	FindByIngredientName(ctx context.Context, ingredientName string) ([]*menu.MenuItem, error)
+	FindByBatchDefinitionID(ctx context.Context, batchDefID primitive.ObjectID) ([]*menu.MenuItem, error)
 	Update(ctx context.Context, id primitive.ObjectID, item *menu.MenuItem) error
 	Delete(ctx context.Context, id primitive.ObjectID) error
 }

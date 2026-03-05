@@ -11,8 +11,16 @@
       <div class="px-4 py-3 md:px-6 lg:px-8" style="padding-top: max(0.75rem, env(safe-area-inset-top))">
         <div class="flex items-center justify-between mb-3">
           <h1 class="text-xl md:text-2xl font-bold text-gray-800">💰 Chi phí món</h1>
-          <!-- Desktop: View Toggle -->
+          <!-- Desktop: View Toggle + Recalculate Button -->
           <div class="hidden md:flex gap-2">
+            <button @click="recalculateAllCosts" 
+              :disabled="isRecalculating"
+              :class="isRecalculating ? 'bg-gray-300 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600 active:bg-green-700'"
+              class="px-3 py-1 rounded-lg text-sm font-medium text-white transition-colors flex items-center gap-1">
+              <span v-if="isRecalculating" class="animate-spin">⏳</span>
+              <span v-else>🔄</span>
+              <span>{{ isRecalculating ? 'Đang tính...' : 'Tính lại tất cả' }}</span>
+            </button>
             <button @click="viewMode = 'card'" 
               :class="viewMode === 'card' ? 'bg-blue-500 text-white' : 'bg-white text-gray-700 border border-gray-300'"
               class="px-3 py-1 rounded-lg text-sm font-medium">
@@ -22,6 +30,16 @@
               :class="viewMode === 'table' ? 'bg-blue-500 text-white' : 'bg-white text-gray-700 border border-gray-300'"
               class="px-3 py-1 rounded-lg text-sm font-medium">
               📊 Bảng
+            </button>
+          </div>
+          <!-- Mobile: Recalculate Button Only -->
+          <div class="md:hidden">
+            <button @click="recalculateAllCosts" 
+              :disabled="isRecalculating"
+              :class="isRecalculating ? 'bg-gray-300 cursor-not-allowed' : 'bg-green-500 active:bg-green-600'"
+              class="px-3 py-1 rounded-lg text-sm font-medium text-white flex items-center gap-1">
+              <span v-if="isRecalculating" class="animate-spin">⏳</span>
+              <span v-else>🔄</span>
             </button>
           </div>
         </div>
@@ -284,6 +302,12 @@ import SkeletonLoader from '../components/SkeletonLoader.vue'
 import { usePullToRefresh } from '../composables/usePullToRefresh'
 import { menuCostService } from '../services/menuCost'
 import { formatPrice, formatPercentage } from '../utils/formatters'
+import { debugMenuCost } from '../utils/debugMenuCost'
+
+// Make debug function available in console
+if (typeof window !== 'undefined') {
+  window.debugMenuCost = debugMenuCost
+}
 
 // State
 const loading = ref(false)
@@ -296,6 +320,7 @@ const menuItems = ref([])
 const summary = ref(null)
 const recalculationStatus = ref(null)
 const viewMode = ref('card') // 'card' or 'table'
+const isRecalculating = ref(false)
 
 // Cost breakdown modal state
 const showCostBreakdown = ref(false)
@@ -447,6 +472,30 @@ const fetchData = async () => {
     error.value = err.response?.data?.error || 'Không thể tải dữ liệu chi phí món'
   } finally {
     loading.value = false
+  }
+}
+
+// Recalculate all costs function
+const recalculateAllCosts = async () => {
+  if (isRecalculating.value) return
+  
+  isRecalculating.value = true
+  
+  try {
+    const response = await menuCostService.recalculateAllCosts()
+    
+    // Show success message
+    alert(`✅ Đã gửi yêu cầu tính lại chi phí cho ${response.total_items} món.\n\nĐang xử lý trong background...`)
+    
+    // Refresh data after a short delay to show updated status
+    setTimeout(() => {
+      fetchData()
+    }, 1000)
+  } catch (err) {
+    console.error('Error recalculating costs:', err)
+    alert('❌ Lỗi khi tính lại chi phí: ' + (err.response?.data?.error || err.message))
+  } finally {
+    isRecalculating.value = false
   }
 }
 

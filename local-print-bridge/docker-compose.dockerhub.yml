@@ -1,0 +1,54 @@
+version: '3.8'
+
+# Docker Compose file để sử dụng image từ DockerHub
+# Không cần build, chỉ cần pull image
+
+services:
+  print-bridge:
+    # Pull image từ DockerHub thay vì build local
+    image: linhtranphu/local-print-bridge:latest
+    
+    container_name: local-print-bridge
+    
+    ports:
+      - "3001:3001"
+    
+    environment:
+      - PORT=3001
+      - HOST=0.0.0.0
+      - DEFAULT_BILL_PRINTER_IP=${DEFAULT_BILL_PRINTER_IP:-192.168.1.115}
+      - DEFAULT_BILL_PRINTER_PORT=${DEFAULT_BILL_PRINTER_PORT:-9100}
+      - DEFAULT_LABEL_PRINTER_IP=${DEFAULT_LABEL_PRINTER_IP:-192.168.1.116}
+      - DEFAULT_LABEL_PRINTER_PORT=${DEFAULT_LABEL_PRINTER_PORT:-9100}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - PRINTER_TIMEOUT=${PRINTER_TIMEOUT:-5}
+    
+    restart: unless-stopped
+    
+    # Security options for Chromium on Linux
+    security_opt:
+      - seccomp:unconfined
+    
+    # Increased shared memory for Chromium (IMPORTANT for Linux)
+    shm_size: '512mb'
+    
+    # Capabilities for Chromium
+    cap_add:
+      - SYS_ADMIN
+    
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+# Usage:
+# 1. Copy file này và .env vào máy Linux
+# 2. Edit .env với printer IPs của bạn
+# 3. docker compose pull
+# 4. docker compose up -d
+#
+# Update to new version:
+# docker compose pull
+# docker compose up -d

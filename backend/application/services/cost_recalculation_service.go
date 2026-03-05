@@ -292,10 +292,16 @@ func (s *CostRecalculationService) GetRecalculationStatus(ctx context.Context) (
 	s.statusMu.RLock()
 	defer s.statusMu.RUnlock()
 	
+	// Get real-time queue size
+	queuedItems := len(s.recalcQueue)
+	
+	// InProgress should be true only when there are items in the queue
+	inProgress := queuedItems > 0
+	
 	// Create a copy to avoid race conditions
 	statusCopy := &RecalculationStatus{
-		InProgress:     s.status.InProgress,
-		QueuedItems:    len(s.recalcQueue), // Get real-time queue size
+		InProgress:     inProgress,
+		QueuedItems:    queuedItems,
 		ProcessedItems: s.status.ProcessedItems,
 		FailedItems:    s.status.FailedItems,
 		LastUpdated:    s.status.LastUpdated,

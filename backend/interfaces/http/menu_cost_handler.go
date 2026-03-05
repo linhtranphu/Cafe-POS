@@ -17,6 +17,7 @@ type MenuCostHandler struct {
 	profitAnalyzer       *services.ProfitAnalyzerService
 	costCalculator       *services.CostCalculatorService
 	recalculationService *services.CostRecalculationService
+	menuRepo             services.MenuRepository
 }
 
 // NewMenuCostHandler creates a new menu cost handler
@@ -24,11 +25,13 @@ func NewMenuCostHandler(
 	profitAnalyzer *services.ProfitAnalyzerService,
 	costCalculator *services.CostCalculatorService,
 	recalculationService *services.CostRecalculationService,
+	menuRepo services.MenuRepository,
 ) *MenuCostHandler {
 	return &MenuCostHandler{
 		profitAnalyzer:       profitAnalyzer,
 		costCalculator:       costCalculator,
 		recalculationService: recalculationService,
+		menuRepo:             menuRepo,
 	}
 }
 
@@ -443,5 +446,37 @@ func (h *MenuCostHandler) CalculateCost(c *gin.Context) {
 		"cost_status":            string(result.CostStatus),
 		"cost_last_calculated_at": result.CostLastCalculatedAt,
 		"missing_ingredients":    result.MissingIngredients,
+	})
+}
+
+// RecalculateAllCosts handles POST /api/menu/costs/recalculate-all
+// Queues cost recalculation for all menu items
+// This is useful when batch costs change or user wants to refresh all costs
+func (h *MenuCostHandler) RecalculateAllCosts(c *gin.Context) {
+	// Get all menu items
+	menuItems, err := h.menuRepo.FindAll(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch menu items"})
+		return
+	}
+
+	// Queue recalculation for each menu item
+	queuedCount := 0
+	failedCount := 0
+	
+	for _, menuItem := range menuItems {
+		err := h.recalculationService.QueueRecalculation(menuItem.ID)
+		if err != nil {
+			failedCount++
+		} else {
+			queuedCount++
+		}
+	}
+	
+	c.JSON(http.StatusOK, gin.H{
+		"message":      "cost recalculation queued for all menu items",
+		"total_items":  len(menuItems),
+		"queued_count": queuedCount,
+		"failed_count": failedCount,
 	})
 }

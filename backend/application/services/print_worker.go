@@ -177,7 +177,18 @@ func (w *printWorker) ProcessJob(ctx context.Context, job *printing.PrintJob) er
 	}()
 
 	// Send print command
-	if err := printer.Print(job.Content); err != nil {
+	var printData string
+	if job.ContentType == "binary" {
+		// Content is base64-encoded binary data, decode it
+		printData = job.Content // Printer will handle base64 decoding
+		log.Printf("[PRINT] Sending binary content (base64) - job_id=%s, size=%d bytes", job.ID.Hex(), len(job.Content))
+	} else {
+		// Content is plain text
+		printData = job.Content
+		log.Printf("[PRINT] Sending text content - job_id=%s, size=%d bytes", job.ID.Hex(), len(job.Content))
+	}
+	
+	if err := printer.Print(printData); err != nil {
 		log.Printf("[PRINT ERROR] Print command failed - job_id=%s, order_id=%s, printer=%s, error=%v, timestamp=%s",
 			job.ID.Hex(), job.OrderID.Hex(), printerConfig.Name, err, time.Now().Format(time.RFC3339))
 		return w.handlePrintError(ctx, job, fmt.Errorf("failed to print: %w", err))

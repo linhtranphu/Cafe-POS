@@ -24,6 +24,7 @@ type CashierShiftService struct {
 	fundHandoverRepo    *mongodb.FundHandoverRepository
 	waiterShiftRepo     ShiftRepository // To check if waiter shifts are closed
 	stateMachineManager *domain.StateMachineManager
+	fundService         *FundService
 	mongoClient         *mongo.Client
 }
 
@@ -33,6 +34,7 @@ func NewCashierShiftService(
 	fundHandoverRepo *mongodb.FundHandoverRepository,
 	waiterShiftRepo ShiftRepository,
 	stateMachineManager *domain.StateMachineManager,
+	fundService *FundService,
 	mongoClient *mongo.Client,
 ) *CashierShiftService {
 	return &CashierShiftService{
@@ -40,6 +42,7 @@ func NewCashierShiftService(
 		fundHandoverRepo:    fundHandoverRepo,
 		waiterShiftRepo:     waiterShiftRepo,
 		stateMachineManager: stateMachineManager,
+		fundService:         fundService,
 		mongoClient:         mongoClient,
 	}
 }
@@ -79,9 +82,53 @@ func (s *CashierShiftService) StartCashierShift(
 	// Create new cashier shift
 	shift := cashier.NewCashierShift(cashierID, cashierName, startingFloat)
 
-	// Save to repository
-	if err := s.cashierShiftRepo.Create(ctx, shift); err != nil {
-		return nil, err
+	// If starting float > 0, create fund withdrawal transaction
+	// Use MongoDB transaction for atomicity
+	if startingFloat > 0 {
+		session, err := s.mongoClient.StartSession()
+		if err != nil {
+			return nil, fmt.Errorf("failed to start session: %w", err)
+		}
+		defer session.EndSession(ctx)
+
+		err = mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
+			if err := session.StartTransaction(); err != nil {
+				return err
+			}
+
+			// Create cashier shift first to get the ID
+			if err := s.cashierShiftRepo.Create(sc, shift); err != nil {
+				session.AbortTransaction(sc)
+				return fmt.Errorf("failed to create cashier shift: %w", err)
+			}
+
+			// Create fund withdrawal for starting float
+			reason := fmt.Sprintf("Tiền đầu ca cho thu ngân %s", cashierName)
+			_, _, err := s.fundService.CreateWithdrawal(
+				sc,
+				startingFloat, // cash amount
+				0,             // transfer amount
+				reason,
+				cashierID,
+				cashierName,
+				"cashier",
+			)
+			if err != nil {
+				session.AbortTransaction(sc)
+				return fmt.Errorf("failed to create fund withdrawal for starting float: %w", err)
+			}
+
+			return session.CommitTransaction(sc)
+		})
+
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// No starting float, just create the shift
+		if err := s.cashierShiftRepo.Create(ctx, shift); err != nil {
+			return nil, err
+		}
 	}
 
 	return shift, nil

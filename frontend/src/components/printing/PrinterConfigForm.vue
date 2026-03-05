@@ -48,15 +48,19 @@
               </select>
             </div>
 
-            <!-- Paper Width (chỉ cho BILL) -->
-            <div v-if="formData.type === 'BILL'">
+            <!-- Paper Width -->
+            <div v-if="formData.type">
               <label class="block text-sm font-bold text-gray-700 mb-2">📏 Khổ Giấy *</label>
               <select 
                 v-model.number="formData.paper_width" 
                 class="w-full px-4 py-3 border-2 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
-                <option :value="58">58mm (Nhỏ)</option>
-                <option :value="80">80mm (Lớn)</option>
+                <option :value="58">58mm (Nhỏ - Label)</option>
+                <option :value="72">72mm (Trung bình)</option>
+                <option :value="80">80mm (Lớn - Bill)</option>
               </select>
+              <p class="text-xs text-gray-500 mt-1">
+                {{ formData.type === 'LABEL' ? 'Khuyến nghị: 58mm cho tem nhãn' : 'Khuyến nghị: 80mm cho hóa đơn' }}
+              </p>
             </div>
           </div>
         </div>
@@ -262,7 +266,7 @@ if (props.mode === 'edit' && props.printer) {
 }
 
 const isValid = computed(() => {
-  if (!formData.value.name || !formData.value.type || !formData.value.connection_type) {
+  if (!formData.value.name || !formData.value.type || !formData.value.connection_type || !formData.value.paper_width) {
     return false
   }
 
@@ -291,6 +295,15 @@ const canTestConnection = computed(() => {
 watch(() => [formData.value.connection_type, formData.value.ip_address, formData.value.port, formData.value.usb_path], () => {
   testResult.value = null
   printerStore.clearTestResult()
+})
+
+// Auto-set paper_width based on printer type
+watch(() => formData.value.type, (newType) => {
+  if (newType === 'LABEL' && formData.value.paper_width === 80) {
+    formData.value.paper_width = 58
+  } else if (newType === 'BILL' && formData.value.paper_width === 58) {
+    formData.value.paper_width = 80
+  }
 })
 
 const handleTestConnection = async () => {
@@ -336,9 +349,9 @@ const handleSave = async () => {
       delete printerData.port
     }
 
-    // Clean up paper_width for LABEL type
-    if (printerData.type === 'LABEL') {
-      delete printerData.paper_width
+    // Set default paper_width if not set
+    if (!printerData.paper_width) {
+      printerData.paper_width = printerData.type === 'LABEL' ? 58 : 80
     }
 
     await printerStore.savePrinter(printerData)

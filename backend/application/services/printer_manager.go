@@ -5,6 +5,7 @@ import (
 
 	"cafe-pos/backend/domain/printing"
 	infraPrinting "cafe-pos/backend/infrastructure/printing"
+	"cafe-pos/backend/infrastructure/printbridge"
 )
 
 // PrinterStatus represents the status of a printer
@@ -17,14 +18,24 @@ type Printer = infraPrinting.Printer
 type PrinterManager interface {
 	GetPrinter(config *printing.PrinterConfig) (Printer, error)
 	TestConnection(config *printing.PrinterConfig) error
+	SetPrintBridgeClient(client *printbridge.Client)
 }
 
 // printerManager implements the PrinterManager interface
-type printerManager struct{}
+type printerManager struct{
+	printBridgeClient *printbridge.Client
+}
 
 // NewPrinterManager creates a new printer manager instance
 func NewPrinterManager() PrinterManager {
-	return &printerManager{}
+	return &printerManager{
+		printBridgeClient: nil,
+	}
+}
+
+// SetPrintBridgeClient sets the print bridge client for using bridge mode
+func (pm *printerManager) SetPrintBridgeClient(client *printbridge.Client) {
+	pm.printBridgeClient = client
 }
 
 // GetPrinter returns a printer instance based on the configuration (factory pattern)
@@ -33,19 +44,30 @@ func (pm *printerManager) GetPrinter(config *printing.PrinterConfig) (Printer, e
 		return nil, fmt.Errorf("printer config cannot be nil")
 	}
 
+	// If print bridge client is configured and available, use bridge printer directly
+	// No need to create innerPrinter (which requires fonts, etc.)
+	if pm.printBridgeClient != nil && pm.printBridgeClient.IsAvailable() {
+		return infraPrinting.NewBridgePrinter(config, pm.printBridgeClient, nil), nil
+	}
+
+	// No print bridge - create direct printer
+	var innerPrinter Printer
+	var err error
+
 	// Factory pattern: create appropriate printer based on type
 	switch config.Type {
 	case printing.PrinterTypeBill:
-		printer, err := infraPrinting.NewESCPOSPrinter(config)
+		innerPrinter, err = infraPrinting.NewESCPOSPrinter(config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create ESC/POS printer: %w", err)
 		}
-		return printer, nil
 	case printing.PrinterTypeLabel:
-		return infraPrinting.NewLabelPrinter(config), nil
+		innerPrinter = infraPrinting.NewLabelPrinter(config)
 	default:
 		return nil, fmt.Errorf("unsupported printer type: %s", config.Type)
 	}
+
+	return innerPrinter, nil
 }
 
 // TestConnection tests if a printer is reachable with the given configuration

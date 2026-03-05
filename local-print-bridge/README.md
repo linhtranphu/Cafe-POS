@@ -1,202 +1,90 @@
-# Local Print Bridge
+# Local Print Bridge (Go + chromedp)
 
-Bridge service để kết nối Cafe POS Backend với máy in nhiệt qua mạng LAN.
+Print bridge service viết bằng Go, sử dụng chromedp để render HTML thành ESC/POS commands.
 
-## Tính năng
+## Yêu cầu
 
-- ✅ **WebSocket Client**: Nhận print job real-time từ Backend
-- ✅ **HTTP Client**: Cập nhật trạng thái job về Backend
-- ✅ **HTTP Server**: API để manual print/reprint
-- ✅ **Auto-reconnect**: Tự động kết nối lại khi mất kết nối
-- ✅ **Error handling**: Xử lý lỗi và retry
-- ✅ **Logging**: Chi tiết logs để debug
-
-## Kiến trúc
-
-```
-Backend (EC2)
-    │
-    │ WebSocket (real-time push)
-    ▼
-Print Bridge (Windows PC)
-    │
-    │ Raw TCP (Port 9100)
-    ▼
-Thermal Printers (LAN)
-```
+- Go 1.21+
+- Chrome/Chromium browser (chromedp sẽ tự động download nếu chưa có)
 
 ## Cài đặt
 
-### Development
-
 ```bash
-npm install
+# Install dependencies
+go mod download
+
+# Copy .env
 cp .env.example .env
-# Cập nhật BACKEND_URL trong .env
-npm start
+
+# Edit .env và cấu hình printer IPs
+nano .env
 ```
 
-### Production (Docker)
+## Chạy
 
 ```bash
-# Build image
-docker build -t local-print-bridge .
+# Development
+go run main.go
 
-# Hoặc pull từ Docker Hub
-docker pull linhtranphu/local-print-bridge:latest
+# Build
+make build
+./print-bridge
 
-# Run
-docker run -d \
-  --name local-print-bridge \
-  --restart unless-stopped \
-  --network host \
-  --env-file .env \
-  linhtranphu/local-print-bridge:latest
+# Docker
+make docker-build
+make docker-run
 ```
 
-## Cấu hình
+## Endpoints
 
-File `.env`:
+### POST /render-and-print
+Render HTML và in trực tiếp
 
-```bash
-# Server
-PORT=3001
-
-# Backend (WebSocket + HTTP)
-BACKEND_URL=http://YOUR_EC2_IP:3000
-
-# Printers
-DEFAULT_BILL_PRINTER_IP=192.168.1.115
-DEFAULT_LABEL_PRINTER_IP=192.168.1.101
-```
-
-## API Endpoints
-
-### Health Check
-```
-GET /health
-```
-
-### Manual Print
-```
-POST /print
-Body: {
-  "jobId": "string",
-  "content": "string",
-  "printerIP": "string",
-  "printerPort": 9100,
-  "type": "bill|label"
-}
-```
-
-### Test Connection
-```
-POST /test-connection
-Body: {
-  "printerIP": "string",
+```json
+{
+  "html": "<html>...</html>",
+  "width": 576,
+  "printerIP": "192.168.1.100",
   "printerPort": 9100
 }
 ```
 
-### Status
-```
-GET /status
-```
+### POST /print
+In ESC/POS data trực tiếp
 
-## WebSocket Events
-
-Print Bridge lắng nghe các events từ Backend:
-
-- `print-job-created`: Job mới được tạo → Tự động in
-- `print-job-status-changed`: Trạng thái job thay đổi
-- `print-job-failed`: Job thất bại
-
-## Logs
-
-```bash
-# Docker
-docker logs -f local-print-bridge
-
-# Development
-npm start
+```json
+{
+  "content": "base64_or_raw_data",
+  "printerIP": "192.168.1.100",
+  "printerPort": 9100
+}
 ```
 
-Logs sẽ hiển thị:
-- WebSocket connection status
-- Print job processing
-- Printer communication
-- Errors and warnings
+### POST /test-connection
+Test kết nối máy in
 
-## Troubleshooting
-
-### WebSocket không kết nối
-
-```
-[WebSocket] Connection error: Error: timeout
+```json
+{
+  "printerIP": "192.168.1.100",
+  "printerPort": 9100
+}
 ```
 
-**Giải pháp:**
-- Kiểm tra BACKEND_URL đúng chưa
-- Kiểm tra EC2 expose port 3000
-- Test: `curl http://YOUR_EC2_IP:3000/api/login`
+### GET /health
+Health check
 
-### Máy in không in
+### GET /status
+Service status
 
-```
-[PrintJobHandler] ❌ Job failed: connect ETIMEDOUT
-```
+## So sánh với Node.js version
 
-**Giải pháp:**
-- Kiểm tra printer IP đúng chưa
-- Kiểm tra printer bật và kết nối LAN
-- Test: `POST /test-connection`
-
-### Backend không nhận status update
-
-```
-[PrintJobHandler] Failed to update backend
-```
-
-**Giải pháp:**
-- Kiểm tra BACKEND_URL có http:// prefix
-- Kiểm tra EC2 backend đang chạy
-- Kiểm tra firewall/security group
-
-## Development
-
-### Structure
-
-```
-src/
-├── index.js                    # Main server
-├── services/
-│   ├── websocketClient.js      # WebSocket client
-│   ├── printJobHandler.js      # Job processing
-│   ├── printerService.js       # Printer communication
-│   └── backendSync.js          # Backend API calls
-└── utils/
-    └── logger.js               # Logging utility
-```
-
-### Testing
-
-```bash
-# Test WebSocket
-./test-websocket.sh
-
-# Test manual print
-./test-print.sh
-```
-
-## Deployment
-
-Xem [DEPLOY_WINDOWS_WEBSOCKET.md](./DEPLOY_WINDOWS_WEBSOCKET.md) để hướng dẫn chi tiết deploy trên Windows PC tại quán cafe.
-
-### Build Docker Image
-
-```bash
-./build-print-bridge-docker.sh 1.1.0
-```
+| Feature | Node.js (Puppeteer) | Go (chromedp) |
+|---------|---------------------|---------------|
+| Memory | ~200MB | ~50MB |
+| Startup | ~2s | ~0.5s |
+| Binary size | N/A (interpreted) | ~20MB |
+| Dependencies | node_modules (~300MB) | None (single binary) |
+| Cross-platform | ✅ | ✅ |
 
 ## License
 

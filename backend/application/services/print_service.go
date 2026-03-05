@@ -1,9 +1,13 @@
 package services
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
+	"html/template"
 	"log"
+	"os"
 	"time"
 
 	"cafe-pos/backend/domain/order"
@@ -46,13 +50,14 @@ type WebSocketBroadcaster interface {
 
 // printService implements the PrintService interface
 type printService struct {
-	printJobRepo      printing.PrintJobRepository
-	printerConfigRepo printing.PrinterConfigRepository
-	templateRepo      printing.PrintTemplateRepository
-	templateRenderer  TemplateRenderer
-	orderRepo         OrderRepository // To fetch order data for reprints
-	shopSettingsRepo  settings.ShopSettingsRepository
-	wsBroadcaster     WebSocketBroadcaster
+	printJobRepo       printing.PrintJobRepository
+	printerConfigRepo  printing.PrinterConfigRepository
+	templateRepo       printing.PrintTemplateRepository
+	templateRenderer   TemplateRenderer
+	chromedpRenderer   *ChromedpBillRendererOptimized
+	orderRepo          OrderRepository // To fetch order data for reprints
+	shopSettingsRepo   settings.ShopSettingsRepository
+	wsBroadcaster      WebSocketBroadcaster
 }
 
 // PrintServiceConfig contains configuration for the print service
@@ -68,11 +73,18 @@ type PrintServiceConfig struct {
 
 // NewPrintService creates a new print service
 func NewPrintService(config PrintServiceConfig) PrintService {
+	// Initialize chromedp renderer
+	chromedpRenderer, err := NewChromedpBillRendererOptimized()
+	if err != nil {
+		log.Printf("Warning: Failed to initialize Chromedp renderer: %v", err)
+	}
+	
 	return &printService{
 		printJobRepo:      config.PrintJobRepo,
 		printerConfigRepo: config.PrinterConfigRepo,
 		templateRepo:      config.TemplateRepo,
 		templateRenderer:  config.TemplateRenderer,
+		chromedpRenderer:  chromedpRenderer,
 		orderRepo:         config.OrderRepo,
 		shopSettingsRepo:  config.ShopSettingsRepo,
 		wsBroadcaster:     config.WSBroadcaster,
@@ -108,17 +120,29 @@ func (s *printService) CreatePrintJobsForOrder(ctx context.Context, ord *order.O
 		return fmt.Errorf("no default label printer configured")
 	}
 
-	// Get default templates
-	billTemplate, err := s.templateRepo.FindDefault(ctx, printing.TemplateTypeBill)
-	if err != nil {
-		log.Printf("[PRINT ERROR] Failed to get default bill template for order %s: %v", ord.OrderNumber, err)
-		return fmt.Errorf("failed to get default bill template: %w", err)
-	}
+	// Get default templates (only needed if not using print bridge)
+	// When using print bridge, we render HTML directly from file
+	var billTemplate *printing.PrintTemplate
+	var labelTemplate *printing.PrintTemplate
+	
+	// Check if using print bridge
+	shopSettings, err := s.shopSettingsRepo.GetSettings(ctx)
+	if err == nil && shopSettings != nil && shopSettings.PrintBridgeURL != "" {
+		// Using print bridge - templates not needed
+		log.Printf("[PRINT] Using print bridge, skipping template lookup")
+	} else {
+		// Not using print bridge - need templates from database
+		billTemplate, err = s.templateRepo.FindDefault(ctx, printing.TemplateTypeBill)
+		if err != nil {
+			log.Printf("[PRINT ERROR] Failed to get default bill template for order %s: %v", ord.OrderNumber, err)
+			return fmt.Errorf("failed to get default bill template: %w", err)
+		}
 
-	labelTemplate, err := s.templateRepo.FindDefault(ctx, printing.TemplateTypeLabel)
-	if err != nil {
-		log.Printf("[PRINT ERROR] Failed to get default label template for order %s: %v", ord.OrderNumber, err)
-		return fmt.Errorf("failed to get default label template: %w", err)
+		labelTemplate, err = s.templateRepo.FindDefault(ctx, printing.TemplateTypeLabel)
+		if err != nil {
+			log.Printf("[PRINT ERROR] Failed to get default label template for order %s: %v", ord.OrderNumber, err)
+			return fmt.Errorf("failed to get default label template: %w", err)
+		}
 	}
 
 	// Create bill print job
@@ -292,12 +316,44 @@ func (s *printService) createBillJob(ctx context.Context, ord *order.Order, prin
 		return fmt.Errorf("failed to fetch shop settings: %w", err)
 	}
 
-	// Render bill content
-	content, err := s.templateRenderer.RenderBill(ord, template, shopSettings)
-	if err != nil {
-		log.Printf("[PRINT ERROR] Template rendering failed for bill - order_id=%s, order_number=%s, error=%v, timestamp=%s",
-			ord.ID.Hex(), ord.OrderNumber, err, time.Now().Format(time.RFC3339))
-		return fmt.Errorf("failed to render bill: %w", err)
+	var content string
+	var contentType string
+
+	// When using print bridge, render HTML and let print bridge handle conversion
+	// Print bridge will convert HTML → image → ESC/POS
+	if shopSettings.PrintBridgeURL != "" {
+		// Render HTML bill (print bridge will handle the rest)
+		htmlContent, err := s.renderBillHTML(ord, shopSettings)
+		if err != nil {
+			log.Printf("[PRINT ERROR] Failed to render HTML for bill - order_id=%s, order_number=%s, error=%v, timestamp=%s",
+				ord.ID.Hex(), ord.OrderNumber, err, time.Now().Format(time.RFC3339))
+			return fmt.Errorf("failed to render HTML bill: %w", err)
+		}
+		content = htmlContent
+		contentType = "html"
+		log.Printf("[PRINT] Using HTML for print bridge - order_id=%s, order_number=%s, bridge_url=%s", 
+			ord.ID.Hex(), ord.OrderNumber, shopSettings.PrintBridgeURL)
+	} else {
+		// Fallback: No print bridge, try local renderers
+		if s.chromedpRenderer != nil {
+			escposData, err := s.chromedpRenderer.RenderBillToESCPOS(ord, shopSettings)
+			if err != nil {
+				log.Printf("[PRINT ERROR] Chromedp rendering failed - order_id=%s, error=%v", ord.OrderNumber, err)
+				return fmt.Errorf("failed to render bill with chromedp: %w", err)
+			}
+			content = base64.StdEncoding.EncodeToString(escposData)
+			contentType = "binary"
+			log.Printf("[PRINT] Using Chromedp renderer - order_id=%s", ord.OrderNumber)
+		} else {
+			// Last resort: text template
+			content, err = s.templateRenderer.RenderBill(ord, template, shopSettings)
+			if err != nil {
+				log.Printf("[PRINT ERROR] Text template rendering failed - order_id=%s, error=%v", ord.OrderNumber, err)
+				return fmt.Errorf("failed to render bill: %w", err)
+			}
+			contentType = "text"
+			log.Printf("[PRINT] Using text template - order_id=%s", ord.OrderNumber)
+		}
 	}
 
 	// Create print job
@@ -307,6 +363,7 @@ func (s *printService) createBillJob(ctx context.Context, ord *order.Order, prin
 		OrderNumber: ord.OrderNumber,
 		PrinterID:   printer.ID,
 		Content:     content,
+		ContentType: contentType,
 		Status:      printing.PrintJobStatusPending,
 		RetryCount:  0,
 		MaxRetries:  3,
@@ -320,8 +377,8 @@ func (s *printService) createBillJob(ctx context.Context, ord *order.Order, prin
 		return fmt.Errorf("failed to create print job: %w", err)
 	}
 
-	log.Printf("[PRINT] Bill job created - job_id=%s, order_id=%s, order_number=%s, printer=%s, timestamp=%s",
-		job.ID.Hex(), ord.ID.Hex(), ord.OrderNumber, printer.Name, time.Now().Format(time.RFC3339))
+	log.Printf("[PRINT] Bill job created - job_id=%s, order_id=%s, order_number=%s, printer=%s, content_type=%s, timestamp=%s",
+		job.ID.Hex(), ord.ID.Hex(), ord.OrderNumber, printer.Name, contentType, time.Now().Format(time.RFC3339))
 	
 	// Broadcast WebSocket event
 	if s.wsBroadcaster != nil {
@@ -378,4 +435,72 @@ func (s *printService) createLabelJob(ctx context.Context, ord *order.Order, ite
 	}
 	
 	return nil
+}
+
+// renderBillHTML renders bill HTML from template file
+func (s *printService) renderBillHTML(ord *order.Order, shopSettings *settings.ShopSettings) (string, error) {
+	// Read HTML template file
+	templatePath := "./application/services/templates/bill_template_optimized.html"
+	templateContent, err := os.ReadFile(templatePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read HTML template: %w", err)
+	}
+
+	// Parse template
+	tmpl, err := template.New("bill").Parse(string(templateContent))
+	if err != nil {
+		return "", fmt.Errorf("failed to parse HTML template: %w", err)
+	}
+
+	// Prepare data
+	data := s.prepareBillData(ord, shopSettings)
+
+	// Execute template
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("failed to execute HTML template: %w", err)
+	}
+
+	return buf.String(), nil
+}
+
+// prepareBillData prepares data for bill template rendering
+func (s *printService) prepareBillData(ord *order.Order, shopSettings *settings.ShopSettings) map[string]interface{} {
+	// Format items
+	items := make([]map[string]interface{}, 0, len(ord.Items))
+	for i, item := range ord.Items {
+		itemName := item.Name
+		if item.VariantName != "" {
+			itemName = fmt.Sprintf("%s (%s)", item.Name, item.VariantName)
+		}
+
+		items = append(items, map[string]interface{}{
+			"STT":       i + 1,
+			"Name":      itemName,
+			"Quantity":  item.Quantity,
+			"UnitPrice": formatMoneyVN(item.Price),
+			"Total":     formatMoneyVN(item.Subtotal),
+		})
+	}
+
+	data := map[string]interface{}{
+		"ShopName":      shopSettings.ShopName,
+		"ShopAddress":   shopSettings.ShopAddress,
+		"ShopPhone":     shopSettings.ShopPhone,
+		"ShowLogo":      shopSettings.ShowLogo,
+		"ShowAddress":   shopSettings.ShowAddress,
+		"ShowPhone":     shopSettings.ShowPhone,
+		"OrderNumber":   ord.OrderNumber,
+		"CustomerName":  ord.CustomerName,
+		"WaiterName":    ord.WaiterName,
+		"PaymentMethod": string(ord.PaymentMethod),
+		"CreatedDate":   ord.CreatedAt.Format("02/01/2006 03:04 PM"),
+		"Items":         items,
+		"Total":         formatMoneyVN(ord.Total),
+		"CustomMessage": shopSettings.CustomMessage,
+		"ShowCustomMsg": shopSettings.ShowCustomMessage,
+		"LogoURL":       shopSettings.LogoURL,
+	}
+	
+	return data
 }

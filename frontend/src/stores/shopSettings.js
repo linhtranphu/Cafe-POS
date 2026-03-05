@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { fetchShopSettings, updateShopSettings } from '../services/shopSettings'
+import { fetchShopSettings, updateShopSettings, createShopSettings } from '../services/shopSettings'
 
 export const useShopSettingsStore = defineStore('shopSettings', {
   state: () => ({
@@ -38,6 +38,20 @@ export const useShopSettingsStore = defineStore('shopSettings', {
         return this.settings
       } catch (error) {
         this.error = error.response?.data?.error || 'Failed to update settings'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async createSettings(settingsData) {
+      this.loading = true
+      this.error = null
+      try {
+        this.settings = await createShopSettings(settingsData)
+        return this.settings
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Failed to create settings'
         throw error
       } finally {
         this.loading = false

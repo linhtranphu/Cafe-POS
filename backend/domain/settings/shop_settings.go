@@ -14,6 +14,7 @@ type ShopSettings struct {
 	ShopPhone          string             `bson:"shop_phone,omitempty" json:"shop_phone,omitempty"`
 	LogoURL            string             `bson:"logo_url,omitempty" json:"logo_url,omitempty"`
 	CustomMessage      string             `bson:"custom_message,omitempty" json:"custom_message,omitempty"`
+	PrintBridgeURL     string             `bson:"print_bridge_url,omitempty" json:"print_bridge_url,omitempty"` // Local print bridge URL
 	ShowLogo           bool               `bson:"show_logo" json:"show_logo"`                                   // Show logo on bill
 	ShowAddress        bool               `bson:"show_address" json:"show_address"`                             // Show address on bill
 	ShowPhone          bool               `bson:"show_phone" json:"show_phone"`                                 // Show phone on bill

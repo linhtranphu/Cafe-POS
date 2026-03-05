@@ -1,0 +1,189 @@
+package http
+
+import (
+	"fmt"
+	"log"
+	"net"
+	"time"
+
+	"cafe-pos/backend/application/services"
+	"cafe-pos/backend/domain/settings"
+
+	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+// VisualPrintHandler handles visual bill printing requests
+type VisualPrintHandler struct {
+	htmlRenderer       *services.HTMLBillRenderer
+	chromedpRenderer   *services.ChromedpBillRendererOptimized
+	orderRepo          services.OrderRepository
+	shopSettingsRepo   settings.ShopSettingsRepository
+}
+
+// NewVisualPrintHandler creates a new visual print handler
+func NewVisualPrintHandler(
+	htmlRenderer *services.HTMLBillRenderer,
+	orderRepo services.OrderRepository,
+	shopSettingsRepo settings.ShopSettingsRepository,
+) *VisualPrintHandler {
+	// Initialize Chromedp renderer
+	chromedpRenderer, err := services.NewChromedpBillRendererOptimized()
+	if err != nil {
+		log.Printf("Warning: Failed to initialize Chromedp renderer: %v", err)
+	}
+	
+	return &VisualPrintHandler{
+		htmlRenderer:     htmlRenderer,
+		chromedpRenderer: chromedpRenderer,
+		orderRepo:        orderRepo,
+		shopSettingsRepo: shopSettingsRepo,
+	}
+}
+
+// PrintVisualBillRequest represents the request to print a visual bill
+type PrintVisualBillRequest struct {
+	OrderID      string `json:"order_id" binding:"required"`
+	PrinterIP    string `json:"printer_ip" binding:"required"`
+	RenderEngine string `json:"render_engine"` // "chromedp" or "gg" (default: chromedp)
+}
+
+// PrintVisualBill handles POST /api/visual-print/bill
+func (h *VisualPrintHandler) PrintVisualBill(c *gin.Context) {
+	var req PrintVisualBillRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid request: " + err.Error()})
+		return
+	}
+
+	// Parse order ID
+	orderID, err := primitive.ObjectIDFromHex(req.OrderID)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid order ID"})
+		return
+	}
+
+	// Fetch order
+	ord, err := h.orderRepo.FindByID(c.Request.Context(), orderID)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "Order not found"})
+		return
+	}
+
+	// Fetch shop settings
+	shopSettings, err := h.shopSettingsRepo.GetSettings(c.Request.Context())
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to fetch shop settings"})
+		return
+	}
+
+	// Render bill to ESC/POS using optimized chromedp renderer
+	var escposData []byte
+	var renderErr error
+	
+	if h.chromedpRenderer != nil {
+		escposData, renderErr = h.chromedpRenderer.RenderBillToESCPOS(ord, shopSettings)
+	} else if h.htmlRenderer != nil {
+		escposData, renderErr = h.htmlRenderer.RenderBillToESCPOS(ord, shopSettings)
+	} else {
+		c.JSON(500, gin.H{"error": "No renderer available"})
+		return
+	}
+	
+	if renderErr != nil {
+		log.Printf("Failed to render bill: %v", renderErr)
+		c.JSON(500, gin.H{"error": "Failed to render bill: " + renderErr.Error()})
+		return
+	}
+
+	// Send to printer
+	if err := sendToPrinter(req.PrinterIP, escposData); err != nil {
+		log.Printf("Failed to send to printer: %v", err)
+		c.JSON(500, gin.H{"error": "Failed to send to printer: " + err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"success": true,
+		"message": "Bill printed successfully",
+		"order_number": ord.OrderNumber,
+	})
+}
+
+// PreviewVisualBill handles GET /api/visual-print/preview/:order_id
+func (h *VisualPrintHandler) PreviewVisualBill(c *gin.Context) {
+	orderIDStr := c.Param("order_id")
+	
+	// Parse order ID
+	orderID, err := primitive.ObjectIDFromHex(orderIDStr)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid order ID"})
+		return
+	}
+
+	// Fetch order
+	ord, err := h.orderRepo.FindByID(c.Request.Context(), orderID)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "Order not found"})
+		return
+	}
+
+	// Fetch shop settings
+	shopSettings, err := h.shopSettingsRepo.GetSettings(c.Request.Context())
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to fetch shop settings"})
+		return
+	}
+
+	// Save preview image using optimized chromedp renderer
+	filename := fmt.Sprintf("preview_bill_%s.png", ord.OrderNumber)
+	var renderErr error
+	
+	if h.chromedpRenderer != nil {
+		renderErr = h.chromedpRenderer.SavePreviewImage(ord, shopSettings, filename)
+	} else if h.htmlRenderer != nil {
+		renderErr = h.htmlRenderer.SaveImagePreview(ord, shopSettings, filename)
+	} else {
+		c.JSON(500, gin.H{"error": "No renderer available"})
+		return
+	}
+	
+	if renderErr != nil {
+		log.Printf("Failed to save preview: %v", renderErr)
+		c.JSON(500, gin.H{"error": "Failed to create preview: " + renderErr.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"success": true,
+		"message": "Preview created successfully",
+		"filename": filename,
+		"order_number": ord.OrderNumber,
+	})
+}
+
+// sendToPrinter sends ESC/POS data to a network printer
+func sendToPrinter(printerIP string, data []byte) error {
+	// Add port if not specified
+	if _, _, err := net.SplitHostPort(printerIP); err != nil {
+		printerIP = printerIP + ":9100"
+	}
+
+	// Connect to printer
+	conn, err := net.DialTimeout("tcp", printerIP, 5*time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to connect to printer: %w", err)
+	}
+	defer conn.Close()
+
+	// Set write deadline
+	conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+
+	// Send data
+	_, err = conn.Write(data)
+	if err != nil {
+		return fmt.Errorf("failed to write to printer: %w", err)
+	}
+
+	return nil
+}

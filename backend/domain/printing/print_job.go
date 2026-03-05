@@ -31,7 +31,8 @@ type PrintJob struct {
 	OrderID     primitive.ObjectID `bson:"order_id" json:"order_id"`
 	OrderNumber string             `bson:"order_number" json:"order_number"`
 	PrinterID   primitive.ObjectID `bson:"printer_id" json:"printer_id"`
-	Content     string             `bson:"content" json:"content"` // Rendered content
+	Content     string             `bson:"content" json:"content"` // Rendered content (text or base64 encoded binary)
+	ContentType string             `bson:"content_type,omitempty" json:"content_type,omitempty"` // "text" or "binary" (default: "text")
 	Status      PrintJobStatus     `bson:"status" json:"status"`
 	RetryCount  int                `bson:"retry_count" json:"retry_count"`
 	MaxRetries  int                `bson:"max_retries" json:"max_retries"`

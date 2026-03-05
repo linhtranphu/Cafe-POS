@@ -19,6 +19,8 @@ type LineFormat struct {
 	Bold        bool
 	Alignment   Alignment
 	IsSeparator bool
+	FontSize    float64 // Font size in points (18pt, 20pt, 22pt)
+	IsTableRow  bool    // True if line is part of a table
 }
 
 // FormatParser parses text content and identifies formatting requirements for each line
@@ -46,6 +48,8 @@ func (p *FormatParser) Parse(content string) []LineFormat {
 			Bold:        p.detectBold(trimmed),
 			Alignment:   p.detectAlignment(trimmed),
 			IsSeparator: p.isSeparator(trimmed),
+			FontSize:    p.detectFontSize(trimmed),
+			IsTableRow:  p.isTableRow(trimmed),
 		}
 		
 		result = append(result, lineFormat)
@@ -141,4 +145,103 @@ func (p *FormatParser) isSeparator(line string) bool {
 	}
 
 	return true
+}
+
+// detectFontSize determines the font size for a line based on its content
+// Returns: 22pt for headers, 20pt for totals, 18pt for regular content
+func (p *FormatParser) detectFontSize(line string) float64 {
+	if line == "" {
+		return 18.0 // Default size for empty lines
+	}
+
+	upper := strings.ToUpper(line)
+
+	// Total line: "TỔNG CỘNG", "TOTAL", "GRAND TOTAL"
+	// Check this first before header detection
+	if strings.Contains(upper, "TỔNG CỘNG") || 
+	   strings.Contains(upper, "GRAND TOTAL") ||
+	   (strings.HasPrefix(upper, "TOTAL") && strings.Contains(line, ":")) {
+		return 20.0
+	}
+
+	// Footer messages should be 18pt (not headers)
+	// Check for common footer keywords
+	if strings.Contains(upper, "THANK") || strings.Contains(upper, "CẢM ƠN") ||
+	   strings.Contains(upper, "VISIT") || strings.Contains(upper, "WELCOME") ||
+	   strings.Contains(upper, "HẸN GẶP") || strings.Contains(upper, "CHÀO") {
+		return 18.0
+	}
+
+	// Header lines: Shop name, "HÓA ĐƠN BÁN HÀNG", etc.
+	// These are typically short lines without colons
+	if !strings.Contains(line, ":") && len(line) < 30 && len(line) > 0 {
+		// Check if it's a header-like line (not a separator, not empty)
+		if !p.isSeparator(line) {
+			// Check for specific header keywords
+			if strings.Contains(upper, "HÓA ĐƠN") || 
+			   strings.Contains(upper, "INVOICE") ||
+			   strings.Contains(upper, "RECEIPT") ||
+			   strings.Contains(upper, "BÁN HÀNG") {
+				return 22.0
+			}
+			// Shop name is typically the first non-empty line
+			// For now, we'll use 22pt for short centered lines that look like headers
+			return 22.0
+		}
+	}
+
+	// All other content: table rows, order info, footer, etc.
+	return 18.0
+}
+
+// isTableRow determines if a line is part of a table
+// Table rows are identified by being between [TABLE_START] and [TABLE_END] markers
+// or by having a specific structure (multiple columns with spacing)
+func (p *FormatParser) isTableRow(line string) bool {
+	if line == "" {
+		return false
+	}
+
+	// Check for table markers
+	if strings.Contains(line, "[TABLE_START]") || strings.Contains(line, "[TABLE_END]") {
+		return false // Markers themselves are not table rows
+	}
+
+	// Table header row typically contains column names
+	upper := strings.ToUpper(line)
+	if strings.Contains(upper, "TÊN MÓN") || 
+	   strings.Contains(upper, "SỐ LƯỢNG") || 
+	   strings.Contains(upper, "ĐƠN GIÁ") ||
+	   strings.Contains(upper, "THÀNH TIỀN") ||
+	   strings.Contains(upper, "ITEM NAME") ||
+	   strings.Contains(upper, "QUANTITY") ||
+	   strings.Contains(upper, "PRICE") {
+		return true
+	}
+
+	// Table separator lines (dashes between header and content)
+	if p.isSeparator(line) && strings.Contains(line, "-") {
+		// This could be a table separator
+		// We'll mark it as a table row if it's a dash separator
+		return true
+	}
+
+	// Item rows typically have multiple spaces (column separation)
+	// and contain numbers (quantity, prices)
+	// This is a heuristic and may need refinement
+	spaceCount := strings.Count(line, "  ") // Count double spaces
+	hasNumbers := false
+	for _, ch := range line {
+		if ch >= '0' && ch <= '9' {
+			hasNumbers = true
+			break
+		}
+	}
+
+	// If line has multiple column-like spacing and numbers, it's likely a table row
+	if spaceCount >= 2 && hasNumbers {
+		return true
+	}
+
+	return false
 }

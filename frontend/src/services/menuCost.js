@@ -31,7 +31,7 @@ export const menuCostService = {
     }
     
     const queryString = params.toString()
-    const url = queryString ? `/menu/costs?${queryString}` : '/menu/costs'
+    const url = queryString ? `/manager/menu/costs?${queryString}` : '/manager/menu/costs'
     
     const response = await api.get(url)
     return response.data
@@ -43,7 +43,7 @@ export const menuCostService = {
    * @returns {Promise<MenuItemCostBreakdown>} Menu item cost breakdown
    */
   async getMenuCostDetail(id) {
-    const response = await api.get(`/menu/costs/${id}`)
+    const response = await api.get(`/manager/menu/costs/${id}`)
     return response.data
   },
 
@@ -60,9 +60,19 @@ export const menuCostService = {
     }
     
     const queryString = params.toString()
-    const url = queryString ? `/menu/warnings?${queryString}` : '/menu/warnings'
+    const url = queryString ? `/manager/menu/warnings?${queryString}` : '/manager/menu/warnings'
     
     const response = await api.get(url)
+    return response.data
+  },
+
+  /**
+   * Recalculate costs for all menu items
+   * Queues background jobs to recalculate costs based on current ingredient/batch prices
+   * @returns {Promise<{message: string, total_items: number, queued_count: number, failed_count: number}>}
+   */
+  async recalculateAllCosts() {
+    const response = await api.post('/manager/menu/costs/recalculate-all')
     return response.data
   }
 }
