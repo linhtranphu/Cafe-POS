@@ -209,7 +209,10 @@
         {{range $index, $item := .Items}}
         <div class="item-row">
             <div class="col-stt">{{add $index 1}}</div>
-            <div class="col-name">{{$item.Name}}{{if $item.VariantName}} ({{$item.VariantName}}){{end}}</div>
+            <div class="col-name">
+                {{$item.Name}}{{if $item.VariantName}} ({{$item.VariantName}}){{end}}
+                {{if $item.Note}}<br><span style="font-size: 14px; color: #555;">🧊 {{$item.Note}}</span>{{end}}
+            </div>
             <div class="col-qty">{{$item.Quantity}}</div>
             <div class="col-price">{{formatMoney $item.Price}}</div>
             <div class="col-total">{{formatMoney $item.Subtotal}}</div>

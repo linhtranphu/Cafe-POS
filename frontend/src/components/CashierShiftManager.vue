@@ -296,7 +296,7 @@ const shiftStore = useShiftStore()
 
 // State
 const showStartModal = ref(false)
-const startingFloat = ref(null)
+const startingFloat = ref(1000000) // Default 1,000,000 VND
 const startingFloatError = ref(null)
 const startingLoading = ref(false)
 const loadingHandovers = ref(false)
@@ -527,7 +527,7 @@ const startShift = async () => {
   try {
     await cashierShiftStore.startCashierShift(startingFloat.value)
     showStartModal.value = false
-    startingFloat.value = null
+    startingFloat.value = 1000000 // Reset to default
   } catch (error) {
     console.error('Failed to start cashier shift:', error)
   } finally {

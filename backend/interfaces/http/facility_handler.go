@@ -6,16 +6,22 @@ import (
 	"time"
 	"cafe-pos/backend/application/services"
 	"cafe-pos/backend/domain/facility"
+	"cafe-pos/backend/domain/user"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type FacilityHandler struct {
-	service *services.FacilityService
+	service                     *services.FacilityService
+	fundExpenseIntegrationService *services.FundExpenseIntegrationService
 }
 
 func NewFacilityHandler(service *services.FacilityService) *FacilityHandler {
 	return &FacilityHandler{service: service}
+}
+
+func (h *FacilityHandler) SetFundExpenseIntegrationService(s *services.FundExpenseIntegrationService) {
+	h.fundExpenseIntegrationService = s
 }
 
 func (h *FacilityHandler) GetAllFacilities(c *gin.Context) {
@@ -43,16 +49,69 @@ func (h *FacilityHandler) GetFacility(c *gin.Context) {
 }
 
 func (h *FacilityHandler) CreateFacility(c *gin.Context) {
-	var f facility.Facility
-	if err := c.ShouldBindJSON(&f); err != nil {
+	var req struct {
+		facility.Facility
+		PaidFromFund bool   `json:"paid_from_fund"`
+		MoneyType    string `json:"money_type"` // "cash" or "transfer"
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	userID, _ := primitive.ObjectIDFromHex(c.GetString("user_id"))
 	username := c.GetString("username")
+	var userRole string
+	if rv, ok := c.Get("role"); ok {
+		if roleType, ok := rv.(user.Role); ok {
+			userRole = string(roleType)
+		} else if roleStr, ok := rv.(string); ok {
+			userRole = roleStr
+		}
+	}
 
-	if err := h.service.CreateFacility(c.Request.Context(), &f, userID, username); err != nil {
+	f := &req.Facility
+
+	// If paid from fund, use atomic fund integration flow
+	if req.PaidFromFund && f.Cost > 0 {
+		if h.fundExpenseIntegrationService == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "fund expense integration service not available"})
+			return
+		}
+		moneyType := req.MoneyType
+		if moneyType == "" {
+			moneyType = "cash"
+		}
+		if moneyType != "cash" && moneyType != "transfer" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "money_type phải là 'cash' hoặc 'transfer'"})
+			return
+		}
+
+		result, err := h.fundExpenseIntegrationService.PurchaseFacilityFromFund(c.Request.Context(), services.PurchaseFacilityFromFundRequest{
+			Facility:  f,
+			MoneyType: moneyType,
+			UserID:    userID,
+			UserName:  username,
+			UserRole:  userRole,
+		})
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Create history record
+		_ = h.service.CreateFacilityHistory(c.Request.Context(), f.ID, "created", "Tạo mới tài sản (trả từ quỹ): "+f.Name, nil, result.Facility, userID, username)
+
+		c.JSON(http.StatusCreated, gin.H{
+			"facility":         result.Facility,
+			"expense":          result.Expense,
+			"fund_transaction": result.FundTransaction,
+		})
+		return
+	}
+
+	// Normal create (no fund payment)
+	if err := h.service.CreateFacility(c.Request.Context(), f, userID, username); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

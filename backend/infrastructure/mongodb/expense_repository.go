@@ -140,3 +140,37 @@ func (r *ExpenseRepository) DeletePrepaid(ctx context.Context, id primitive.Obje
 	_, err := r.prepaid.DeleteOne(ctx, bson.M{"_id": id})
 	return err
 }
+
+// FindByFundTransactionID finds an expense by fund transaction ID
+// Requirement 1.5: Find expense by fund transaction ID reference
+func (r *ExpenseRepository) FindByFundTransactionID(ctx context.Context, fundTxID primitive.ObjectID) (*expense.Expense, error) {
+	var exp expense.Expense
+	err := r.expenses.FindOne(ctx, bson.M{"fund_transaction_id": fundTxID}).Decode(&exp)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &exp, nil
+}
+
+// FindPaidFromFund finds expenses paid from fund with pagination
+// Requirements 4.3, 4.4: Filter and query expenses paid from fund
+func (r *ExpenseRepository) FindPaidFromFund(ctx context.Context, limit, offset int) ([]expense.Expense, error) {
+	filter := bson.M{
+		"paid_from_fund": true,
+		"fund_transaction_id": bson.M{"$exists": true, "$ne": primitive.NilObjectID},
+	}
+	
+	cursor, err := r.expenses.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	
+	var expenses []expense.Expense
+	if err = cursor.All(ctx, &expenses); err != nil {
+		return nil, err
+	}
+	return expenses, nil
+}

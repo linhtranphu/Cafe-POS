@@ -47,7 +47,7 @@ export const profitAnalysisService = {
    * @returns {Promise<OperatingExpense>} Created/updated operating expense
    */
   async createOperatingExpense(data) {
-    const response = await api.post('/operating-expenses', data)
+    const response = await api.post('/manager/expenses', data)
     return response.data
   },
 
@@ -62,11 +62,11 @@ export const profitAnalysisService = {
       params.append('start_date', dateRange.start)
       params.append('end_date', dateRange.end)
       
-      const response = await api.get(`/operating-expenses?${params.toString()}`)
+      const response = await api.get(`/manager/expenses?${params.toString()}`)
       return response.data
     }
     
-    const response = await api.get('/operating-expenses')
+    const response = await api.get('/manager/expenses')
     return response.data
   }
 }

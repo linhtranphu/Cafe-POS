@@ -11,11 +11,20 @@
       <div class="px-4 py-4" style="padding-top: max(1rem, env(safe-area-inset-top))">
         <div class="flex items-center justify-between mb-4">
           <h1 class="text-2xl font-bold text-gray-900">📋 Orders</h1>
-          <button 
-            @click="refreshOrders" 
-            class="p-2.5 rounded-xl bg-gray-100 active:bg-gray-200 transition-colors touch-manipulation">
-            <span class="text-xl">🔄</span>
-          </button>
+          <div class="flex gap-2">
+            <!-- Merge Button (show when there are mergeable orders) -->
+            <button 
+              v-if="!selectionMode && mergeableOrdersCount >= 2"
+              @click="enterSelectionMode"
+              class="p-2.5 rounded-xl bg-purple-100 text-purple-600 active:bg-purple-200 transition-colors touch-manipulation">
+              <span class="text-xl">🔗</span>
+            </button>
+            <button 
+              @click="refreshOrders" 
+              class="p-2.5 rounded-xl bg-gray-100 active:bg-gray-200 transition-colors touch-manipulation">
+              <span class="text-xl">🔄</span>
+            </button>
+          </div>
         </div>
         
         <!-- Shift Tabs -->
@@ -49,21 +58,68 @@
             </div>
           </button>
         </div>
-        
-        <!-- Status Filter Pills -->
-        <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
-          <button v-for="status in statuses" :key="status.value" 
-            @click="filterStatus = status.value"
+
+        <!-- Payment Status Tabs -->
+        <div v-if="!selectionMode" class="flex gap-2">
+          <button 
+            @click="paymentFilter = 'unpaid'"
             :class="[
-              'px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-all touch-manipulation active:scale-95',
-              filterStatus === status.value 
-                ? 'bg-green-500 text-white shadow-lg' 
+              'flex-1 py-2.5 px-3 rounded-lg font-medium text-sm transition-all touch-manipulation active:scale-98',
+              paymentFilter === 'unpaid' 
+                ? 'bg-amber-500 text-white shadow-md' 
                 : 'bg-gray-100 text-gray-700 active:bg-gray-200'
             ]">
-            <span class="mr-1">{{ status.icon }}</span>
-            <span>{{ status.label }}</span>
-            <span class="ml-1.5 text-xs opacity-80">({{ getOrderCountByStatus(status.value) }})</span>
+            <div class="flex items-center justify-center gap-1.5">
+              <span>📄</span>
+              <span>Chưa thu tiền</span>
+              <span class="text-xs opacity-80">({{ unpaidOrdersCount }})</span>
+            </div>
           </button>
+          <button 
+            @click="paymentFilter = 'paid'"
+            :class="[
+              'flex-1 py-2.5 px-3 rounded-lg font-medium text-sm transition-all touch-manipulation active:scale-98',
+              paymentFilter === 'paid' 
+                ? 'bg-green-500 text-white shadow-md' 
+                : 'bg-gray-100 text-gray-700 active:bg-gray-200'
+            ]">
+            <div class="flex items-center justify-center gap-1.5">
+              <span>✅</span>
+              <span>Đã thu tiền</span>
+              <span class="text-xs opacity-80">({{ paidOrdersCount }})</span>
+            </div>
+          </button>
+          <button 
+            @click="paymentFilter = 'original'"
+            :class="[
+              'flex-1 py-2.5 px-3 rounded-lg font-medium text-sm transition-all touch-manipulation active:scale-98',
+              paymentFilter === 'original' 
+                ? 'bg-blue-500 text-white shadow-md' 
+                : 'bg-gray-100 text-gray-700 active:bg-gray-200'
+            ]">
+            <div class="flex items-center justify-center gap-1.5">
+              <span>📋</span>
+              <span>Bill gốc</span>
+              <span class="text-xs opacity-80">({{ originalOrdersCount }})</span>
+            </div>
+          </button>
+        </div>
+
+        <!-- Selection Mode Header -->
+        <div v-else class="bg-purple-50 border border-purple-200 rounded-xl p-3">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-semibold text-purple-900">
+              🔗 Chọn orders để gộp
+            </span>
+            <button 
+              @click="exitSelectionMode"
+              class="text-sm text-purple-600 font-medium">
+              Hủy
+            </button>
+          </div>
+          <div class="text-xs text-purple-700">
+            Đã chọn: {{ selectedOrderIds.length }} orders
+          </div>
         </div>
       </div>
     </div>
@@ -88,21 +144,42 @@
       <div v-else-if="filteredOrders.length === 0" class="text-center py-20">
         <div class="text-7xl mb-4">📭</div>
         <p class="text-gray-500 text-base font-medium">
-          {{ shiftFilter === 'current' ? 'Chưa có order nào trong ca này' : 'Không có order từ ca khác' }}
+          {{ getEmptyMessage() }}
         </p>
       </div>
       
       <div v-else class="space-y-3">
         <div v-for="order in filteredOrders" :key="order.id" 
-          @click="viewOrderDetail(order)"
-          class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 active:scale-[0.98] active:shadow-md transition-all touch-manipulation">
+          @click="selectionMode ? toggleOrderSelection(order) : viewOrderDetail(order)"
+          :class="[
+            'bg-white rounded-2xl p-4 shadow-sm border active:scale-[0.98] active:shadow-md transition-all touch-manipulation',
+            order.bill_printed ? 'border-2 border-amber-400 bg-amber-50' : 'border-gray-100',
+            selectionMode && selectedOrderIds.includes(order.id) ? 'ring-2 ring-purple-500 bg-purple-50' : '',
+            selectionMode && !isOrderMergeable(order) ? 'opacity-50' : ''
+          ]">
+          
+          <!-- Selection Checkbox (in selection mode) -->
+          <div v-if="selectionMode" class="absolute top-4 right-4">
+            <div :class="[
+              'w-6 h-6 rounded-full border-2 flex items-center justify-center',
+              selectedOrderIds.includes(order.id) 
+                ? 'bg-purple-500 border-purple-500' 
+                : 'border-gray-300 bg-white'
+            ]">
+              <span v-if="selectedOrderIds.includes(order.id)" class="text-white text-sm">✓</span>
+            </div>
+          </div>
           
           <!-- Order Header -->
-          <div class="flex justify-between items-start mb-3">
+          <div class="flex justify-between items-start mb-3" :class="selectionMode ? 'pr-8' : ''">
             <div class="flex-1 min-w-0">
-              <h3 class="font-bold text-lg text-gray-900 truncate">{{ order.order_number }}</h3>
-              <p class="text-sm text-gray-600 font-medium">{{ order.customer_name || 'Khách lẻ' }}</p>
-              <p class="text-xs text-gray-400 mt-0.5">{{ formatTime(order.created_at) }}</p>
+              <div class="flex items-center gap-2">
+                <h3 class="font-bold text-lg text-gray-900 truncate">{{ order.customer_name || 'Khách lẻ' }}</h3>
+                <span v-if="order.bill_printed" class="text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full font-semibold">
+                  📄 Đã in
+                </span>
+              </div>
+              <p class="text-xs text-gray-400 font-medium">{{ order.order_number }} · {{ formatTime(order.created_at) }}</p>
               <!-- Show shift info when viewing "other shifts" -->
               <p v-if="shiftFilter === 'other' && order.shift_id" class="text-xs text-purple-600 font-medium mt-1">
                 📋 Ca: {{ order.shift_id.substring(0, 8) }}...
@@ -150,6 +227,11 @@
 
           <!-- Quick Actions -->
           <div class="mt-3 flex gap-2">
+            <button v-if="isStatus(order, ORDER_STATUS.CREATED) && !order.bill_printed" 
+              @click.stop="printTempBill(order.id)"
+              class="flex-1 bg-amber-500 active:bg-amber-600 text-white py-3 rounded-xl text-sm font-semibold shadow-md touch-manipulation active:scale-98 transition-all">
+              📄 In bill tạm
+            </button>
             <button v-if="isStatus(order, ORDER_STATUS.CREATED)" 
               @click.stop="quickPayment(order)"
               class="flex-1 bg-green-500 active:bg-green-600 text-white py-3 rounded-xl text-sm font-semibold shadow-md touch-manipulation active:scale-98 transition-all">
@@ -174,22 +256,37 @@
       </div>
     </div>
 
-    <!-- Floating Action Button -->
-    <button v-if="hasOpenShift" 
-      @click="startNewOrder"
-      class="fixed bottom-24 right-5 w-16 h-16 bg-blue-500 active:bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center text-3xl touch-manipulation active:scale-95 transition-all z-30">
-      ➕
-    </button>
-
     <!-- Bottom Navigation -->
     <BottomNav />
 
-    <!-- Create Order Modal - New Component -->
-    <CreateOrderModal 
-      v-model="showCreateOrder"
-      :menu-items="menuItems"
-      :categories="categories"
-      @confirm="handleOrderConfirm"
+    <!-- Selection Mode Bottom Bar -->
+    <div v-if="selectionMode" class="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-purple-200 p-4 z-40 shadow-lg">
+      <div class="flex gap-3">
+        <button
+          @click="exitSelectionMode"
+          class="flex-1 px-4 py-3 text-gray-700 bg-gray-100 rounded-xl font-semibold active:bg-gray-200 transition-colors">
+          Hủy
+        </button>
+        <button
+          @click="openMergeModal"
+          :disabled="selectedOrderIds.length < 2"
+          :class="[
+            'flex-1 px-4 py-3 text-white rounded-xl font-semibold transition-colors',
+            selectedOrderIds.length >= 2
+              ? 'bg-purple-500 active:bg-purple-600'
+              : 'bg-gray-300 cursor-not-allowed'
+          ]">
+          🔗 Gộp {{ selectedOrderIds.length }} orders
+        </button>
+      </div>
+    </div>
+
+    <!-- Merge Bills Modal -->
+    <MergeBillsModal
+      :show="showMergeModal"
+      :selected-orders="selectedOrdersForMerge"
+      @close="closeMergeModal"
+      @merged="handleMerged"
     />
 
     <!-- Order Detail Modal -->
@@ -263,6 +360,11 @@
 
             <!-- Actions -->
             <div class="space-y-2">
+              <button v-if="isStatus(selectedOrder, ORDER_STATUS.CREATED) && !selectedOrder.bill_printed" 
+                @click="printTempBill(selectedOrder.id)"
+                class="w-full bg-amber-500 text-white py-3 rounded-xl font-medium active:bg-amber-600">
+                📄 In bill tạm
+              </button>
               <button v-if="isStatus(selectedOrder, ORDER_STATUS.CREATED)" 
                 @click="showPaymentModal(selectedOrder)"
                 class="w-full bg-green-500 text-white py-3 rounded-xl font-medium active:bg-green-600">
@@ -361,7 +463,7 @@
 
           <div class="mb-4">
             <label class="block text-sm font-medium mb-2">Phương thức</label>
-            <div class="grid grid-cols-3 gap-2">
+            <div class="grid grid-cols-2 gap-2">
               <button v-for="method in paymentMethods" :key="method.value"
                 @click="paymentMethod = method.value"
                 :class="[
@@ -433,53 +535,6 @@
         </div>
       </div>
     </transition>
-
-    <!-- Customer Name Modal -->
-    <transition name="slide-up">
-      <div v-if="showCustomerNameModal" class="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-end">
-        <div class="bg-white rounded-t-3xl w-full p-6 pb-8">
-          <h3 class="text-xl font-bold mb-2 text-gray-900">Tên khách hàng</h3>
-          <p class="text-sm text-gray-600 mb-4">Nhập tên khách hàng để dễ dàng quản lý order (tùy chọn)</p>
-          
-          <!-- Prominent Customer Name Input -->
-          <div class="mb-6 p-4 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 rounded-2xl border-2 border-amber-200 shadow-sm">
-            <label class="block text-sm font-bold text-amber-900 mb-3 flex items-center gap-2">
-              <span class="text-2xl">👤</span>
-              <span>Tên khách hàng</span>
-            </label>
-            <input v-model="customerName" 
-              type="text" 
-              placeholder="Nhập tên khách hàng..."
-              autofocus
-              class="w-full px-4 py-4 rounded-xl border-2 border-amber-300 bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-lg font-medium placeholder-amber-400 touch-manipulation transition-all shadow-sm">
-          </div>
-
-          <!-- Order Summary -->
-          <div class="mb-6 p-4 bg-gray-50 rounded-xl">
-            <div class="flex justify-between items-center mb-2">
-              <span class="text-sm text-gray-600">Số món</span>
-              <span class="font-semibold text-gray-900">{{ cart.length }} món</span>
-            </div>
-            <div class="flex justify-between items-center">
-              <span class="text-sm text-gray-600">Tổng tiền</span>
-              <span class="text-xl font-bold text-green-600">{{ formatPrice(cartTotal) }}</span>
-            </div>
-          </div>
-
-          <!-- Action Buttons -->
-          <div class="flex gap-3">
-            <button @click="showCustomerNameModal = false" 
-              class="flex-1 bg-gray-200 text-gray-700 py-4 rounded-xl font-semibold touch-manipulation active:scale-98 transition-all">
-              Quay lại
-            </button>
-            <button @click="finalizeOrder" 
-              class="flex-1 bg-blue-500 active:bg-blue-600 text-white py-4 rounded-xl font-semibold shadow-lg touch-manipulation active:scale-98 transition-all">
-              Tạo Order
-            </button>
-          </div>
-        </div>
-      </div>
-    </transition>
   </div>
 </template>
 
@@ -487,12 +542,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useOrderStore } from '../stores/order'
 import { useShiftStore } from '../stores/shift'
-import { useMenuStore } from '../stores/menu'
 import { useAuthStore } from '../stores/auth'
 import { useRouter } from 'vue-router'
 import BottomNav from '../components/BottomNav.vue'
 import PullToRefresh from '../components/PullToRefresh.vue'
-import CreateOrderModal from '../components/CreateOrderModal.vue'
+import MergeBillsModal from '../components/MergeBillsModal.vue'
 import { usePullToRefresh } from '../composables/usePullToRefresh'
 import { printJobService } from '../services/printJob'
 import { 
@@ -506,19 +560,22 @@ import {
 const router = useRouter()
 const orderStore = useOrderStore()
 const shiftStore = useShiftStore()
-const menuStore = useMenuStore()
 const authStore = useAuthStore()
 
 // State
 const shiftFilter = ref('current') // 'current' or 'other'
+const paymentFilter = ref('unpaid') // 'unpaid' or 'paid'
 const filterStatus = ref('ALL')
-const showCreateOrder = ref(false)
-const showCustomerNameModal = ref(false) // Modal for customer name
 const selectedOrder = ref(null)
 const showPayment = ref(false)
 const paymentOrder = ref(null)
 const paymentAmount = ref(0)
 const paymentMethod = ref(PAYMENT_METHOD.CASH)
+
+// Merge Bills State
+const selectionMode = ref(false)
+const selectedOrderIds = ref([])
+const showMergeModal = ref(false)
 
 // Cancel Order State
 const showCancelModal = ref(false)
@@ -535,50 +592,14 @@ const canReprint = computed(() => {
   return role === 'cashier' || role === 'manager'
 })
 
-// Create Order State
-const customerName = ref('')
-const cart = ref([]) // Will receive data from CreateOrderModal
-
 // Data
 const statuses = STATUS_FILTER_OPTIONS
-
-// Get unique categories from menu items dynamically
-const categories = computed(() => {
-  const allCategory = { id: 'all', name: 'Tất cả', icon: '📋' }
-  
-  if (!menuItems.value || menuItems.value.length === 0) {
-    return [allCategory]
-  }
-  
-  // Get unique categories from menu items
-  const uniqueCategories = [...new Set(menuItems.value.map(item => item.category))]
-  
-  // Map categories with icons
-  const categoryIcons = {
-    'Cà phê': '☕',
-    'Trà': '🍵',
-    'Nước ép': '🧃',
-    'Bánh ngọt': '🍰',
-    'Món nhẹ': '🍴',
-    'Sinh tố': '🥤',
-    'Đồ uống khác': '🥛'
-  }
-  
-  const menuCategories = uniqueCategories.map(cat => ({
-    id: cat,
-    name: cat,
-    icon: categoryIcons[cat] || '🍽️'
-  }))
-  
-  return [allCategory, ...menuCategories]
-})
 
 const paymentMethods = PAYMENT_METHOD_DISPLAY
 
 // Computed
 const loading = computed(() => orderStore.loading)
 const orders = computed(() => orderStore.orders)
-const menuItems = computed(() => menuStore.items)
 const hasOpenShift = computed(() => shiftStore.hasOpenShift)
 
 // Filter orders by shift first
@@ -596,10 +617,25 @@ const ordersByShift = computed(() => {
   }
 })
 
-// Then filter by status
+// Then filter by payment status
+const ordersByPaymentStatus = computed(() => {
+  if (paymentFilter.value === 'unpaid') {
+    // Chưa thu tiền = tất cả orders chưa thanh toán (status = CREATED)
+    return ordersByShift.value.filter(o => o.status === ORDER_STATUS.CREATED)
+  } else if (paymentFilter.value === 'paid') {
+    // Đã thu tiền = status = PAID
+    return ordersByShift.value.filter(o => o.status === ORDER_STATUS.PAID)
+  } else if (paymentFilter.value === 'original') {
+    // Bill gốc = orders không có merged_into_id (chưa bị gộp vào bill khác)
+    return ordersByShift.value.filter(o => !o.merged_into_id)
+  }
+  return ordersByShift.value
+})
+
+// Then filter by status (if needed)
 const filteredOrders = computed(() => {
-  if (filterStatus.value === 'ALL') return ordersByShift.value
-  return ordersByShift.value.filter(o => o.status === filterStatus.value)
+  if (filterStatus.value === 'ALL') return ordersByPaymentStatus.value
+  return ordersByPaymentStatus.value.filter(o => o.status === filterStatus.value)
 })
 
 // Count orders for each tab
@@ -615,13 +651,89 @@ const otherShiftsOrdersCount = computed(() => {
   return orders.value.filter(o => o.shift_id !== currentShiftId).length
 })
 
-const cartTotal = computed(() => {
-  return cart.value.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+// Count unpaid and paid orders in current shift filter
+const unpaidOrdersCount = computed(() => {
+  const currentShiftId = shiftStore.currentShift?.id
+  let shiftOrders = []
+  
+  if (shiftFilter.value === 'current') {
+    if (!currentShiftId) return 0
+    shiftOrders = orders.value.filter(o => o.shift_id === currentShiftId)
+  } else {
+    if (!currentShiftId) {
+      shiftOrders = orders.value
+    } else {
+      shiftOrders = orders.value.filter(o => o.shift_id !== currentShiftId)
+    }
+  }
+  
+  // Chưa thu tiền = tất cả orders có status = CREATED
+  return shiftOrders.filter(o => o.status === ORDER_STATUS.CREATED).length
+})
+
+const paidOrdersCount = computed(() => {
+  const currentShiftId = shiftStore.currentShift?.id
+  let shiftOrders = []
+  
+  if (shiftFilter.value === 'current') {
+    if (!currentShiftId) return 0
+    shiftOrders = orders.value.filter(o => o.shift_id === currentShiftId)
+  } else {
+    if (!currentShiftId) {
+      shiftOrders = orders.value
+    } else {
+      shiftOrders = orders.value.filter(o => o.shift_id !== currentShiftId)
+    }
+  }
+  
+  return shiftOrders.filter(o => o.status === ORDER_STATUS.PAID).length
+})
+
+// Count original orders (not merged into another order)
+const originalOrdersCount = computed(() => {
+  const currentShiftId = shiftStore.currentShift?.id
+  let shiftOrders = []
+  
+  if (shiftFilter.value === 'current') {
+    if (!currentShiftId) return 0
+    shiftOrders = orders.value.filter(o => o.shift_id === currentShiftId)
+  } else {
+    if (!currentShiftId) {
+      shiftOrders = orders.value
+    } else {
+      shiftOrders = orders.value.filter(o => o.shift_id !== currentShiftId)
+    }
+  }
+  
+  // Bill gốc = orders không có merged_into_id
+  return shiftOrders.filter(o => !o.merged_into_id).length
 })
 
 // Helper to check order status
 const isStatus = (order, status) => order.status === status
 const isAnyStatus = (order, statuses) => statuses.includes(order.status)
+
+// Merge Bills Computed Properties
+const mergeableOrders = computed(() => {
+  // Only orders in current shift that are CREATED (unpaid) can be merged
+  const currentShiftId = shiftStore.currentShift?.id
+  if (!currentShiftId) return []
+  
+  return orders.value.filter(o => 
+    o.shift_id === currentShiftId &&
+    o.status === ORDER_STATUS.CREATED
+  )
+})
+
+const mergeableOrdersCount = computed(() => mergeableOrders.value.length)
+
+const selectedOrdersForMerge = computed(() => {
+  return orders.value.filter(o => selectedOrderIds.value.includes(o.id))
+})
+
+const isOrderMergeable = (order) => {
+  return mergeableOrders.value.some(o => o.id === order.id)
+}
 
 // Methods
 const refreshOrders = async () => {
@@ -657,38 +769,27 @@ const formatDate = (date) => {
   return new Date(date).toLocaleString('vi-VN')
 }
 
+const getEmptyMessage = () => {
+  if (paymentFilter.value === 'unpaid') {
+    return 'Chưa có order nào chưa thu tiền'
+  } else if (paymentFilter.value === 'paid') {
+    return 'Chưa có order nào đã thu tiền'
+  } else if (paymentFilter.value === 'original') {
+    return 'Chưa có bill gốc nào (chưa gộp)'
+  }
+  return 'Chưa có order nào'
+}
+
 const viewOrderDetail = (order) => {
   selectedOrder.value = order
 }
 
-const startNewOrder = () => {
-  showCreateOrder.value = true
-}
-
-const handleOrderConfirm = (cartArray) => {
-  // Store cart data and show customer name modal
-  cart.value = cartArray
-  showCreateOrder.value = false
-  showCustomerNameModal.value = true
-}
-
-const finalizeOrder = async () => {
+const printTempBill = async (orderId) => {
   try {
-    const orderData = {
-      customer_name: customerName.value || '',
-      items: cart.value,
-      note: '',
-      shift_id: shiftStore.currentShift.id
-    }
-    await orderStore.createOrder(orderData)
-    
-    // Close all modals and reset
-    showCustomerNameModal.value = false
-    showCreateOrder.value = false
-    cart.value = []
-    customerName.value = ''
+    await orderStore.printTemporaryBill(orderId)
+    alert('✅ Đã in bill tạm thành công')
   } catch (error) {
-    alert('Lỗi: ' + (error.response?.data?.error || error.message))
+    alert('❌ Lỗi: ' + error.message)
   }
 }
 
@@ -805,12 +906,57 @@ const handleReprintLabel = async (orderId, itemIndex) => {
   }
 }
 
+// Merge Bills Methods
+const enterSelectionMode = () => {
+  selectionMode.value = true
+  selectedOrderIds.value = []
+}
+
+const exitSelectionMode = () => {
+  selectionMode.value = false
+  selectedOrderIds.value = []
+}
+
+const toggleOrderSelection = (order) => {
+  // Only allow selecting mergeable orders
+  if (!isOrderMergeable(order)) return
+  
+  const index = selectedOrderIds.value.indexOf(order.id)
+  if (index > -1) {
+    selectedOrderIds.value.splice(index, 1)
+  } else {
+    selectedOrderIds.value.push(order.id)
+  }
+}
+
+const openMergeModal = () => {
+  if (selectedOrderIds.value.length < 2) {
+    alert('⚠️ Vui lòng chọn ít nhất 2 orders để gộp')
+    return
+  }
+  showMergeModal.value = true
+}
+
+const closeMergeModal = () => {
+  showMergeModal.value = false
+}
+
+const handleMerged = (response) => {
+  // Exit selection mode
+  exitSelectionMode()
+  
+  // Show success message
+  alert(`✅ ${response.message}`)
+  
+  // Refresh orders
+  refreshOrders()
+}
+
 // Lifecycle
 onMounted(async () => {
   await Promise.all([
     shiftStore.fetchCurrentShift(),
-    orderStore.fetchOrders(),
-    menuStore.fetchMenuItems()
+    orderStore.fetchOrders()
   ])
 })
 </script>

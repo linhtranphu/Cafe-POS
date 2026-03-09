@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <style>
+        /* Reset & Base */
         * {
             margin: 0;
             padding: 0;
@@ -13,123 +14,149 @@
             width: 576px;
             background: white;
             color: black;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-            padding: 15px 20px;
+            font-family: Arial, sans-serif;
+            padding: 0 15px 10px 15px; /* Giảm padding trái phải một chút để tăng diện tích in */
         }
-        
+
+        /* Header Section */
         .header {
             display: flex;
-            align-items: flex-start;
+            align-items: center;
             margin-bottom: 25px;
+            padding-top: 10px;
         }
         
         .logo {
-            width: 200px;
-            margin-left: 20px;
-            margin-right: 60px;
+            width: 160px;
+            margin-right: 25px;
             flex-shrink: 0;
         }
         
         .logo img {
-            width: 200px;
+            width: 100%;
             height: auto;
             display: block;
         }
         
         .shop-info {
             flex: 1;
-            padding-top: 20px;
         }
         
         .shop-name {
-            font-size: 25px;
+            font-size: 26px;
             font-weight: bold;
-            margin-bottom: 5px;
-            text-shadow: 2px 0 0 currentColor;
-            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
         }
         
-        .shop-address {
-            font-size: 16px;
-            margin-bottom: 12px;
-            line-height: 18px;
+        .shop-address, .shop-phone {
+            font-size: 17px;
+            line-height: 1.3;
         }
-        
-        .shop-phone {
-            font-size: 16px;
-            line-height: 18px;
-        }
-        
+
+        /* Title */
         .bill-title {
             text-align: center;
-            font-size: 34px;
+            font-size: 32px;
             font-weight: bold;
             margin: 15px 0;
+            border-top: 1px dashed black;
+            border-bottom: 1px dashed black;
+            padding: 10px 0;
         }
-        
-        .order-info {
-            font-size: 16px;
+
+        /* Order Info (ESC/POS Style) */
+        .order-info-container {
+            width: 100%;
+            font-size: 19px;
+            line-height: 1.6;
             margin-bottom: 15px;
-            line-height: 20px;
         }
-        
-        .order-info div {
-            margin-left: 10px;
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
         }
-        
-        .divider {
-            border-top: 1px solid black;
-            margin: 15px 0;
+
+        .info-col.right {
+            text-align: right;
         }
-        
+
+        .customer-row {
+            border-top: 1px dotted #000;
+            margin-top: 5px;
+            padding-top: 5px;
+            font-weight: bold;
+        }
+
+        /* Items Table */
         table {
             width: 100%;
             border-collapse: collapse;
-            border-style: dashed;
-            margin-bottom: 5px;
+            margin: 10px 0;
         }
         
         th {
-            font-size: 17px;
-            font-weight: normal;
+            font-size: 20px;
+            font-weight: bold;
             text-align: left;
             padding: 8px 0;
-            border-bottom: 1px solid black;
-        }
-        
-        th.right,
-        td.right {
-            text-align: right;
+            border-bottom: 2px solid black;
         }
         
         td {
-            font-size: 17px;
+            font-size: 20px;
             padding: 10px 0;
+            vertical-align: top;
         }
         
-        .total-row {
-            border-top: 1px solid black;
-            padding-top: 15px;
-        }
-        
-        .total-label {
-            font-size: 20px;
-            font-weight: bold;
-            padding-left: 190px;
-        }
-        
-        .total-amount {
-            font-size: 20px;
-            font-weight: bold;
+        .right {
             text-align: right;
-            padding-right: 10px;
+        }
+
+        /* Total Section */
+        .total-container {
+            border-top: 2px solid black;
+            margin-top: 5px;
+            padding-top: 10px;
+        }
+
+        .total-row-final {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+        }
+
+        .total-label {
+            font-size: 24px;
+            font-weight: bold;
+            margin-right: 20px;
+        }
+
+        .total-amount {
+            font-size: 28px;
+            font-weight: 900;
+        }
+
+        /* Footer */
+        .divider {
+            border-top: 1px solid black;
+            margin: 20px 0;
         }
         
         .thanks {
             text-align: center;
             font-size: 22px;
-            margin-top: 30px;
-            margin-bottom: 30px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .wifi-section {
+            text-align: center;
+            font-size: 18px;
+            margin-top: 15px;
+            line-height: 1.4;
         }
     </style>
 </head>
@@ -138,11 +165,9 @@
         {{if .ShowLogo}}
         <div class="logo">
             {{if .LogoBase64}}
-            <img src="{{.LogoBase64}}" alt="Logo">
+            
             {{else}}
-            <!-- Fallback: Small test logo (50x50 red square) -->
-            <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mP8z8BQz0AEYBxVSF+FABJADveWkH6oAAAAAElFTkSuQmCC" 
-                 alt="Test Logo" style="width:200px;height:200px;background:#ff0000;">
+            
             {{end}}
         </div>
         {{end}}
@@ -159,54 +184,65 @@
     
     <div class="bill-title">HÓA ĐƠN THANH TOÁN</div>
     
-    <div class="order-info">
-        <div>Order: {{.OrderNumber}}</div>
-        {{if .CustomerName}}
-        <div>Khách hàng: {{.CustomerName}}</div>
-        {{end}}
-        <div>Waiter: {{.WaiterName}}</div>
-        <div>Thanh Toán: {{.PaymentMethod}}</div>
-        <div>Ngày tạo: {{.CreatedDate}}</div>
+    <div class="order-info-container">
+        <div class="info-row">
+            <div class="info-col">Số đơn: <strong>{{.OrderNumber}}</strong></div>
+            <div class="info-col right">NV: {{.WaiterName}}</div>
+        </div>
+
+        <div class="info-row">
+            <div class="info-col">{{.CreatedDate}}</div>
+            <div class="info-col right">PTTT: {{.PaymentMethod}}</div>
+        </div>
+
+        <div class="customer-row">
+            Khách hàng: {{if .CustomerName}}{{.CustomerName}}{{else}}Khách lẻ{{end}}
+        </div>
     </div>
-    
-    
     
     <table>
         <thead>
             <tr>
-                <th style="width: 55px; padding-left: 10px;">STT</th>
-                <th style="width: 240px;">Tên món</th>
-                <th style="width: 40px;">SL</th>
+                <th style="width: 40px;">#</th>
+                <th style="width: 235px;">Tên món</th>
+                <th style="width: 45px;">SL</th>
                 <th style="width: 110px;">Đơn giá</th>
-                <th class="right" style="width: 110px; padding-right: 10px;">Thành tiền</th>
+                <th class="right" style="width: 110px;">Thành tiền</th>
             </tr>
         </thead>
         <tbody>
             {{range .Items}}
             <tr>
-                <td style="padding-left: 10px;">{{.STT}}</td>
-                <td>{{.Name}}</td>
+                <td>{{.STT}}</td>
+                <td>
+                    {{.Name}}
+                    {{if .Note}}<span class="item-note">({{.Note}})</span>{{end}}
+                </td>
                 <td>{{.Quantity}}</td>
                 <td>{{.UnitPrice}}</td>
-                <td class="right" style="padding-right: 10px;">{{.Total}}</td>
+                <td class="right">{{.Total}}</td>
             </tr>
             {{end}}
         </tbody>
     </table>
     
-    
-    
-    <table class="total-row">
-        <tr>
-            <td class="total-label">TỔNG TIỀN:</td>
-            <td class="total-amount">{{.Total}}</td>
-        </tr>
-    </table>
+    <div class="total-container">
+        <div class="total-row-final">
+            <span class="total-label">TỔNG CỘNG:</span>
+            <span class="total-amount">{{.Total}}</span>
+        </div>
+    </div>
     
     <div class="divider"></div>
     
     {{if .ShowCustomMsg}}
     <div class="thanks">{{.CustomMessage}}</div>
     {{end}}
-</body>
+
+    <div class="wifi-section">
+        <div>Wifi: <strong>Ta Cafe</strong></div>
+        <div>Mật khẩu: <strong>capheongta</strong></div>
+    </div>
+
+    <div style="height: 30px;"></div> </body>
 </html>

@@ -35,6 +35,15 @@
             👤 {{ creator }}
           </button>
         </div>
+        
+        <!-- Paid from Fund Filter -->
+        <div class="mt-2">
+          <button @click="paidFromFundFilter = !paidFromFundFilter" 
+            :class="paidFromFundFilter ? 'bg-blue-500 text-white' : 'bg-white text-gray-700 border border-gray-300'"
+            class="px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap">
+            💰 {{ paidFromFundFilter ? 'Đang lọc: Chi từ quỹ' : 'Lọc: Chi từ quỹ' }}
+          </button>
+        </div>
       </div>
     </div>
 
@@ -181,8 +190,12 @@
             <!-- Expense Header -->
             <div class="flex justify-between items-start mb-3">
               <div class="flex-1">
-                <div class="flex items-center gap-2 mb-1">
+                <div class="flex items-center gap-2 mb-1 flex-wrap">
                   <h3 class="font-bold text-lg">{{ expense.description }}</h3>
+                  <span v-if="expense.paid_from_fund" 
+                    class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-medium">
+                    💰 Chi từ quỹ
+                  </span>
                   <span v-if="expense.source_type && expense.source_type !== 'manual'" 
                     :class="getSourceTypeBadgeClass(expense.source_type)"
                     class="px-2 py-0.5 rounded text-[10px] font-medium">
@@ -227,6 +240,30 @@
             <div v-if="expense.notes" class="mb-3 p-2 bg-gray-50 rounded-lg text-sm text-gray-600 border-l-2 border-gray-300">
               <span class="text-xs font-semibold text-gray-500">Ghi chú:</span>
               <p>{{ expense.notes }}</p>
+            </div>
+
+            <!-- Fund Transaction Link -->
+            <div v-if="expense.paid_from_fund && expense.fund_transaction_id" class="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">💰</span>
+                  <div>
+                    <div class="text-xs font-semibold text-blue-700">Giao dịch quỹ</div>
+                    <div class="text-xs text-blue-600">Đã trừ từ quỹ</div>
+                  </div>
+                </div>
+                <button @click="navigateToFundTransaction(expense.fund_transaction_id)"
+                  class="bg-blue-500 text-white px-3 py-1 rounded-lg text-xs font-medium active:bg-blue-600">
+                  Xem chi tiết →
+                </button>
+              </div>
+            </div>
+
+            <!-- Warning for fund-paid expenses -->
+            <div v-if="expense.paid_from_fund" class="mb-3 p-2 bg-yellow-50 rounded-lg border border-yellow-200">
+              <div class="text-xs text-yellow-700">
+                ⚠️ Chi phí này đã được chi từ quỹ. Không thể chỉnh sửa số tiền.
+              </div>
             </div>
 
             <!-- Quick Actions -->
@@ -291,7 +328,11 @@
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-3">Số tiền (VNĐ) *</label>
                 <input v-model.number="formData.amount" type="number" min="0" step="1000" required placeholder="0"
-                  class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                  :disabled="isEditing && currentExpense?.paid_from_fund"
+                  class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed" />
+                <p v-if="isEditing && currentExpense?.paid_from_fund" class="text-xs text-orange-600 mt-1">
+                  ⚠️ Không thể thay đổi số tiền của chi phí đã chi từ quỹ
+                </p>
               </div>
             </div>
 
@@ -305,12 +346,104 @@
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-3">Thanh toán *</label>
                 <select v-model="formData.payment_method" required
-                  class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                  :disabled="formData.paid_from_fund"
+                  class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed">
                   <option v-for="option in PAYMENT_METHOD_OPTIONS" :key="option.value" :value="option.value">
                     {{ option.label }}
                   </option>
                 </select>
               </div>
+            </div>
+
+            <!-- Paid from Fund Section (ingredient style) -->
+            <div v-if="!isEditing || !currentExpense?.paid_from_fund"
+              class="border-2 rounded-xl p-4 transition-colors"
+              :class="formData.paid_from_fund ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-white'">
+              <label class="flex items-center gap-3 cursor-pointer">
+                <input
+                  v-model="formData.paid_from_fund"
+                  type="checkbox"
+                  @change="handlePaidFromFundChange"
+                  :disabled="isEditing && currentExpense?.paid_from_fund"
+                  class="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed" />
+                <div class="flex-1">
+                  <div class="font-semibold text-gray-800">💰 Chi từ quỹ</div>
+                  <div class="text-xs text-gray-500 mt-0.5">Tự động trừ tiền từ quỹ và ghi nhận giao dịch</div>
+                </div>
+              </label>
+
+              <!-- Fund detail when checked -->
+              <div v-if="formData.paid_from_fund" class="mt-4 space-y-3">
+                <!-- Loading -->
+                <div v-if="fundBalanceLoading" class="text-sm text-gray-500 text-center py-2">
+                  Đang tải số dư quỹ...
+                </div>
+
+                <!-- Error -->
+                <div v-else-if="fundBalanceError" class="text-sm text-red-600 bg-red-50 rounded-lg p-3">
+                  ⚠️ Không thể tải số dư quỹ
+                </div>
+
+                <!-- Balance display -->
+                <div v-else-if="fundBalance" class="bg-white rounded-xl p-3 border border-purple-200 space-y-2">
+                  <div class="text-xs font-semibold text-gray-500 mb-2">SỐ DƯ QUỸ HIỆN TẠI</div>
+                  <div class="flex justify-between items-center text-sm">
+                    <span class="text-gray-600">💵 Tiền mặt:</span>
+                    <span class="font-bold text-green-600">{{ formatPrice(fundBalance.cash || 0) }}</span>
+                  </div>
+                  <div class="flex justify-between items-center text-sm">
+                    <span class="text-gray-600">🏦 Chuyển khoản:</span>
+                    <span class="font-bold text-green-600">{{ formatPrice(fundBalance.transfer || 0) }}</span>
+                  </div>
+                  <div class="flex justify-between items-center text-sm pt-1 border-t border-purple-100">
+                    <span class="text-gray-700 font-medium">Tổng:</span>
+                    <span class="font-bold text-purple-600">{{ formatPrice(fundBalance.total || 0) }}</span>
+                  </div>
+                </div>
+
+                <!-- Money type selector -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Loại tiền</label>
+                  <div class="grid grid-cols-2 gap-2">
+                    <button type="button"
+                      @click="formData.money_type = 'cash'"
+                      :class="formData.money_type === 'cash' ? 'bg-purple-500 text-white border-purple-500' : 'bg-white text-gray-700 border-gray-300'"
+                      class="py-3 rounded-xl border-2 text-sm font-medium transition-colors">
+                      💵 Tiền mặt
+                    </button>
+                    <button type="button"
+                      @click="formData.money_type = 'transfer'"
+                      :class="formData.money_type === 'transfer' ? 'bg-purple-500 text-white border-purple-500' : 'bg-white text-gray-700 border-gray-300'"
+                      class="py-3 rounded-xl border-2 text-sm font-medium transition-colors">
+                      🏦 Chuyển khoản
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Insufficient balance warnings -->
+                <div v-if="isInsufficientCash" class="bg-red-50 border border-red-200 rounded-xl p-3">
+                  <div class="text-sm text-red-700 font-medium">
+                    ⚠️ Tiền mặt không đủ! Cần {{ formatPrice(formData.amount) }}, còn {{ formatPrice(fundBalance?.cash || 0) }}
+                  </div>
+                </div>
+                <div v-if="isInsufficientTransfer" class="bg-red-50 border border-red-200 rounded-xl p-3">
+                  <div class="text-sm text-red-700 font-medium">
+                    ⚠️ Số dư chuyển khoản không đủ! Cần {{ formatPrice(formData.amount) }}, còn {{ formatPrice(fundBalance?.transfer || 0) }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Notice when editing a fund-paid expense -->
+            <div v-if="isEditing && currentExpense?.paid_from_fund"
+              class="bg-orange-50 border border-orange-200 rounded-xl p-3 text-sm text-orange-700">
+              ⚠️ Chi phí này đã được chi từ quỹ. Không thể thay đổi.
+            </div>
+
+            <!-- Auto-expense note when not paying from fund -->
+            <div v-if="!formData.paid_from_fund && !isEditing"
+              class="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-700">
+              💡 Chi phí sẽ được ghi nhận thủ công, không trừ từ quỹ.
             </div>
 
             <!-- Nhà cung cấp -->
@@ -337,7 +470,8 @@
               class="flex-1 bg-gray-200 text-gray-700 py-4 rounded-xl font-medium text-base active:bg-gray-300 transition-colors">
               Hủy
             </button>
-            <button @click="saveExpense" :disabled="!formData.description || !formData.category_id || formData.amount <= 0"
+            <button @click="saveExpense" 
+              :disabled="!formData.description || !formData.category_id || formData.amount <= 0 || isInsufficientBalance"
               class="flex-1 bg-green-500 text-white py-4 rounded-xl font-medium text-base active:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
               {{ isEditing ? 'Cập nhật' : 'Thêm chi phí' }}
             </button>
@@ -356,11 +490,14 @@ import PullToRefresh from '../components/PullToRefresh.vue'
 import { usePullToRefresh } from '../composables/usePullToRefresh'
 import { formatDate, formatPrice } from '../utils/formatters'
 import { PAYMENT_METHODS, PAYMENT_METHOD_OPTIONS, getPaymentMethodLabel } from '../constants/expense'
+import { fundExpenseService } from '../services/fundExpenseService'
+import { getBalance } from '../services/fund'
 
 const expenseStore = useExpenseStore()
 
 const searchQuery = ref('')
 const creatorFilter = ref('')
+const paidFromFundFilter = ref(false)
 const showCreateForm = ref(false)
 const showCategoryModal = ref(false)
 const isEditing = ref(false)
@@ -374,8 +511,15 @@ const formData = ref({
   date: new Date().toISOString().split('T')[0],
   payment_method: PAYMENT_METHODS.CASH,
   vendor: '',
-  notes: ''
+  notes: '',
+  paid_from_fund: false,
+  money_type: 'cash'
 })
+
+const fundBalance = ref(null)
+const fundBalanceLoading = ref(false)
+const fundBalanceError = ref(false)
+const loadingBalance = ref(false)
 
 const expenses = computed(() => expenseStore.expenses || [])
 const categories = computed(() => expenseStore.categories || [])
@@ -397,6 +541,11 @@ const filteredExpenses = computed(() => {
       const creator = e.created_by || 'Hệ thống'
       return creator === creatorFilter.value
     })
+  }
+  
+  // Filter by paid from fund
+  if (paidFromFundFilter.value) {
+    filtered = filtered.filter(e => e.paid_from_fund === true)
   }
   
   // Filter by search query
@@ -507,6 +656,8 @@ const getSourceTypeBadgeClass = (sourceType) => {
 const openCreateModal = () => {
   cancelEdit()
   showCreateForm.value = true
+  // Load fund balance when opening form
+  loadFundBalance()
 }
 
 const toggleCategoryForm = () => {
@@ -518,9 +669,12 @@ const openEditModal = (expense) => {
   currentExpense.value = expense
   formData.value = {
     ...expense,
-    date: new Date(expense.date).toISOString().split('T')[0]
+    date: new Date(expense.date).toISOString().split('T')[0],
+    paid_from_fund: expense.paid_from_fund || false
   }
   showCreateForm.value = true
+  // Load fund balance when opening form
+  loadFundBalance()
 }
 
 const cancelEdit = () => {
@@ -534,9 +688,55 @@ const cancelEdit = () => {
     date: new Date().toISOString().split('T')[0],
     payment_method: PAYMENT_METHODS.CASH,
     vendor: '',
-    notes: ''
+    notes: '',
+    paid_from_fund: false,
+    money_type: 'cash'
+  }
+  fundBalance.value = null
+  fundBalanceError.value = false
+}
+
+const loadFundBalance = async () => {
+  try {
+    fundBalanceLoading.value = true
+    loadingBalance.value = true
+    fundBalanceError.value = false
+    const balance = await getBalance()
+    fundBalance.value = balance.current_balance
+  } catch (error) {
+    console.error('Error loading fund balance:', error)
+    fundBalance.value = null
+    fundBalanceError.value = true
+  } finally {
+    fundBalanceLoading.value = false
+    loadingBalance.value = false
   }
 }
+
+const handlePaidFromFundChange = () => {
+  if (formData.value.paid_from_fund) {
+    formData.value.payment_method = 'fund'
+    loadFundBalance()
+  } else {
+    formData.value.payment_method = PAYMENT_METHODS.CASH
+    fundBalance.value = null
+    fundBalanceError.value = false
+  }
+}
+
+const isInsufficientCash = computed(() => {
+  if (!formData.value.paid_from_fund || !fundBalance.value || formData.value.money_type !== 'cash') return false
+  return formData.value.amount > (fundBalance.value.cash || 0)
+})
+
+const isInsufficientTransfer = computed(() => {
+  if (!formData.value.paid_from_fund || !fundBalance.value || formData.value.money_type !== 'transfer') return false
+  return formData.value.amount > (fundBalance.value.transfer || 0)
+})
+
+const isInsufficientBalance = computed(() => {
+  return isInsufficientCash.value || isInsufficientTransfer.value
+})
 
 const saveExpense = async () => {
   try {
@@ -558,6 +758,12 @@ const saveExpense = async () => {
       return
     }
     
+    // Validate fund balance if paid from fund
+    if (formData.value.paid_from_fund && isInsufficientBalance.value) {
+      alert(`Số dư quỹ không đủ! Số dư hiện tại: ${formatPrice(fundBalance.value.total)}, Cần: ${formatPrice(formData.value.amount)}`)
+      return
+    }
+    
     // Prepare data - convert date to ISO format
     const dataToSend = { ...formData.value }
     if (dataToSend.date) {
@@ -569,18 +775,41 @@ const saveExpense = async () => {
     console.log('Sending expense data:', dataToSend)
     
     if (isEditing.value) {
+      // For editing, use regular expense update (cannot change paid_from_fund)
       await expenseStore.updateExpense(currentExpense.value.id, dataToSend)
       alert('Cập nhật chi phí thành công')
     } else {
-      await expenseStore.createExpense(dataToSend)
-      alert('Thêm chi phí thành công')
+      // For creating, check if paid from fund
+      if (formData.value.paid_from_fund) {
+        // Use fund expense service
+        await fundExpenseService.createExpenseFromFund({
+          ...dataToSend,
+          money_type: formData.value.money_type || 'cash'
+        })
+        alert('Tạo chi phí từ quỹ thành công')
+        // Refresh expenses list
+        await expenseStore.fetchExpenses()
+      } else {
+        // Use regular expense creation
+        await expenseStore.createExpense(dataToSend)
+        alert('Thêm chi phí thành công')
+      }
     }
     showCreateForm.value = false
     cancelEdit()
   } catch (error) {
     console.error('Error saving expense:', error)
     console.error('Error response:', error.response?.data)
-    alert(`Có lỗi xảy ra: ${error.response?.data?.error || error.message}`)
+    
+    // Handle specific error messages
+    let errorMessage = 'Có lỗi xảy ra'
+    if (error.message) {
+      errorMessage = error.message
+    } else if (error.response?.data?.error) {
+      errorMessage = error.response.data.error
+    }
+    
+    alert(errorMessage)
   }
 }
 
@@ -622,6 +851,11 @@ const deleteCategory = async (categoryId) => {
       alert('Có lỗi xảy ra khi xóa danh mục')
     }
   }
+}
+
+const navigateToFundTransaction = (fundTransactionId) => {
+  // Navigate to fund management view with transaction detail
+  window.location.href = `/fund?transaction=${fundTransactionId}`
 }
 
 // Refresh data function

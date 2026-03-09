@@ -255,7 +255,7 @@ func main() {
 	batchReportHandler := http.NewBatchReportHandler(batchReportService)
 	// Print handlers - now with WebSocket broadcaster
 	printJobHandler := http.NewPrintJobHandler(printService, printJobRepo, wsBroadcaster)
-	printerConfigHandler := http.NewPrinterConfigHandler(printerConfigRepo, printerManager)
+	printerConfigHandler := http.NewPrinterConfigHandler(printerConfigRepo, printerManager, shopSettingsRepo)
 	printTemplateHandler := http.NewPrintTemplateHandler(printTemplateRepo, templateRenderer, shopSettingsRepo)
 	shopSettingsHandler := http.NewShopSettingsHandler(shopSettingsRepo)
 	logoUploadHandler := http.NewLogoUploadHandler(shopSettingsRepo, "./uploads/logos")
@@ -320,6 +320,7 @@ func main() {
 	menuCategoryHandler := http.NewMenuCategoryHandler(menuCategoryService)
 	
 	// Ingredient service (stockHistoryRepo already initialized above)
+	ingredientRestockRepo := mongodb.NewIngredientRestockRepository(db)
 	ingredientService := services.NewIngredientService(ingredientRepo, stockHistoryRepo)
 	ingredientHandler := http.NewIngredientHandler(ingredientService)
 	facilityRepo := mongodb.NewFacilityRepository(db)
@@ -327,7 +328,8 @@ func main() {
 	facilityHandler := http.NewFacilityHandler(facilityService)
 	expenseRepo := mongodb.NewExpenseRepository(db)
 	expenseService := services.NewExpenseService(expenseRepo)
-	expenseHandler := http.NewExpenseHandler(expenseService)
+	fundExpenseIntegrationService := services.NewFundExpenseIntegrationService(expenseRepo, fundTransactionRepo, ingredientRepo, ingredientRestockRepo, facilityRepo, fundService, client)
+	expenseHandler := http.NewExpenseHandler(expenseService, fundExpenseIntegrationService)
 
 	// Menu cost and profit analysis handlers
 	menuCostHandler := http.NewMenuCostHandler(profitAnalyzerService, costCalculatorService, costRecalculationService, menuRepo)
@@ -705,6 +707,8 @@ func main() {
 				manager.POST("/fund/deposit", fundHandler.Deposit)
 				manager.POST("/fund/withdraw", fundHandler.Withdraw)
 				manager.GET("/fund/transactions/:id", fundHandler.GetTransactionDetail)
+				manager.GET("/fund/balances", fundHandler.GetAllFundBalances)
+				manager.POST("/fund/transfer", fundHandler.Transfer)
 				manager.GET("/expense-categories", expenseHandler.GetCategories)
 				manager.DELETE("/expense-categories/:id", expenseHandler.DeleteCategory)
 				manager.POST("/recurring-expenses", expenseHandler.CreateRecurring)

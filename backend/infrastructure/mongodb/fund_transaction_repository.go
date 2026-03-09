@@ -40,7 +40,29 @@ func NewFundTransactionRepository(db *mongo.Database) *FundTransactionRepository
 			{Key: "type", Value: 1},
 		},
 	})
-	
+
+	// Index on fund_type
+	collection.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "fund_type", Value: 1}},
+	})
+
+	// Compound index on fund_type + timestamp
+	collection.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "fund_type", Value: 1},
+			{Key: "timestamp", Value: -1},
+		},
+	})
+
+	// Sparse index on source_type + source_id
+	collection.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "source_type", Value: 1},
+			{Key: "source_id", Value: 1},
+		},
+		Options: options.Index().SetSparse(true),
+	})
+
 	return &FundTransactionRepository{
 		collection: collection,
 	}
@@ -125,6 +147,31 @@ func (r *FundTransactionRepository) FindAll(ctx context.Context, limit, offset i
 	}
 	
 	return transactions, nil
+}
+
+// FindByFilter retrieves fund transactions matching an arbitrary BSON filter
+func (r *FundTransactionRepository) FindByFilter(ctx context.Context, filter bson.M, limit, offset int) ([]*fund.FundTransaction, error) {
+	opts := options.Find().
+		SetSort(bson.D{{Key: "timestamp", Value: -1}}).
+		SetLimit(int64(limit)).
+		SetSkip(int64(offset))
+
+	cursor, err := r.collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var transactions []*fund.FundTransaction
+	if err := cursor.All(ctx, &transactions); err != nil {
+		return nil, err
+	}
+	return transactions, nil
+}
+
+// CountByFilter counts fund transactions matching an arbitrary BSON filter
+func (r *FundTransactionRepository) CountByFilter(ctx context.Context, filter bson.M) (int64, error) {
+	return r.collection.CountDocuments(ctx, filter)
 }
 
 // Count counts fund transactions matching the filter

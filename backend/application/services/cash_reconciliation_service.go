@@ -32,6 +32,7 @@ func NewCashReconciliationService(
 type ShiftStatusResponse struct {
 	Shift           *order.Shift                   `json:"shift"`
 	TotalOrders     int                            `json:"total_orders"`
+	TotalItems      int                            `json:"total_items"`      // Total number of items ordered
 	TotalRevenue    float64                        `json:"total_revenue"`
 	CashRevenue     float64                        `json:"cash_revenue"`
 	TransferRevenue float64                        `json:"transfer_revenue"`
@@ -111,13 +112,19 @@ func (s *CashReconciliationService) GetShiftStatus(shiftID string) (*ShiftStatus
 	response := &ShiftStatusResponse{
 		Shift:       shift,
 		TotalOrders: len(orders),
+		TotalItems:  0,
 	}
 
-	// Calculate revenue by payment method
+	// Calculate revenue by payment method and count total items
 	for _, ord := range orders {
 		// Count in-progress orders for barista shifts
 		if ord.Status == order.StatusInProgress {
 			response.InProgressCount++
+		}
+		
+		// Count total items (sum of quantities)
+		for _, item := range ord.Items {
+			response.TotalItems += item.Quantity
 		}
 		
 		if ord.Status == order.StatusPaid || ord.Status == order.StatusInProgress || ord.Status == order.StatusServed {

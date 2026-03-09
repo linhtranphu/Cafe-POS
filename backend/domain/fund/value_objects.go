@@ -5,7 +5,8 @@ import "errors"
 // ValidateTransactionType validates if the transaction type is valid
 func ValidateTransactionType(t TransactionType) error {
 	switch t {
-	case TransactionTypeDeposit, TransactionTypeWithdrawal:
+	case TransactionTypeDeposit, TransactionTypeWithdrawal,
+		TransactionTypeFundHandover, TransactionTypeStartingFloat:
 		return nil
 	default:
 		return errors.New("invalid transaction type")

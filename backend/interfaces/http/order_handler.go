@@ -521,3 +521,41 @@ func (h *OrderHandler) ReprintLabel(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Label queued for printing"})
 }
+
+// PrintTemporaryBill handles POST /api/orders/:id/print-temp-bill
+func (h *OrderHandler) PrintTemporaryBill(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	o, err := h.orderService.PrintTemporaryBill(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, o)
+}
+
+// MergeOrders handles POST /api/orders/merge
+func (h *OrderHandler) MergeOrders(c *gin.Context) {
+	var req order.MergeOrdersRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	userID, _ := c.Get("user_id")
+	username, _ := c.Get("username")
+
+	response, err := h.orderService.MergeOrders(c.Request.Context(), &req, userID.(string), username.(string))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
+}

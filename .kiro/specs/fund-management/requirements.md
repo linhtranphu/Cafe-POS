@@ -1,175 +1,143 @@
-# Fund Management - Requirements
+# Quản lý Quỹ Tiền (Fund Management) — Requirements
 
 ## Tổng quan
-Manager cần một view để quản lý quỹ tiền của quán, bao gồm:
-- Xem tổng quan số dư quỹ (tiền mặt và chuyển khoản)
-- Xem lịch sử giao dịch ra/vào quỹ
-- Thêm/rút tiền từ quỹ (deposit/withdrawal)
-- Xem chi tiết các giao dịch
+
+Hệ thống quản lý 4 quỹ tiền tách biệt theo chức năng, cho phép manager theo dõi dòng tiền chi tiết, xem báo cáo theo ngày, và chuyển tiền giữa các quỹ.
+
+---
+
+## Mô hình 4 quỹ
+
+| Quỹ | ID | Mục đích | Nguồn vào | Nguồn ra |
+|-----|----|----------|-----------|----------|
+| 🗄️ Ngăn kéo tiền | `cash_drawer` | Tiền mặt tại quầy thu ngân | Bàn giao từ waiter (cash_handover) | Tiền đầu ca (starting_float), chuyển về quỹ vận hành |
+| ⚙️ Quỹ vận hành | `operating` | Chi phí vận hành hàng ngày | Bàn giao ca (fund_handover), nạp thủ công | Chi phí vận hành, chuyển quỹ |
+| 📦 Quỹ nguyên liệu | `inventory` | Mua nguyên liệu / hàng tồn kho | Chuyển từ quỹ vận hành | Mua nguyên liệu |
+| 💎 Quỹ lợi nhuận | `profit` | Lợi nhuận tích lũy | Chuyển từ quỹ vận hành | Rút thủ công |
+
+---
 
 ## User Stories
 
-### US1: Xem tổng quan quỹ
-**Là** manager  
-**Tôi muốn** xem tổng quan số dư quỹ hiện tại  
-**Để** biết quán đang có bao nhiêu tiền
+### US1: Xem tổng quan 4 quỹ
+**Là** manager
+**Tôi muốn** xem số dư của từng quỹ
+**Để** biết tiền đang nằm ở đâu
 
 **Acceptance Criteria:**
-- Hiển thị số dư tiền mặt hiện tại
-- Hiển thị số dư chuyển khoản hiện tại
-- Hiển thị tổng số dư
-- Hiển thị số dư đầu ngày (opening balance)
-- Hiển thị tổng thu trong ngày (từ orders + handovers)
-- Hiển thị tổng chi trong ngày (withdrawals)
+- Hiển thị 4 thẻ quỹ theo lưới 2×2
+- Mỗi thẻ hiển thị: tên quỹ, icon, tổng số dư, phân tách cash / transfer
+- Hiển thị thêm tổng tất cả quỹ ở đầu trang
+- Load dữ liệu realtime khi refresh
 
-### US2: Xem lịch sử giao dịch
-**Là** manager  
-**Tôi muốn** xem lịch sử tất cả giao dịch ra/vào quỹ  
-**Để** theo dõi dòng tiền
+---
 
-**Acceptance Criteria:**
-- Hiển thị danh sách giao dịch theo thời gian (mới nhất trước)
-- Mỗi giao dịch hiển thị:
-  - Loại giao dịch (deposit, withdrawal, handover, fund_handover)
-  - Số tiền (cash/transfer)
-  - Người thực hiện
-  - Thời gian
-  - Ghi chú/lý do
-- Có thể filter theo:
-  - Loại giao dịch
-  - Ngày (hôm nay, hôm qua, tuần này, tháng này, custom range)
-  - Loại tiền (cash, transfer, all)
-
-### US3: Thêm tiền vào quỹ (Deposit)
-**Là** manager  
-**Tôi muốn** thêm tiền vào quỹ  
-**Để** bổ sung vốn hoặc ghi nhận tiền từ nguồn khác
+### US2: Báo cáo ngày
+**Là** manager
+**Tôi muốn** xem báo cáo thu chi trong ngày
+**Để** đối chiếu cuối ngày
 
 **Acceptance Criteria:**
-- Form nhập:
-  - Loại tiền (cash/transfer/both)
-  - Số tiền cash (nếu có)
-  - Số tiền transfer (nếu có)
-  - Lý do/ghi chú (required, min 10 chars)
-- Validate số tiền > 0
-- Ghi nhận người thực hiện và thời gian
-- Cập nhật số dư quỹ ngay lập tức
+- Hiển thị số dư đầu ngày (opening balance) của từng quỹ
+- Tổng tiền vào hôm nay (inflow) phân theo nguồn:
+  - Bàn giao ca (handover)
+  - Nạp thủ công (deposit)
+- Tổng tiền ra hôm nay (outflow) phân theo nguồn:
+  - Chi phí vận hành (expense)
+  - Mua nguyên liệu (ingredient)
+  - Rút thủ công (withdrawal)
+- Số dư cuối ngày (= đầu ngày + vào - ra)
 
-### US4: Rút tiền từ quỹ (Withdrawal)
-**Là** manager  
-**Tôi muốn** rút tiền từ quỹ  
-**Để** chi tiêu hoặc chuyển tiền ra ngoài
+---
 
-**Acceptance Criteria:**
-- Form nhập:
-  - Loại tiền (cash/transfer/both)
-  - Số tiền cash (nếu có)
-  - Số tiền transfer (nếu có)
-  - Lý do/ghi chú (required, min 10 chars)
-- Validate số tiền > 0
-- Validate số tiền rút <= số dư hiện tại
-- Ghi nhận người thực hiện và thời gian
-- Cập nhật số dư quỹ ngay lập tức
-
-### US5: Xem chi tiết giao dịch
-**Là** manager  
-**Tôi muốn** xem chi tiết một giao dịch  
-**Để** hiểu rõ hơn về giao dịch đó
+### US3: Lịch sử giao dịch với filter
+**Là** manager
+**Tôi muốn** xem và lọc lịch sử giao dịch
+**Để** tra cứu và kiểm soát dòng tiền
 
 **Acceptance Criteria:**
-- Click vào giao dịch để xem chi tiết
-- Hiển thị đầy đủ thông tin:
-  - ID giao dịch
-  - Loại giao dịch
-  - Số tiền (cash/transfer/total)
-  - Người thực hiện (tên + role)
-  - Thời gian
-  - Ghi chú/lý do
-  - Số dư trước/sau giao dịch (nếu có)
-  - Metadata khác (shift_id, order_id, etc.)
+- Filter theo loại giao dịch: tất cả / nạp / rút / bàn giao / chuyển quỹ
+- Filter theo quỹ: tất cả / từng quỹ cụ thể
+- Filter theo nguồn: tất cả / expense / nguyên liệu / bàn giao / thủ công
+- Filter theo loại tiền: tất cả / tiền mặt / chuyển khoản
+- Filter theo ngày: hôm nay / hôm qua / tuần này / tháng này / tùy chỉnh
+- Phân trang (load more)
 
-## Data Sources
+---
 
-### Giao dịch vào quỹ (Inflow):
-1. **Cash Handovers** (từ waiter → cashier)
-   - Collection: `cash_handovers`
-   - Fields: cash_amount, transfer_amount, from_shift_id, to_shift_id
-   
-2. **Fund Handovers** (từ cashier → fund)
-   - Collection: `fund_handovers`
-   - Fields: cash_amount, transfer_amount, cashier_shift_id
-   
-3. **Deposits** (manager thêm tiền)
-   - Collection: `fund_transactions` (new)
-   - Type: "deposit"
+### US4: Chi tiết nguồn giao dịch
+**Là** manager
+**Tôi muốn** xem giao dịch quỹ liên kết đến record gốc
+**Để** hiểu tại sao tiền ra/vào
 
-### Giao dịch ra quỹ (Outflow):
-1. **Withdrawals** (manager rút tiền)
-   - Collection: `fund_transactions` (new)
-   - Type: "withdrawal"
+**Acceptance Criteria:**
+- Mỗi giao dịch có badge hiển thị nguồn (expense / ingredient / handover / manual / fund_transfer)
+- Nhấn vào giao dịch → xem modal chi tiết
+- Modal chi tiết hiển thị:
+  - Thông tin giao dịch (type, amount, reason, người thực hiện, thời gian)
+  - Số dư trước / sau
+  - Link đến record gốc: expense → xem expense; ingredient → xem restock; handover → xem ca
+  - Với giao dịch chuyển quỹ: hiển thị quỹ nguồn → quỹ đích
 
-2. **Starting Float** (tiền đầu ca cho cashier)
-   - Collection: `cashier_shifts`
-   - Field: starting_float
+---
 
-## Technical Requirements
+### US5: Bàn giao ca → Quỹ
+**Là** manager
+**Tôi muốn** xem giao dịch bàn giao ca phản ánh đúng trong quỹ
+**Để** đối chiếu với thực tế
 
-### Backend:
-1. Tạo domain model `FundTransaction`
-2. Tạo repository `FundTransactionRepository`
-3. Tạo service `FundService` với methods:
-   - `GetCurrentBalance()` - tính số dư hiện tại
-   - `GetTransactionHistory(filters)` - lấy lịch sử
-   - `Deposit(amount, type, reason)` - thêm tiền
-   - `Withdraw(amount, type, reason)` - rút tiền
-   - `GetTransactionDetail(id)` - chi tiết giao dịch
-4. Tạo HTTP handlers cho manager role
-5. API endpoints:
-   - `GET /api/manager/fund/balance` - số dư hiện tại
-   - `GET /api/manager/fund/transactions` - lịch sử (with filters)
-   - `POST /api/manager/fund/deposit` - thêm tiền
-   - `POST /api/manager/fund/withdraw` - rút tiền
-   - `GET /api/manager/fund/transactions/:id` - chi tiết
+**Acceptance Criteria:**
+- Khi cashier kết thúc ca và bàn giao tiền, tạo FundTransaction với type=`fund_handover`, fund_type=`cash_drawer`
+- Hiển thị trong lịch sử quỹ với badge "Bàn giao ca"
+- Link tới cashier shift record tương ứng
 
-### Frontend:
-1. Tạo view `FundManagementView.vue`
-2. Tạo service `fundService.js`
-3. Tạo store `fundStore.js` (optional)
-4. Components:
-   - `FundBalanceCard.vue` - hiển thị số dư
-   - `FundTransactionList.vue` - danh sách giao dịch
-   - `DepositModal.vue` - form thêm tiền
-   - `WithdrawalModal.vue` - form rút tiền
-   - `TransactionDetailModal.vue` - chi tiết giao dịch
+---
 
-## UI/UX Requirements
+### US6: Nạp tiền / Rút tiền thủ công
+**Là** manager
+**Tôi muốn** nạp hoặc rút tiền thủ công từ bất kỳ quỹ nào
+**Để** điều chỉnh số dư quỹ
 
-### Mobile-First Design:
-- Card-based layout
-- Pull-to-refresh
-- Touch-friendly buttons (min 44px height)
-- Bottom navigation
-- Responsive grid
+**Acceptance Criteria:**
+- Chọn quỹ muốn nạp/rút
+- Chọn loại tiền: tiền mặt / chuyển khoản
+- Nhập số tiền (rút: validate ≤ số dư loại tiền đó trong quỹ)
+- Nhập lý do (tối thiểu 10 ký tự)
+- Hiển thị số dư quỹ hiện tại trước khi xác nhận
 
-### Color Coding:
-- 💵 Green: Tiền mặt (cash)
-- 💳 Blue: Chuyển khoản (transfer)
-- 📥 Green: Giao dịch vào (inflow/deposit)
-- 📤 Red: Giao dịch ra (outflow/withdrawal)
-- 🔄 Orange: Handover transactions
+---
 
-### Navigation:
-- Thêm menu item "💰 Quỹ tiền" trong manager dashboard
-- Route: `/manager/fund`
+### US7: Chuyển tiền giữa quỹ
+**Là** manager
+**Tôi muốn** chuyển tiền từ quỹ này sang quỹ khác
+**Để** phân bổ vốn theo nhu cầu
 
-## Security & Permissions
-- Chỉ manager role mới được truy cập
-- Tất cả operations phải ghi audit log
-- Validate permissions ở cả frontend và backend
+**Acceptance Criteria:**
+- Chọn quỹ nguồn và quỹ đích (không được trùng nhau)
+- Chọn loại tiền: tiền mặt / chuyển khoản
+- Nhập số tiền (validate ≤ số dư loại tiền đó của quỹ nguồn)
+- Nhập lý do
+- Tạo atomic: 1 withdrawal từ quỹ nguồn + 1 deposit vào quỹ đích, cross-reference lẫn nhau
+- Hiển thị 2 giao dịch liên kết trong lịch sử
 
-## Future Enhancements (Out of Scope)
-- Export báo cáo Excel/PDF
-- Biểu đồ thống kê dòng tiền
-- Alerts khi số dư thấp
-- Multi-currency support
-- Reconciliation với bank statements
+---
+
+## Data Flow
+
+```
+Order completed
+    ↓
+Waiter bàn giao cho Cashier (cash_handover)
+    ↓ tiền mặt vào ngăn kéo
+Cashier kết ca → bàn giao cho Manager (fund_handover)
+    ↓ FundTransaction(type=fund_handover, fund_type=cash_drawer)
+
+Manager phân bổ:
+    ├─ Chuyển sang Quỹ vận hành   → fund_transfer
+    ├─ Chuyển sang Quỹ nguyên liệu → fund_transfer
+    └─ Chuyển sang Quỹ lợi nhuận  → fund_transfer
+
+Chi phí phát sinh:
+    ├─ Expense "Chi từ quỹ" → withdrawal, fund_type=operating, source_type=expense
+    └─ Mua nguyên liệu      → withdrawal, fund_type=inventory, source_type=ingredient
+```

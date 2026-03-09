@@ -303,7 +303,7 @@ const loadingManagedFunds = ref(false)
 
 // Cashier shift management state
 const showStartModal = ref(false)
-const startingFloat = ref(null)
+const startingFloat = ref(1000000) // Default 1,000,000 VND
 const startingFloatError = ref(null)
 const startingLoading = ref(false)
 
@@ -365,7 +365,7 @@ const handleStartShift = async () => {
   try {
     await cashierShiftStore.startCashierShift(startingFloat.value)
     showStartModal.value = false
-    startingFloat.value = null
+    startingFloat.value = 1000000 // Reset to default
     await refreshData()
   } catch (error) {
     startingFloatError.value = error.response?.data?.error || 'Không thể bắt đầu ca'

@@ -8,6 +8,7 @@ import FacilityManagementView from '../views/FacilityManagementView.vue'
 import FacilityAddEditView from '../views/FacilityAddEditView.vue'
 import ExpenseManagementView from '../views/ExpenseManagementView.vue'
 import OrderView from '../views/OrderView.vue'
+import CreateOrderView from '../views/CreateOrderView.vue'
 import BaristaView from '../views/BaristaView.vue'
 import ShiftView from '../views/ShiftView.vue'
 import ManagerShiftView from '../views/ManagerShiftView.vue'
@@ -80,6 +81,12 @@ const routes = [
     path: '/orders',
     name: 'Orders',
     component: OrderView,
+    meta: { requiresAuth: true, requiresNotBarista: true }
+  },
+  {
+    path: '/create-order',
+    name: 'CreateOrder',
+    component: CreateOrderView,
     meta: { requiresAuth: true, requiresNotBarista: true }
   },
   {

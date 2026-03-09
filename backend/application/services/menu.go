@@ -158,12 +158,15 @@ func (s *MenuService) UpdateMenuItem(ctx context.Context, id primitive.ObjectID,
 				if req.Price > 0 {
 					item.Price = req.Price
 				}
-				if len(req.Ingredients) > 0 {
+				// Always update ingredients if provided (even if empty)
+				if req.Ingredients != nil {
 					item.Ingredients = req.Ingredients
 					
-					// Validate batch ingredients
-					if err := s.validateBatchIngredients(ctx, req.Ingredients); err != nil {
-						return nil, err
+					// Validate batch ingredients (only if not empty)
+					if len(req.Ingredients) > 0 {
+						if err := s.validateBatchIngredients(ctx, req.Ingredients); err != nil {
+							return nil, err
+						}
 					}
 				}
 			}
@@ -187,12 +190,15 @@ func (s *MenuService) UpdateMenuItem(ctx context.Context, id primitive.ObjectID,
 				if req.Price > 0 {
 					item.Price = req.Price
 				}
-				if len(req.Ingredients) > 0 {
+				// Always update ingredients if provided in request (even if empty array)
+				if req.Ingredients != nil {
 					item.Ingredients = req.Ingredients
 					
-					// Validate batch ingredients
-					if err := s.validateBatchIngredients(ctx, req.Ingredients); err != nil {
-						return nil, err
+					// Validate batch ingredients (only if not empty)
+					if len(req.Ingredients) > 0 {
+						if err := s.validateBatchIngredients(ctx, req.Ingredients); err != nil {
+							return nil, err
+						}
 					}
 				}
 			}
@@ -216,12 +222,15 @@ func (s *MenuService) UpdateMenuItem(ctx context.Context, id primitive.ObjectID,
 			if req.Price > 0 {
 				item.Price = req.Price
 			}
-			if len(req.Ingredients) > 0 {
+			// Always update ingredients if provided in request (even if empty array)
+			if req.Ingredients != nil {
 				item.Ingredients = req.Ingredients
 				
-				// Validate batch ingredients
-				if err := s.validateBatchIngredients(ctx, req.Ingredients); err != nil {
-					return nil, err
+				// Validate batch ingredients (only if not empty)
+				if len(req.Ingredients) > 0 {
+					if err := s.validateBatchIngredients(ctx, req.Ingredients); err != nil {
+						return nil, err
+					}
 				}
 			}
 		}

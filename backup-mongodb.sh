@@ -1,64 +1,62 @@
 #!/bin/bash
+
+# Script to backup MongoDB from Docker container
+# Usage: ./backup-mongodb.sh [output_directory]
+
 set -e
 
-# Load environment variables
-if [ -f .env ]; then
-    export $(cat .env | grep -v '^#' | xargs)
-else
-    echo "❌ File .env không tồn tại!"
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Configuration
+CONTAINER_NAME="cafe-pos-mongodb"
+DB_NAME="cafe_pos"
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+OUTPUT_DIR="${1:-./mongodb_backup_${TIMESTAMP}}"
+
+echo -e "${GREEN}=== MongoDB Backup Script ===${NC}"
+echo ""
+
+# Check if container is running
+if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+    echo -e "${RED}Error: Container '$CONTAINER_NAME' is not running${NC}"
     exit 1
 fi
 
-BACKUP_DIR="./mongodb-backup"
-TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-BACKUP_PATH="${BACKUP_DIR}/backup-${TIMESTAMP}"
+# Create output directory
+mkdir -p "$OUTPUT_DIR"
 
-echo "🗄️  MongoDB Backup Script"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-echo "📁 Backup location: ${BACKUP_PATH}"
-echo ""
+# Perform backup
+echo "Backing up database '$DB_NAME' to '$OUTPUT_DIR'..."
+docker exec $CONTAINER_NAME mongodump \
+    --db $DB_NAME \
+    --out /tmp/backup
 
-# Create backup directory
-mkdir -p ${BACKUP_DIR}
+# Copy backup from container
+echo "Copying backup files from container..."
+docker cp $CONTAINER_NAME:/tmp/backup/$DB_NAME "$OUTPUT_DIR/"
 
-echo "🔄 Đang backup MongoDB..."
-docker exec cafe-pos-mongodb mongodump \
-  --username ${MONGO_INITDB_ROOT_USERNAME} \
-  --password ${MONGO_INITDB_ROOT_PASSWORD} \
-  --authenticationDatabase admin \
-  --out /data/backup-${TIMESTAMP}
+# Clean up container
+echo "Cleaning up temporary files in container..."
+docker exec $CONTAINER_NAME rm -rf /tmp/backup
+
+# Create backup info file
+cat > "$OUTPUT_DIR/backup_info.txt" << EOF
+Backup Information
+==================
+Database: $DB_NAME
+Container: $CONTAINER_NAME
+Timestamp: $TIMESTAMP
+Date: $(date)
+EOF
 
 echo ""
-echo "📦 Copy backup ra ngoài container..."
-docker cp cafe-pos-mongodb:/data/backup-${TIMESTAMP} ${BACKUP_PATH}
-
+echo -e "${GREEN}=== Backup Complete ===${NC}"
 echo ""
-echo "🧹 Dọn dẹp backup trong container..."
-docker exec cafe-pos-mongodb rm -rf /data/backup-${TIMESTAMP}
-
+echo "Backup saved to: $OUTPUT_DIR"
 echo ""
-echo "✅ Backup hoàn tất!"
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "📊 Thông tin backup:"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-echo "Location: ${BACKUP_PATH}"
-echo "Size: $(du -sh ${BACKUP_PATH} | cut -f1)"
-echo ""
-echo "Collections:"
-ls -lh ${BACKUP_PATH}/${MONGODB_DATABASE:-cafe_pos}/ 2>/dev/null || echo "  (Không tìm thấy collections)"
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "💡 Để restore backup này:"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-echo "docker cp ${BACKUP_PATH} cafe-pos-mongodb:/data/"
-echo "docker exec cafe-pos-mongodb mongorestore \\"
-echo "  --username ${MONGO_INITDB_ROOT_USERNAME} \\"
-echo "  --password ${MONGO_INITDB_ROOT_PASSWORD} \\"
-echo "  --authenticationDatabase admin \\"
-echo "  --drop \\"
-echo "  /data/backup-${TIMESTAMP}"
-echo ""
+echo "To restore this backup, run:"
+echo "  ./restore-mongodb.sh $OUTPUT_DIR/$DB_NAME"

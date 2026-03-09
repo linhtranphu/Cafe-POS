@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E \"\\\\.\\(vue|js|go|html\\)$\")",
+      "Bash(xargs cat)",
+      "Bash(go build ./...)",
+      "Bash(go build -v .)",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/login -H \"Content-Type: application/json\" -d '{\"\"username\"\":\"\"admin\"\",\"\"password\"\":\"\"admin123\"\"}')",
+      "Bash(curl -s http://localhost:3000/api/health)",
+      "Bash(curl -s http://localhost:3000/health)",
+      "Bash(curl -s -X POST http://localhost:3000/api/login -H \"Content-Type: application/json\" -d '{\"\"username\"\":\"\"admin\"\",\"\"password\"\":\"\"admin123\"\"}')",
+      "Bash(docker ps --format \"table {{.Names}}\\\\t{{.Image}}\\\\t{{.Ports}}\")",
+      "Bash(lsof -i :3000)",
+      "Read(//Volumes/Linh-DAT/Misc Projects/Cafe POS/**)",
+      "Bash(go build -o main .)",
+      "Bash(bash restart_local.sh)",
+      "Bash(docker exec cafe-pos-mongodb mongosh --username admin --password password123 --authenticationDatabase admin --quiet --eval \"try { rs.status\\(\\).ok } catch\\(e\\) { 0 }\")",
+      "Bash(docker exec cafe-pos-mongodb mongosh --username admin --password \"108trannhatduat\" --authenticationDatabase admin --eval \":*)",
+      "Bash(# Kill existing processes lsof -t -i:3000)",
+      "Bash(xargs kill -9)",
+      "Bash(lsof -t -i:5173)",
+      "Bash(curl -s http://localhost:3000/api/login -X POST -H \"Content-Type: application/json\" -d '{\"\"username\"\":\"\"admin\"\",\"\"password\"\":\"\"admin123\"\"}')",
+      "Bash(curl -s http://localhost:5173)",
+      "Bash(lsof -t -i:3000)",
+      "Bash(xxd)",
+      "Bash(go build .)"
+    ]
+  }
+}

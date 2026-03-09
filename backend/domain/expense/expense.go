@@ -1,6 +1,7 @@
 package expense
 
 import (
+	"errors"
 	"time"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -10,6 +11,7 @@ const (
 	PaymentMethodCash = "cash"
 	PaymentMethodBank = "bank"
 	PaymentMethodCard = "card"
+	PaymentMethodFund = "fund" // Payment from fund
 )
 
 // Recurring Frequency Constants
@@ -43,6 +45,10 @@ type Expense struct {
 	SourceType string             `bson:"source_type,omitempty" json:"source_type,omitempty"`
 	SourceID   primitive.ObjectID `bson:"source_id,omitempty" json:"source_id,omitempty"`
 	
+	// Fund integration fields
+	PaidFromFund      bool               `bson:"paid_from_fund" json:"paid_from_fund"`
+	FundTransactionID primitive.ObjectID `bson:"fund_transaction_id,omitempty" json:"fund_transaction_id,omitempty"`
+	
 	// Creator tracking
 	CreatedBy string    `bson:"created_by" json:"created_by"`
 	CreatedAt time.Time `bson:"created_at" json:"created_at"`
@@ -75,4 +81,38 @@ type PrepaidExpense struct {
 	StartDate   time.Time          `bson:"start_date" json:"start_date"`
 	EndDate     time.Time          `bson:"end_date" json:"end_date"`
 	CreatedAt   time.Time          `bson:"created_at" json:"created_at"`
+}
+
+// ValidateFundPaymentConsistency validates that fund payment fields are consistent
+// Requirement 8.6: When paid_from_fund is true, fund_transaction_id must be populated
+// Requirement 10.1: When paid_from_fund is true, payment_method must be "fund"
+func (e *Expense) ValidateFundPaymentConsistency() error {
+	if e.PaidFromFund {
+		if e.FundTransactionID.IsZero() {
+			return errors.New("fund_transaction_id is required when paid_from_fund is true")
+		}
+		if e.PaymentMethod != PaymentMethodFund {
+			return errors.New("payment_method must be 'fund' when paid_from_fund is true")
+		}
+	}
+	
+	// If payment method is fund, paid_from_fund must be true
+	if e.PaymentMethod == PaymentMethodFund && !e.PaidFromFund {
+		return errors.New("paid_from_fund must be true when payment_method is 'fund'")
+	}
+	
+	return nil
+}
+
+// IsModifiable checks if the expense can be modified
+// Requirement 11.1: Cannot modify paid_from_fund flag if fund_transaction_id is populated
+// Requirement 11.3: Cannot modify amount if paid from fund
+func (e *Expense) IsModifiable() bool {
+	return !e.PaidFromFund || e.FundTransactionID.IsZero()
+}
+
+// CanModifyAmount checks if the expense amount can be modified
+// Requirement 11.3: Cannot modify amount if paid from fund
+func (e *Expense) CanModifyAmount() bool {
+	return !e.PaidFromFund
 }

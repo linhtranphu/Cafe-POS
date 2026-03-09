@@ -784,6 +784,21 @@ func (s *CashierShiftService) CloseShiftWithFundHandover(
 			return nil, fmt.Errorf("failed to create fund handover: %w", err)
 		}
 
+		// 9b. Record FundTransaction for this handover (cash_drawer fund)
+		if s.fundService != nil {
+			if err := s.fundService.RecordHandover(
+				sessCtx,
+				handover.CashAmount,
+				handover.TransferAmount,
+				shift.ID,
+				shift.CashierID,
+				shift.CashierName,
+				"cashier",
+			); err != nil {
+				log.Printf("⚠️ [FUND HANDOVER TX] Failed to record fund transaction: %v (non-fatal)", err)
+			}
+		}
+
 		// 10. Initiate closure
 		if err := shift.InitiateClosure(userID, deviceID, now); err != nil {
 			return nil, fmt.Errorf("failed to initiate closure: %w", err)

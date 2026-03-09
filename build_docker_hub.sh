@@ -158,6 +158,29 @@ else
 fi
 
 echo ""
+
+# Cleanup Docker to free up space
+echo "=========================================="
+echo "🧹 Cleaning up Docker..."
+echo "=========================================="
+echo ""
+
+echo "Removing dangling images..."
+docker image prune -f
+
+echo ""
+echo "Removing unused build cache..."
+docker builder prune -f
+
+echo ""
+echo "Removing stopped containers..."
+docker container prune -f
+
+echo ""
+echo "📊 Docker disk usage after cleanup:"
+docker system df
+
+echo ""
 echo "=========================================="
 echo "✅ All Done!"
 echo "=========================================="
@@ -169,6 +192,10 @@ echo "  Print Bridge: $PRINT_BRIDGE_IMAGE:latest"
 echo ""
 echo "🚀 Images are now available on Docker Hub"
 echo "   Ready for deployment!"
+echo ""
+echo "💡 Tip: If you need more space, run:"
+echo "   docker system prune -a --volumes"
+echo "   (This will remove ALL unused images and volumes)"
 echo ""
 echo "📝 To deploy on production:"
 echo "   Backend/Frontend: docker-compose pull && docker-compose up -d"

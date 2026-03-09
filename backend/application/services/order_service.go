@@ -20,6 +20,7 @@ type OrderRepository interface {
 	FindByWaiterID(ctx context.Context, waiterID primitive.ObjectID) ([]*order.Order, error)
 	FindByStatus(ctx context.Context, status order.OrderStatus) ([]*order.Order, error)
 	FindByOrderNumber(ctx context.Context, orderNumber string) (*order.Order, error)
+	FindByIDs(ctx context.Context, ids []primitive.ObjectID) ([]*order.Order, error)
 	FindAll(ctx context.Context) ([]*order.Order, error)
 }
 
@@ -703,4 +704,211 @@ func (s *OrderService) deductBatchIngredients(ctx context.Context, o *order.Orde
 	}
 
 	return totalBatchCost, nil
+}
+
+// PrintTemporaryBill - Mark order as bill printed (for temporary bill printing)
+func (s *OrderService) PrintTemporaryBill(ctx context.Context, id primitive.ObjectID) (*order.Order, error) {
+	o, err := s.orderRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("order not found: %w", err)
+	}
+
+	log.Printf("[ORDER] PrintTemporaryBill called for order %s (ID: %s)", o.OrderNumber, o.ID.Hex())
+
+	// Only allow printing bill for CREATED status orders
+	if o.Status != order.StatusCreated {
+		return nil, fmt.Errorf("can only print temporary bill for unpaid orders")
+	}
+
+	// Mark as bill printed
+	o.BillPrinted = true
+	o.UpdatedAt = time.Now()
+
+	if err := s.orderRepo.Update(ctx, o.ID, o); err != nil {
+		return nil, fmt.Errorf("failed to update order: %w", err)
+	}
+
+	log.Printf("[ORDER] Order %s marked as bill_printed=true", o.OrderNumber)
+
+	// Trigger print job if print service is available
+	if s.printService != nil {
+		log.Printf("[ORDER] Calling CreateTempBillJob for order %s", o.OrderNumber)
+		if err := s.printService.CreateTempBillJob(ctx, o); err != nil {
+			// Log error but don't fail the operation
+			log.Printf("[ORDER ERROR] Failed to print temp bill for order %s: %v", o.OrderNumber, err)
+			fmt.Printf("Warning: Failed to print temp bill for order %s: %v\n", o.OrderNumber, err)
+		} else {
+			log.Printf("[ORDER] CreateTempBillJob completed successfully for order %s", o.OrderNumber)
+		}
+	} else {
+		log.Printf("[ORDER WARNING] Print service is nil, cannot create temp bill job")
+	}
+
+	return o, nil
+}
+
+// MergeOrders - Merge multiple unpaid orders into one
+func (s *OrderService) MergeOrders(ctx context.Context, req *order.MergeOrdersRequest, userID, userName string) (*order.MergeOrdersResponse, error) {
+	// Validate minimum orders
+	if len(req.OrderIDs) < 2 {
+		return nil, errors.New("phải chọn ít nhất 2 orders để gộp")
+	}
+
+	// Convert string IDs to ObjectIDs
+	orderIDs := make([]primitive.ObjectID, 0, len(req.OrderIDs))
+	for _, idStr := range req.OrderIDs {
+		id, err := primitive.ObjectIDFromHex(idStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid order ID: %s", idStr)
+		}
+		orderIDs = append(orderIDs, id)
+	}
+
+	// Fetch all orders
+	orders, err := s.orderRepo.FindByIDs(ctx, orderIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch orders: %w", err)
+	}
+
+	// Validate all orders exist
+	if len(orders) != len(orderIDs) {
+		return nil, errors.New("một số orders không tồn tại")
+	}
+
+	// Validate all orders are mergeable
+	var shiftID primitive.ObjectID
+	hasPaidOrder := false
+	totalAmountPaid := 0.0
+	allItems := []order.OrderItem{}
+	totalDiscount := 0.0
+	cancelledOrderNumbers := []string{}
+
+	for i, o := range orders {
+		// Check if order is mergeable (CREATED or PAID only)
+		if !o.IsMergeable() {
+			return nil, fmt.Errorf("order %s không thể gộp (status: %s)", o.OrderNumber, o.Status)
+		}
+
+		// First order sets the shift ID
+		if i == 0 {
+			shiftID = o.ShiftID
+		} else {
+			// All orders must be in the same shift
+			if o.ShiftID != shiftID {
+				return nil, errors.New("các orders phải thuộc cùng một ca làm việc")
+			}
+		}
+
+		// Check if any order is PAID
+		if o.Status == order.StatusPaid {
+			hasPaidOrder = true
+		}
+
+		// Accumulate amount paid
+		totalAmountPaid += o.AmountPaid
+
+		// Collect all items
+		allItems = append(allItems, o.Items...)
+
+		// Accumulate discounts
+		totalDiscount += o.Discount
+
+		// Track order numbers for cancellation
+		cancelledOrderNumbers = append(cancelledOrderNumbers, o.OrderNumber)
+	}
+
+	// Validate shift is still open
+	shift, err := s.shiftRepo.FindByID(ctx, shiftID)
+	if err != nil || shift.Status != order.ShiftOpen {
+		return nil, errors.New("ca làm việc đã đóng, không thể gộp orders")
+	}
+
+	// Generate new order number
+	now := time.Now()
+	newOrderNumber := fmt.Sprintf("%s-%03d", now.Format("20060102-150405"), now.Nanosecond()/1000000%1000)
+
+	// Determine customer name (use provided or from first order)
+	customerName := req.CustomerName
+	if customerName == "" {
+		customerName = orders[0].CustomerName
+	}
+
+	// Determine waiter (use first order's waiter)
+	waiterID := orders[0].WaiterID
+	waiterName := orders[0].WaiterName
+
+	// Determine status and payment info
+	var newStatus order.OrderStatus
+	var paymentMethod order.PaymentMethod
+	var collectorID primitive.ObjectID
+	var collectorName string
+	var paidAt *time.Time
+
+	if hasPaidOrder {
+		// If any order is PAID, merged order is PAID
+		newStatus = order.StatusPaid
+		// Use payment info from first PAID order
+		for _, o := range orders {
+			if o.Status == order.StatusPaid {
+				paymentMethod = o.PaymentMethod
+				collectorID = o.CollectorID
+				collectorName = o.CollectorName
+				paidAt = o.PaidAt
+				break
+			}
+		}
+	} else {
+		// All orders are CREATED
+		newStatus = order.StatusCreated
+	}
+
+	// Create merged order
+	mergedOrder := &order.Order{
+		OrderNumber:   newOrderNumber,
+		CustomerName:  customerName,
+		WaiterID:      waiterID,
+		WaiterName:    waiterName,
+		ShiftID:       shiftID,
+		Items:         allItems,
+		Discount:      totalDiscount,
+		Status:        newStatus,
+		AmountPaid:    totalAmountPaid,
+		Note:          req.Note,
+		PaymentMethod: paymentMethod,
+		CollectorID:   collectorID,
+		CollectorName: collectorName,
+		PaidAt:        paidAt,
+		BillPrinted:   false, // New order hasn't been printed yet
+	}
+
+	// Calculate totals
+	mergedOrder.CalculateTotal()
+
+	// Create the merged order
+	if err := s.orderRepo.Create(ctx, mergedOrder); err != nil {
+		return nil, fmt.Errorf("failed to create merged order: %w", err)
+	}
+
+	log.Printf("[ORDER] Created merged order %s from %d orders", mergedOrder.OrderNumber, len(orders))
+
+	// Cancel all original orders
+	cancelReason := fmt.Sprintf("Đã gộp vào order #%s", mergedOrder.OrderNumber)
+	for _, o := range orders {
+		o.Status = order.StatusCancelled
+		o.CancelReason = cancelReason
+		o.UpdatedAt = time.Now()
+
+		if err := s.orderRepo.Update(ctx, o.ID, o); err != nil {
+			log.Printf("[ORDER ERROR] Failed to cancel order %s: %v", o.OrderNumber, err)
+			// Continue with other orders even if one fails
+		} else {
+			log.Printf("[ORDER] Cancelled order %s (merged into %s)", o.OrderNumber, mergedOrder.OrderNumber)
+		}
+	}
+
+	return &order.MergeOrdersResponse{
+		MergedOrder:     mergedOrder,
+		CancelledOrders: cancelledOrderNumbers,
+		Message:         fmt.Sprintf("Đã gộp %d orders thành order #%s", len(orders), mergedOrder.OrderNumber),
+	}, nil
 }

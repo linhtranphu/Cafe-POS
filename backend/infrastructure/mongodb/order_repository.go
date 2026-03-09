@@ -179,6 +179,33 @@ func (r *OrderRepository) FindByOrderNumber(ctx context.Context, orderNumber str
 	return &o, nil
 }
 
+func (r *OrderRepository) FindByIDs(ctx context.Context, ids []primitive.ObjectID) ([]*order.Order, error) {
+	ctx, cancel := WithQueryTimeout(ctx)
+	defer cancel()
+	
+	cursor, err := r.collection.Find(ctx, bson.M{"_id": bson.M{"$in": ids}})
+	if err != nil {
+		if IsCollectionNotFoundError(err) {
+			return []*order.Order{}, nil
+		}
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var orders []*order.Order
+	if err = cursor.All(ctx, &orders); err != nil {
+		if IsCollectionNotFoundError(err) {
+			return []*order.Order{}, nil
+		}
+		return nil, err
+	}
+	
+	if orders == nil {
+		orders = []*order.Order{}
+	}
+	return orders, nil
+}
+
 func (r *OrderRepository) Delete(ctx context.Context, id primitive.ObjectID) error {
 	ctx, cancel := WithQueryTimeout(ctx)
 	defer cancel()

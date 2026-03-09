@@ -22,8 +22,7 @@ export const PAYMENT_METHOD = {
 // Payment Method Display
 export const PAYMENT_METHOD_DISPLAY = [
   { value: PAYMENT_METHOD.CASH, label: 'Tiền mặt', icon: '💵' },
-  { value: PAYMENT_METHOD.QR, label: 'QR', icon: '📱' },
-  { value: PAYMENT_METHOD.TRANSFER, label: 'CK', icon: '🏦' }
+  { value: PAYMENT_METHOD.QR, label: 'QR', icon: '📱' }
 ]
 
 // Order Status Display

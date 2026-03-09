@@ -235,10 +235,10 @@ func (m *MenuItem) Validate() error {
 			}
 		}
 		
-		// IMPORTANT: When has_variants=true, old fields should be empty
-		// This prevents data inconsistency
+		// IMPORTANT: When has_variants=true, old fields should be cleared
+		// Auto-fix: set price to 0 instead of returning error
 		if m.Price > 0 {
-			return fmt.Errorf("price should not be set when has_variants=true (use variants instead)")
+			m.Price = 0
 		}
 		if len(m.Ingredients) > 0 {
 			return fmt.Errorf("ingredients should not be set when has_variants=true (use variants instead)")

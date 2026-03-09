@@ -16,6 +16,12 @@ type Facility struct {
 	Cost        float64            `json:"cost" bson:"cost"`
 	Supplier    string             `json:"supplier" bson:"supplier"`
 	Notes       string             `json:"notes" bson:"notes"`
+
+	// Fund payment tracking
+	PaidFromFund      bool               `json:"paid_from_fund" bson:"paid_from_fund"`
+	ExpenseID         primitive.ObjectID `json:"expense_id,omitempty" bson:"expense_id,omitempty"`
+	FundTransactionID primitive.ObjectID `json:"fund_transaction_id,omitempty" bson:"fund_transaction_id,omitempty"`
+
 	CreatedAt   time.Time          `json:"created_at" bson:"created_at"`
 	UpdatedAt   time.Time          `json:"updated_at" bson:"updated_at"`
 }

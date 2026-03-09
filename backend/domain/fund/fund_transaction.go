@@ -11,8 +11,32 @@ import (
 type TransactionType string
 
 const (
-	TransactionTypeDeposit    TransactionType = "deposit"
-	TransactionTypeWithdrawal TransactionType = "withdrawal"
+	TransactionTypeDeposit       TransactionType = "deposit"
+	TransactionTypeWithdrawal    TransactionType = "withdrawal"
+	TransactionTypeFundHandover  TransactionType = "fund_handover"
+	TransactionTypeStartingFloat TransactionType = "starting_float"
+)
+
+// FundType represents which fund a transaction belongs to
+type FundType string
+
+const (
+	FundTypeOperating  FundType = "operating"
+	FundTypeInventory  FundType = "inventory"
+	FundTypeProfit     FundType = "profit"
+	FundTypeCashDrawer FundType = "cash_drawer"
+)
+
+// SourceType represents the origin/source of a fund transaction
+type SourceType string
+
+const (
+	SourceTypeExpense      SourceType = "expense"
+	SourceTypeIngredient   SourceType = "ingredient"
+	SourceTypeFacility     SourceType = "facility"
+	SourceTypeHandover     SourceType = "handover"
+	SourceTypeManual       SourceType = "manual"
+	SourceTypeFundTransfer SourceType = "fund_transfer"
 )
 
 // FundBalance represents the balance of the fund
@@ -24,20 +48,25 @@ type FundBalance struct {
 
 // FundTransaction represents a deposit or withdrawal transaction
 type FundTransaction struct {
-	ID              primitive.ObjectID  `bson:"_id,omitempty" json:"id"`
-	Type            TransactionType     `bson:"type" json:"type"`
-	CashAmount      float64             `bson:"cash_amount" json:"cash_amount"`
-	TransferAmount  float64             `bson:"transfer_amount" json:"transfer_amount"`
-	TotalAmount     float64             `bson:"total_amount" json:"total_amount"`
-	Reason          string              `bson:"reason" json:"reason"`
-	PerformedBy     primitive.ObjectID  `bson:"performed_by" json:"performed_by"`
-	PerformedByName string              `bson:"performed_by_name" json:"performed_by_name"`
-	PerformedByRole string              `bson:"performed_by_role" json:"performed_by_role"`
-	Timestamp       time.Time           `bson:"timestamp" json:"timestamp"`
-	BalanceBefore   *FundBalance        `bson:"balance_before,omitempty" json:"balance_before,omitempty"`
-	BalanceAfter    *FundBalance        `bson:"balance_after,omitempty" json:"balance_after,omitempty"`
-	CreatedAt       time.Time           `bson:"created_at" json:"created_at"`
-	UpdatedAt       time.Time           `bson:"updated_at" json:"updated_at"`
+	ID              primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	Type            TransactionType    `bson:"type" json:"type"`
+	FundType        FundType           `bson:"fund_type,omitempty" json:"fund_type,omitempty"`
+	CashAmount      float64            `bson:"cash_amount" json:"cash_amount"`
+	TransferAmount  float64            `bson:"transfer_amount" json:"transfer_amount"`
+	TotalAmount     float64            `bson:"total_amount" json:"total_amount"`
+	Reason          string             `bson:"reason" json:"reason"`
+	Description     string             `bson:"description,omitempty" json:"description,omitempty"`
+	SourceType      SourceType         `bson:"source_type,omitempty" json:"source_type,omitempty"`
+	SourceID        primitive.ObjectID `bson:"source_id,omitempty" json:"source_id,omitempty"`
+	LinkedTxID      primitive.ObjectID `bson:"linked_tx_id,omitempty" json:"linked_tx_id,omitempty"`
+	PerformedBy     primitive.ObjectID `bson:"performed_by" json:"performed_by"`
+	PerformedByName string             `bson:"performed_by_name" json:"performed_by_name"`
+	PerformedByRole string             `bson:"performed_by_role" json:"performed_by_role"`
+	Timestamp       time.Time          `bson:"timestamp" json:"timestamp"`
+	BalanceBefore   *FundBalance       `bson:"balance_before,omitempty" json:"balance_before,omitempty"`
+	BalanceAfter    *FundBalance       `bson:"balance_after,omitempty" json:"balance_after,omitempty"`
+	CreatedAt       time.Time          `bson:"created_at" json:"created_at"`
+	UpdatedAt       time.Time          `bson:"updated_at" json:"updated_at"`
 }
 
 // NewFundTransaction creates a new fund transaction
@@ -49,7 +78,7 @@ func NewFundTransaction(
 	performedByName, performedByRole string,
 ) (*FundTransaction, error) {
 	now := time.Now()
-	
+
 	transaction := &FundTransaction{
 		Type:            transactionType,
 		CashAmount:      cashAmount,
@@ -73,7 +102,13 @@ func NewFundTransaction(
 
 // Validate validates the fund transaction
 func (ft *FundTransaction) Validate() error {
-	if ft.Type != TransactionTypeDeposit && ft.Type != TransactionTypeWithdrawal {
+	validTypes := map[TransactionType]bool{
+		TransactionTypeDeposit:       true,
+		TransactionTypeWithdrawal:    true,
+		TransactionTypeFundHandover:  true,
+		TransactionTypeStartingFloat: true,
+	}
+	if !validTypes[ft.Type] {
 		return errors.New("invalid transaction type")
 	}
 
@@ -108,4 +143,21 @@ func (ft *FundTransaction) Validate() error {
 func (ft *FundTransaction) SetBalances(before, after *FundBalance) {
 	ft.BalanceBefore = before
 	ft.BalanceAfter = after
+}
+
+// SetFundType sets which fund this transaction belongs to
+func (ft *FundTransaction) SetFundType(fundType FundType) {
+	ft.FundType = fundType
+}
+
+// SetSource sets the source reference for this transaction
+func (ft *FundTransaction) SetSource(sourceType SourceType, sourceID primitive.ObjectID) error {
+	ft.SourceType = sourceType
+	ft.SourceID = sourceID
+	return nil
+}
+
+// LinkTo sets the linked transaction ID (used for fund_transfer pairs)
+func (ft *FundTransaction) LinkTo(linkedTxID primitive.ObjectID) {
+	ft.LinkedTxID = linkedTxID
 }

@@ -10,8 +10,9 @@ import (
 type TemplateType string
 
 const (
-	TemplateTypeBill  TemplateType = "BILL"
-	TemplateTypeLabel TemplateType = "LABEL"
+	TemplateTypeBill     TemplateType = "BILL"
+	TemplateTypeLabel    TemplateType = "LABEL"
+	TemplateTypeTempBill TemplateType = "TEMP_BILL" // Bill tạm
 )
 
 // PrintTemplate represents a print template in the system
@@ -45,7 +46,7 @@ type TemplateData struct {
 
 // CreatePrintTemplateRequest represents the request to create a new print template
 type CreatePrintTemplateRequest struct {
-	Type      TemplateType `json:"type" binding:"required,oneof=BILL LABEL"`
+	Type      TemplateType `json:"type" binding:"required,oneof=BILL LABEL TEMP_BILL"`
 	Name      string       `json:"name" binding:"required"`
 	Content   string       `json:"content" binding:"required"`
 	IsDefault bool         `json:"is_default"`
@@ -53,7 +54,7 @@ type CreatePrintTemplateRequest struct {
 
 // UpdatePrintTemplateRequest represents the request to update a print template
 type UpdatePrintTemplateRequest struct {
-	Type      TemplateType `json:"type" binding:"omitempty,oneof=BILL LABEL"`
+	Type      TemplateType `json:"type" binding:"omitempty,oneof=BILL LABEL TEMP_BILL"`
 	Name      string       `json:"name"`
 	Content   string       `json:"content"`
 	IsDefault *bool        `json:"is_default"`

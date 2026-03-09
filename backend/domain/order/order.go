@@ -54,6 +54,7 @@ type Order struct {
 	AmountPaid      float64            `bson:"amount_paid" json:"amount_paid"`
 	AmountDue       float64            `bson:"amount_due" json:"amount_due"`
 	Status          OrderStatus        `bson:"status" json:"status"`
+	BillPrinted     bool               `bson:"bill_printed" json:"bill_printed"` // Đã in bill tạm
 	PaymentMethod   PaymentMethod      `bson:"payment_method,omitempty" json:"payment_method,omitempty"`
 	CollectorID     primitive.ObjectID `bson:"collector_id,omitempty" json:"collector_id,omitempty"`
 	CollectorName   string             `bson:"collector_name,omitempty" json:"collector_name,omitempty"`
@@ -106,6 +107,18 @@ type RefundRequest struct {
 
 type CancelOrderRequest struct {
 	Reason string `json:"reason" binding:"required"`
+}
+
+type MergeOrdersRequest struct {
+	OrderIDs     []string `json:"order_ids" binding:"required,min=2"`
+	CustomerName string   `json:"customer_name"`
+	Note         string   `json:"note"`
+}
+
+type MergeOrdersResponse struct {
+	MergedOrder     *Order   `json:"merged_order"`
+	CancelledOrders []string `json:"cancelled_orders"`
+	Message         string   `json:"message"`
 }
 
 func (o *Order) CalculateTotal() {
@@ -171,4 +184,9 @@ func (o *Order) CanModify() bool {
 func (o *Order) CanRefund() bool {
 	// BR-08: Refunds only allowed before QUEUED
 	return o.Status == StatusPaid && o.AmountPaid > 0
+}
+
+func (o *Order) IsMergeable() bool {
+	// Can only merge orders that are CREATED or PAID (not sent to bar yet)
+	return o.Status == StatusCreated || o.Status == StatusPaid
 }

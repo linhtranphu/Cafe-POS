@@ -71,6 +71,7 @@ const navItems = computed(() => {
   // Default navigation (waiter, etc.)
   return [
     { path: '/dashboard', icon: '🏠', label: 'Trang chủ' },
+    { path: '/create-order', icon: '➕', label: 'Tạo order' },
     { path: '/orders', icon: '📋', label: 'Orders' },
     { path: '/shifts', icon: '⏰', label: 'Ca làm' },
     { path: '/profile', icon: '👤', label: 'Cá nhân' }

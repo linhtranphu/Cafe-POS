@@ -346,17 +346,91 @@
                 class="w-full px-4 py-4 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"></textarea>
             </div>
 
-            <!-- Auto-Expense Indicator -->
-            <div v-if="!editingFacility && formData.cost > 0" 
-              class="bg-green-50 border border-green-200 rounded-lg p-4 mt-6">
-              <div class="flex items-start gap-3">
-                <span class="text-green-600 text-2xl flex-shrink-0">✅</span>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-green-800">Tự động ghi nhận chi phí</p>
-                  <p class="text-xs text-green-600 mt-2 break-words">
-                    Hệ thống sẽ tự động tạo chi phí: <span class="font-semibold">{{ formatPrice(formData.cost) }}</span>
-                  </p>
-                  <p class="text-xs text-green-600 mt-1">Danh mục: Cơ sở vật chất</p>
+            <!-- Fund Payment Option (only when creating, cost > 0) -->
+            <div v-if="!editingFacility && formData.cost > 0">
+              <div class="bg-purple-50 rounded-xl p-4 border-2 border-purple-300">
+                <label class="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    v-model="formData.paid_from_fund"
+                    @change="onPaidFromFundChange"
+                    class="mt-1 w-5 h-5 text-purple-600 rounded focus:ring-2 focus:ring-purple-500" />
+                  <div class="flex-1">
+                    <div class="font-semibold text-gray-800 mb-1">💰 Chi từ quỹ</div>
+                    <p class="text-xs text-gray-600">Tự động trừ tiền từ quỹ và ghi nhận giao dịch</p>
+
+                    <!-- Fund Balance Display (when checked) -->
+                    <div v-if="formData.paid_from_fund" class="mt-3 bg-white rounded-lg p-3 border border-purple-300">
+                      <div v-if="fundBalanceLoading" class="text-xs text-gray-500">Đang tải số dư quỹ...</div>
+                      <div v-else-if="fundBalanceError" class="text-xs text-red-600">⚠️ {{ fundBalanceError }}</div>
+                      <div v-else>
+                        <div class="text-xs text-gray-600 mb-1">Số dư quỹ hiện tại:</div>
+                        <div class="text-lg font-bold text-purple-700">{{ formatPrice(fundBalance?.total || 0) }}</div>
+                        <div class="text-xs text-gray-500 mt-1">
+                          Tiền mặt: {{ formatPrice(fundBalance?.cash || 0) }} •
+                          Chuyển khoản: {{ formatPrice(fundBalance?.transfer || 0) }}
+                        </div>
+
+                        <!-- Money Type Selector -->
+                        <div class="mt-3 pt-3 border-t border-purple-200">
+                          <label class="block text-xs font-medium text-gray-700 mb-2">Trừ từ *</label>
+                          <div class="grid grid-cols-2 gap-2">
+                            <button type="button"
+                              @click="formData.money_type = 'cash'"
+                              :class="formData.money_type === 'cash' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700'"
+                              class="py-2 px-3 rounded-lg text-sm font-medium transition-colors">
+                              💵 Tiền mặt
+                            </button>
+                            <button type="button"
+                              @click="formData.money_type = 'transfer'"
+                              :class="formData.money_type === 'transfer' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'"
+                              class="py-2 px-3 rounded-lg text-sm font-medium transition-colors">
+                              💳 Chuyển khoản
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Insufficient Balance Warning -->
+                    <div v-if="formData.paid_from_fund && !fundBalanceLoading && !fundBalanceError && formData.cost > 0" class="mt-2">
+                      <div v-if="formData.money_type === 'cash' && formData.cost > (fundBalance?.cash || 0)"
+                        class="bg-red-50 border border-red-300 rounded-lg p-2">
+                        <div class="flex items-start gap-2">
+                          <span class="text-red-600 text-lg">⚠️</span>
+                          <div>
+                            <p class="text-xs font-semibold text-red-800">Tiền mặt trong quỹ không đủ!</p>
+                            <p class="text-xs text-red-600 mt-1">
+                              Cần: {{ formatPrice(formData.cost) }} • Có: {{ formatPrice(fundBalance?.cash || 0) }}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div v-else-if="formData.money_type === 'transfer' && formData.cost > (fundBalance?.transfer || 0)"
+                        class="bg-red-50 border border-red-300 rounded-lg p-2">
+                        <div class="flex items-start gap-2">
+                          <span class="text-red-600 text-lg">⚠️</span>
+                          <div>
+                            <p class="text-xs font-semibold text-red-800">Tiền chuyển khoản trong quỹ không đủ!</p>
+                            <p class="text-xs text-red-600 mt-1">
+                              Cần: {{ formatPrice(formData.cost) }} • Có: {{ formatPrice(fundBalance?.transfer || 0) }}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              <!-- Auto-expense note (when NOT paying from fund) -->
+              <div v-if="!formData.paid_from_fund" class="mt-3 bg-green-50 border border-green-200 rounded-lg p-4">
+                <div class="flex items-start gap-3">
+                  <span class="text-green-600 text-xl flex-shrink-0">✅</span>
+                  <div>
+                    <p class="text-sm font-medium text-green-800">Tự động ghi nhận chi phí</p>
+                    <p class="text-xs text-green-600 mt-1">Chi phí <span class="font-semibold">{{ formatPrice(formData.cost) }}</span> sẽ được ghi vào danh mục Cơ sở vật chất</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -388,17 +462,18 @@ import { useFacilityStore } from '../stores/facility'
 import BottomNav from '../components/BottomNav.vue'
 import PullToRefresh from '../components/PullToRefresh.vue'
 import { usePullToRefresh } from '../composables/usePullToRefresh'
-import { 
-  FACILITY_STATUS, 
+import {
+  FACILITY_STATUS,
   FACILITY_STATUS_OPTIONS,
   FACILITY_TYPE_OPTIONS,
   getFacilityStatusClass,
   getIssueStatusClass
 } from '../constants/facility'
-import { 
-  formatDate, 
+import {
+  formatDate,
   formatPrice
 } from '../utils/formatters'
+import { getBalance } from '../services/fund'
 const facilityStore = useFacilityStore()
 
 const searchQuery = ref('')
@@ -418,12 +493,38 @@ const formData = ref({
   purchase_date: '',
   cost: 0,
   supplier: '',
-  notes: ''
+  notes: '',
+  paid_from_fund: false,
+  money_type: 'cash'
 })
 
 const facilities = computed(() => facilityStore.items || [])
 const maintenanceSchedule = ref([])
 const issueReports = ref([])
+
+// Fund balance state
+const fundBalance = ref(null)
+const fundBalanceLoading = ref(false)
+const fundBalanceError = ref(null)
+
+const fetchFundBalance = async () => {
+  fundBalanceLoading.value = true
+  fundBalanceError.value = null
+  try {
+    const response = await getBalance()
+    fundBalance.value = response.current_balance
+  } catch (error) {
+    fundBalanceError.value = 'Không thể tải số dư quỹ. Vui lòng thử lại.'
+  } finally {
+    fundBalanceLoading.value = false
+  }
+}
+
+const onPaidFromFundChange = () => {
+  if (formData.value.paid_from_fund) {
+    fetchFundBalance()
+  }
+}
 
 // Facility categories from constants + custom categories from backend
 const facilityCategories = computed(() => {
@@ -551,9 +652,13 @@ const openCreateModal = () => {
     purchase_date: todayDate,
     cost: 0,
     supplier: '',
-    notes: ''
+    notes: '',
+    paid_from_fund: false,
+    money_type: 'cash'
   }
   editingFacility.value = null
+  fundBalance.value = null
+  fundBalanceError.value = null
   showFacilityForm.value = true
 }
 
@@ -588,28 +693,26 @@ const deleteFacility = async (facility) => {
 
 const saveFacility = async () => {
   try {
-    // Prepare data - convert date format
     const dataToSend = { ...formData.value }
-    
-    // Remove empty purchase_date or convert to ISO format
+
     if (!dataToSend.purchase_date) {
       delete dataToSend.purchase_date
     } else {
-      // Convert YYYY-MM-DD to ISO format YYYY-MM-DDT00:00:00Z
       dataToSend.purchase_date = dataToSend.purchase_date + 'T00:00:00Z'
     }
-    
-    console.log('Sending facility data:', dataToSend)
-    
+
     if (editingFacility.value) {
       await facilityStore.updateFacility(editingFacility.value.id, dataToSend)
       alert('Cập nhật thiết bị thành công')
     } else {
       await facilityStore.createFacility(dataToSend)
-      alert('Thêm thiết bị thành công')
+      if (dataToSend.paid_from_fund && dataToSend.cost > 0) {
+        alert(`Thêm thiết bị thành công!\nĐã trừ ${formatPrice(dataToSend.cost)} từ quỹ (${dataToSend.money_type === 'cash' ? 'tiền mặt' : 'chuyển khoản'})`)
+      } else {
+        alert('Thêm thiết bị thành công')
+      }
     }
-    
-    // Reset form and close modal
+
     formData.value = {
       name: '',
       type: 'Khác',
@@ -619,12 +722,13 @@ const saveFacility = async () => {
       purchase_date: '',
       cost: 0,
       supplier: '',
-      notes: ''
+      notes: '',
+      paid_from_fund: false,
+      money_type: 'cash'
     }
     showFacilityForm.value = false
     editingFacility.value = null
-    
-    // Refresh facilities list
+
     await facilityStore.fetchFacilities()
   } catch (error) {
     console.error('Error saving facility:', error)

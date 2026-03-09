@@ -192,6 +192,7 @@
         <button 
           type="submit"
           :disabled="saving"
+          @click.prevent="handleSubmit"
           class="flex-1 px-4 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed">
           {{ saving ? 'Đang lưu...' : 'Lưu' }}
         </button>
@@ -302,8 +303,16 @@ const validateForm = () => {
 
 // Handle submit
 const handleSubmit = async () => {
+  console.log('[OperatingExpenseForm] Submit triggered')
+  
   // Validate form
   if (!validateForm()) {
+    console.log('[OperatingExpenseForm] Validation failed')
+    return
+  }
+  
+  if (saving.value) {
+    console.log('[OperatingExpenseForm] Already saving, skipping')
     return
   }
   
@@ -322,13 +331,17 @@ const handleSubmit = async () => {
       other_expenses: formData.value.other_expenses || 0
     }
     
+    console.log('[OperatingExpenseForm] Calling API with data:', expenseData)
+    
     // Call API
     const result = await profitAnalysisService.createOperatingExpense(expenseData)
+    
+    console.log('[OperatingExpenseForm] API success:', result)
     
     // Emit save event with result
     emit('save', result)
   } catch (err) {
-    console.error('Error saving operating expense:', err)
+    console.error('[OperatingExpenseForm] Error saving operating expense:', err)
     errors.value.submit = err.response?.data?.error || 'Không thể lưu chi phí vận hành'
   } finally {
     saving.value = false

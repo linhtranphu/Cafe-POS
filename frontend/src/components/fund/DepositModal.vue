@@ -13,6 +13,19 @@
 
       <!-- Form -->
       <form @submit.prevent="handleSubmit" class="p-6 space-y-4">
+        <!-- Fund Type Selector -->
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">Quỹ tiền</label>
+          <select
+            v-model="form.fund_type"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          >
+            <option v-for="key in fundTypeKeys" :key="key" :value="key">
+              {{ FUND_TYPE_ICONS[key] }} {{ FUND_TYPE_LABELS[key] }}
+            </option>
+          </select>
+        </div>
+
         <!-- Money Type Selector -->
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">Loại tiền</label>
@@ -142,12 +155,15 @@
 <script setup>
 import { ref, computed } from 'vue'
 import * as fundService from '../../services/fund'
-import { formatCurrency, MONEY_TYPES, VALIDATION } from '../../constants/fund'
+import { formatCurrency, MONEY_TYPES, VALIDATION, FUND_TYPES, FUND_TYPE_LABELS, FUND_TYPE_ICONS } from '../../constants/fund'
 
 const emit = defineEmits(['close', 'success'])
 
+const fundTypeKeys = [FUND_TYPES.OPERATING, FUND_TYPES.INVENTORY, FUND_TYPES.PROFIT, FUND_TYPES.CASH_DRAWER]
+
 // State
 const form = ref({
+  fund_type: FUND_TYPES.OPERATING,
   money_type: MONEY_TYPES.CASH,
   cash_amount: 0,
   transfer_amount: 0,
@@ -181,6 +197,7 @@ const handleSubmit = async () => {
 
   try {
     const data = {
+      fund_type: form.value.fund_type,
       cash_amount: form.value.money_type === MONEY_TYPES.CASH || form.value.money_type === MONEY_TYPES.BOTH ? form.value.cash_amount : 0,
       transfer_amount: form.value.money_type === MONEY_TYPES.TRANSFER || form.value.money_type === MONEY_TYPES.BOTH ? form.value.transfer_amount : 0,
       reason: form.value.reason

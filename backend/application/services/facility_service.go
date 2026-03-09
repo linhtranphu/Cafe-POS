@@ -265,6 +265,20 @@ func (s *FacilityService) SearchFacilities(ctx context.Context, filter facility.
 	return facilities, total, nil
 }
 
+// CreateFacilityHistory creates a history record for a facility action
+func (s *FacilityService) CreateFacilityHistory(ctx context.Context, facilityID primitive.ObjectID, action, description string, oldValue, newValue interface{}, userID primitive.ObjectID, username string) error {
+	history := &facility.FacilityHistory{
+		FacilityID:  facilityID,
+		Action:      action,
+		Description: description,
+		OldValue:    oldValue,
+		NewValue:    newValue,
+		UserID:      userID,
+		Username:    username,
+	}
+	return s.repo.CreateHistory(ctx, history)
+}
+
 // FacilityType management
 func (s *FacilityService) CreateFacilityType(ctx context.Context, name string) (*facility.FacilityType, error) {
 	ft := &facility.FacilityType{

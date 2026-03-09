@@ -1,3 +1,96 @@
+// Fund types
+export const FUND_TYPES = {
+  OPERATING: 'operating',
+  INVENTORY: 'inventory',
+  PROFIT: 'profit',
+  CASH_DRAWER: 'cash_drawer',
+  ALL: 'all'
+}
+
+// Fund type labels (Vietnamese)
+export const FUND_TYPE_LABELS = {
+  [FUND_TYPES.OPERATING]: 'Quỹ vận hành',
+  [FUND_TYPES.INVENTORY]: 'Quỹ hàng hóa',
+  [FUND_TYPES.PROFIT]: 'Quỹ lợi nhuận',
+  [FUND_TYPES.CASH_DRAWER]: 'Ngăn kéo tiền',
+  [FUND_TYPES.ALL]: 'Tất cả quỹ'
+}
+
+// Fund type icons
+export const FUND_TYPE_ICONS = {
+  [FUND_TYPES.OPERATING]: '⚙️',
+  [FUND_TYPES.INVENTORY]: '📦',
+  [FUND_TYPES.PROFIT]: '💹',
+  [FUND_TYPES.CASH_DRAWER]: '🗄️'
+}
+
+// Fund type colors (Tailwind classes)
+export const FUND_TYPE_COLORS = {
+  [FUND_TYPES.OPERATING]: 'blue',
+  [FUND_TYPES.INVENTORY]: 'green',
+  [FUND_TYPES.PROFIT]: 'yellow',
+  [FUND_TYPES.CASH_DRAWER]: 'purple'
+}
+
+// Source types
+export const SOURCE_TYPES = {
+  EXPENSE: 'expense',
+  INGREDIENT: 'ingredient',
+  FACILITY: 'facility',
+  HANDOVER: 'handover',
+  MANUAL: 'manual',
+  FUND_TRANSFER: 'fund_transfer',
+  ALL: 'all'
+}
+
+// Source type labels (Vietnamese)
+export const SOURCE_TYPE_LABELS = {
+  [SOURCE_TYPES.EXPENSE]: 'Chi phí',
+  [SOURCE_TYPES.INGREDIENT]: 'Nguyên liệu',
+  [SOURCE_TYPES.FACILITY]: 'Cơ sở vật chất',
+  [SOURCE_TYPES.HANDOVER]: 'Bàn giao ca',
+  [SOURCE_TYPES.MANUAL]: 'Thủ công',
+  [SOURCE_TYPES.FUND_TRANSFER]: 'Chuyển quỹ',
+  [SOURCE_TYPES.ALL]: 'Tất cả nguồn'
+}
+
+// Source type icons
+export const SOURCE_TYPE_ICONS = {
+  [SOURCE_TYPES.EXPENSE]: '🧾',
+  [SOURCE_TYPES.INGREDIENT]: '🥦',
+  [SOURCE_TYPES.FACILITY]: '🏢',
+  [SOURCE_TYPES.HANDOVER]: '🤝',
+  [SOURCE_TYPES.MANUAL]: '✋',
+  [SOURCE_TYPES.FUND_TRANSFER]: '↔️'
+}
+
+// Fund type filter options
+export const FUND_TYPE_FILTER_OPTIONS = [
+  { value: FUND_TYPES.ALL, label: FUND_TYPE_LABELS[FUND_TYPES.ALL] },
+  { value: FUND_TYPES.OPERATING, label: FUND_TYPE_LABELS[FUND_TYPES.OPERATING] },
+  { value: FUND_TYPES.INVENTORY, label: FUND_TYPE_LABELS[FUND_TYPES.INVENTORY] },
+  { value: FUND_TYPES.PROFIT, label: FUND_TYPE_LABELS[FUND_TYPES.PROFIT] },
+  { value: FUND_TYPES.CASH_DRAWER, label: FUND_TYPE_LABELS[FUND_TYPES.CASH_DRAWER] }
+]
+
+// Source type filter options
+export const SOURCE_TYPE_FILTER_OPTIONS = [
+  { value: SOURCE_TYPES.ALL, label: SOURCE_TYPE_LABELS[SOURCE_TYPES.ALL] },
+  { value: SOURCE_TYPES.EXPENSE, label: SOURCE_TYPE_LABELS[SOURCE_TYPES.EXPENSE] },
+  { value: SOURCE_TYPES.INGREDIENT, label: SOURCE_TYPE_LABELS[SOURCE_TYPES.INGREDIENT] },
+  { value: SOURCE_TYPES.FACILITY, label: SOURCE_TYPE_LABELS[SOURCE_TYPES.FACILITY] },
+  { value: SOURCE_TYPES.HANDOVER, label: SOURCE_TYPE_LABELS[SOURCE_TYPES.HANDOVER] },
+  { value: SOURCE_TYPES.MANUAL, label: SOURCE_TYPE_LABELS[SOURCE_TYPES.MANUAL] },
+  { value: SOURCE_TYPES.FUND_TRANSFER, label: SOURCE_TYPE_LABELS[SOURCE_TYPES.FUND_TRANSFER] }
+]
+
+// Helper functions
+export const getFundTypeLabel = (type) => FUND_TYPE_LABELS[type] || type
+export const getFundTypeIcon = (type) => FUND_TYPE_ICONS[type] || '💰'
+export const getFundTypeColor = (type) => FUND_TYPE_COLORS[type] || 'gray'
+export const getSourceTypeLabel = (type) => SOURCE_TYPE_LABELS[type] || type
+export const getSourceTypeIcon = (type) => SOURCE_TYPE_ICONS[type] || '📋'
+
 // Transaction types
 export const TRANSACTION_TYPES = {
   DEPOSIT: 'deposit',
@@ -55,7 +148,8 @@ export const TRANSACTION_TYPE_FILTER_OPTIONS = [
   { value: TRANSACTION_TYPES.ALL, label: TRANSACTION_TYPE_LABELS[TRANSACTION_TYPES.ALL] },
   { value: TRANSACTION_TYPES.DEPOSIT, label: TRANSACTION_TYPE_LABELS[TRANSACTION_TYPES.DEPOSIT] },
   { value: TRANSACTION_TYPES.WITHDRAWAL, label: TRANSACTION_TYPE_LABELS[TRANSACTION_TYPES.WITHDRAWAL] },
-  { value: 'handover', label: 'Bàn giao' }
+  { value: 'handover', label: 'Bàn giao' },
+  { value: 'fund_transfer', label: 'Chuyển quỹ' }
 ]
 
 // Filter options for money type

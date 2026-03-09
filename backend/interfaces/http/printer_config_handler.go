@@ -3,11 +3,14 @@ package http
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
 	"cafe-pos/backend/application/services"
 	"cafe-pos/backend/domain/printing"
+	"cafe-pos/backend/domain/settings"
+	"cafe-pos/backend/infrastructure/printbridge"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -18,13 +21,15 @@ import (
 type PrinterConfigHandler struct {
 	printerConfigRepo printing.PrinterConfigRepository
 	printerManager    services.PrinterManager
+	shopSettingsRepo  settings.ShopSettingsRepository
 }
 
 // NewPrinterConfigHandler creates a new PrinterConfigHandler
-func NewPrinterConfigHandler(printerConfigRepo printing.PrinterConfigRepository, printerManager services.PrinterManager) *PrinterConfigHandler {
+func NewPrinterConfigHandler(printerConfigRepo printing.PrinterConfigRepository, printerManager services.PrinterManager, shopSettingsRepo settings.ShopSettingsRepository) *PrinterConfigHandler {
 	return &PrinterConfigHandler{
 		printerConfigRepo: printerConfigRepo,
 		printerManager:    printerManager,
+		shopSettingsRepo:  shopSettingsRepo,
 	}
 }
 
@@ -260,6 +265,70 @@ func (h *PrinterConfigHandler) TestConnection(c *gin.Context) {
 		return
 	}
 
+	// Get shop settings to check for print bridge URL
+	shopSettings, err := h.shopSettingsRepo.GetSettings(ctx)
+	if err == nil && shopSettings != nil && shopSettings.PrintBridgeURL != "" {
+		// Use print bridge for test
+		log.Printf("[TEST PRINT] Using print bridge: %s", shopSettings.PrintBridgeURL)
+		
+		bridgeClient := printbridge.NewClient(shopSettings.PrintBridgeURL, 30*time.Second)
+		
+		// Check if print bridge is available
+		if !bridgeClient.IsAvailable() {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error":   "Print bridge is not available at " + shopSettings.PrintBridgeURL,
+			})
+			return
+		}
+		
+		// Create test HTML content
+		testHTML := `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        h1 { font-size: 20px; margin: 10px 0; }
+        .info { font-size: 14px; margin: 5px 0; }
+        .divider { border-top: 2px dashed #000; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>TEST PRINT</h1>
+    <div class="divider"></div>
+    <div class="info">Printer: ` + config.Name + `</div>
+    <div class="info">Type: ` + string(config.Type) + `</div>
+    <div class="info">Connection: ` + string(config.ConnectionType) + `</div>
+    <div class="info">IP: ` + config.IPAddress + `:` + fmt.Sprintf("%d", config.Port) + `</div>
+    <div class="divider"></div>
+    <div class="info">This is a test print</div>
+    <div class="info">Đây là bản in thử nghiệm</div>
+    <div class="divider"></div>
+    <div class="info">Date: ` + time.Now().Format("2006-01-02 15:04:05") + `</div>
+    <div class="divider"></div>
+</body>
+</html>`
+		
+		// Send to print bridge
+		if err := bridgeClient.RenderAndPrint(ctx, testHTML, config.IPAddress, config.Port, config.PaperWidth); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error":   "Print via bridge failed: " + err.Error(),
+			})
+			return
+		}
+		
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "Test print successful via print bridge - Check your printer",
+		})
+		return
+	}
+
+	// Fallback to direct connection (old method)
+	log.Printf("[TEST PRINT] No print bridge configured, using direct connection")
+	
 	// Get printer instance
 	printer, err := h.printerManager.GetPrinter(config)
 	if err != nil {

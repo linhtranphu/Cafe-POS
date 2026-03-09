@@ -13,12 +13,30 @@
 
       <!-- Form -->
       <form @submit.prevent="handleSubmit" class="p-6 space-y-4">
-        <!-- Current Balance Warning -->
+        <!-- Fund Type Selector -->
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">Rút từ quỹ</label>
+          <select
+            v-model="form.fund_type"
+            @change="loadFundBalance"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent"
+          >
+            <option v-for="key in fundTypeKeys" :key="key" :value="key">
+              {{ FUND_TYPE_ICONS[key] }} {{ FUND_TYPE_LABELS[key] }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Fund Balance Display -->
         <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <div class="text-sm font-semibold text-yellow-800 mb-2">Số dư hiện tại:</div>
-          <div class="space-y-1 text-sm text-yellow-700">
-            <div>💵 Tiền mặt: {{ formatCurrency(currentBalance?.cash || 0) }}</div>
-            <div>💳 Chuyển khoản: {{ formatCurrency(currentBalance?.transfer || 0) }}</div>
+          <div class="text-sm font-semibold text-yellow-800 mb-2">Số dư quỹ được chọn:</div>
+          <div v-if="loadingFundBalance" class="animate-pulse space-y-1">
+            <div class="h-4 bg-yellow-200 rounded w-40"></div>
+            <div class="h-4 bg-yellow-200 rounded w-40"></div>
+          </div>
+          <div v-else class="space-y-1 text-sm text-yellow-700">
+            <div>💵 Tiền mặt: {{ formatCurrency(fundBalance?.cash || 0) }}</div>
+            <div>💳 Chuyển khoản: {{ formatCurrency(fundBalance?.transfer || 0) }}</div>
           </div>
         </div>
 
@@ -80,7 +98,7 @@
             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-lg"
             required
           />
-          <div v-if="form.cash_amount > (currentBalance?.cash || 0)" class="text-xs text-red-500 mt-1">
+          <div v-if="form.cash_amount > (fundBalance?.cash || 0)" class="text-xs text-red-500 mt-1">
             Số dư không đủ!
           </div>
         </div>
@@ -100,7 +118,7 @@
             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-lg"
             required
           />
-          <div v-if="form.transfer_amount > (currentBalance?.transfer || 0)" class="text-xs text-red-500 mt-1">
+          <div v-if="form.transfer_amount > (fundBalance?.transfer || 0)" class="text-xs text-red-500 mt-1">
             Số dư không đủ!
           </div>
         </div>
@@ -157,9 +175,9 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import * as fundService from '../../services/fund'
-import { formatCurrency, MONEY_TYPES, VALIDATION } from '../../constants/fund'
+import { formatCurrency, MONEY_TYPES, VALIDATION, FUND_TYPES, FUND_TYPE_LABELS, FUND_TYPE_ICONS } from '../../constants/fund'
 
 const props = defineProps({
   currentBalance: {
@@ -170,8 +188,11 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'success'])
 
+const fundTypeKeys = [FUND_TYPES.OPERATING, FUND_TYPES.INVENTORY, FUND_TYPES.PROFIT, FUND_TYPES.CASH_DRAWER]
+
 // State
 const form = ref({
+  fund_type: FUND_TYPES.OPERATING,
   money_type: MONEY_TYPES.CASH,
   cash_amount: 0,
   transfer_amount: 0,
@@ -179,6 +200,20 @@ const form = ref({
 })
 const submitting = ref(false)
 const error = ref('')
+const fundBalance = ref({ cash: 0, transfer: 0, total: 0 })
+const loadingFundBalance = ref(false)
+
+const loadFundBalance = async () => {
+  loadingFundBalance.value = true
+  try {
+    const data = await fundService.getAllBalances()
+    fundBalance.value = data?.[form.value.fund_type] || { cash: 0, transfer: 0, total: 0 }
+  } catch (e) {
+    console.error('Failed to load fund balance:', e)
+  } finally {
+    loadingFundBalance.value = false
+  }
+}
 
 // Computed
 const totalAmount = computed(() => {
@@ -194,16 +229,19 @@ const totalAmount = computed(() => {
 
 const isValid = computed(() => {
   if (totalAmount.value <= 0 || form.value.reason.length < VALIDATION.MIN_REASON_LENGTH) return false
-  
-  // Check sufficient balance
+
   if (form.value.money_type === MONEY_TYPES.CASH || form.value.money_type === MONEY_TYPES.BOTH) {
-    if (form.value.cash_amount > (props.currentBalance?.cash || 0)) return false
+    if (form.value.cash_amount > (fundBalance.value?.cash || 0)) return false
   }
   if (form.value.money_type === MONEY_TYPES.TRANSFER || form.value.money_type === MONEY_TYPES.BOTH) {
-    if (form.value.transfer_amount > (props.currentBalance?.transfer || 0)) return false
+    if (form.value.transfer_amount > (fundBalance.value?.transfer || 0)) return false
   }
-  
+
   return true
+})
+
+onMounted(() => {
+  loadFundBalance()
 })
 
 // Methods
@@ -215,6 +253,7 @@ const handleSubmit = async () => {
 
   try {
     const data = {
+      fund_type: form.value.fund_type,
       cash_amount: form.value.money_type === MONEY_TYPES.CASH || form.value.money_type === MONEY_TYPES.BOTH ? form.value.cash_amount : 0,
       transfer_amount: form.value.money_type === MONEY_TYPES.TRANSFER || form.value.money_type === MONEY_TYPES.BOTH ? form.value.transfer_amount : 0,
       reason: form.value.reason

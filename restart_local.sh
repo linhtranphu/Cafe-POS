@@ -34,7 +34,7 @@ if docker ps | grep -q "$MONGO_CONTAINER"; then
     echo "Checking replica set status..."
     RS_STATUS=$(docker exec "$MONGO_CONTAINER" mongosh \
         --username admin \
-        --password password123 \
+        --password 108trannhatduat \
         --authenticationDatabase admin \
         --quiet \
         --eval "try { rs.status().ok } catch(e) { 0 }" 2>/dev/null || echo "0")
@@ -52,7 +52,7 @@ if docker ps | grep -q "$MONGO_CONTAINER"; then
         echo "Initializing replica set..."
         docker exec "$MONGO_CONTAINER" mongosh \
             --username admin \
-            --password password123 \
+            --password 108trannhatduat \
             --authenticationDatabase admin \
             --eval "
             try {
@@ -88,7 +88,7 @@ else
     echo "Initializing replica set..."
     docker exec "$MONGO_CONTAINER" mongosh \
         --username admin \
-        --password password123 \
+        --password 108trannhatduat \
         --authenticationDatabase admin \
         --eval "
         try {
@@ -199,9 +199,19 @@ if [ ! -f "go.mod" ]; then
 fi
 
 # Set MongoDB URI for local development with replica set
-export MONGODB_URI="mongodb://admin:password123@localhost:27017/cafe_pos?replicaSet=rs0&authSource=admin"
+export MONGODB_URI="mongodb://admin:108trannhatduat@localhost:27017/cafe_pos?replicaSet=rs0&authSource=admin"
 export MONGODB_DATABASE="cafe_pos"
 export JWT_SECRET="your-jwt-secret-key-min-32-chars-long"
+
+# Build backend
+echo "Building backend..."
+if go build -v . > ../backend-build.log 2>&1; then
+    echo "✅ Backend built successfully"
+else
+    echo "❌ Backend build failed"
+    cat ../backend-build.log
+    exit 1
+fi
 
 # Run backend in background
 go run main.go > ../backend.log 2>&1 &
@@ -280,7 +290,7 @@ echo "  Frontend (Local):  http://localhost:5173"
 echo "  Frontend (LAN):    http://$LOCAL_IP:5173"
 echo "  Backend:           http://localhost:3000"
 echo "  Print Bridge:      http://localhost:3001/health"
-echo "  MongoDB:           mongodb://admin:password123@localhost:27017/cafe_pos?replicaSet=rs0&authSource=admin"
+echo "  MongoDB:           mongodb://admin:108trannhatduat@localhost:27017/cafe_pos?replicaSet=rs0&authSource=admin"
 echo ""
 echo "📱 Access from other devices in LAN:"
 echo "  Open browser and go to: http://$LOCAL_IP:5173"

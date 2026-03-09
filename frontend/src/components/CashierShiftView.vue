@@ -201,14 +201,18 @@
       </div>
 
       <!-- Stats Grid -->
-      <div class="grid grid-cols-2 gap-3 mb-4">
+      <div class="grid grid-cols-3 gap-3 mb-4">
         <div class="bg-white bg-opacity-20 rounded-xl p-3">
           <div class="text-xl sm:text-2xl font-bold">{{ shiftStatus.total_orders }}</div>
           <div class="text-xs opacity-90">Tổng đơn</div>
         </div>
         <div class="bg-white bg-opacity-20 rounded-xl p-3">
+          <div class="text-xl sm:text-2xl font-bold">{{ shiftStatus.total_items || 0 }}</div>
+          <div class="text-xs opacity-90">Tổng món</div>
+        </div>
+        <div class="bg-white bg-opacity-20 rounded-xl p-3">
           <div class="text-base sm:text-lg font-bold break-words">{{ formatPrice(shiftStatus.total_revenue) }}</div>
-          <div class="text-xs opacity-90">Tổng doanh thu</div>
+          <div class="text-xs opacity-90">Doanh thu</div>
         </div>
       </div>
 
@@ -239,14 +243,18 @@
       </div>
 
       <!-- Stats Grid -->
-      <div class="grid grid-cols-2 gap-3 mb-4">
+      <div class="grid grid-cols-3 gap-3 mb-4">
         <div class="bg-white/20 rounded-xl p-3 backdrop-blur-sm">
           <div class="text-xl sm:text-2xl font-bold">{{ shiftStatus.total_orders }}</div>
           <div class="text-xs opacity-90">Tổng đơn</div>
         </div>
         <div class="bg-white/20 rounded-xl p-3 backdrop-blur-sm">
+          <div class="text-xl sm:text-2xl font-bold">{{ shiftStatus.total_items || 0 }}</div>
+          <div class="text-xs opacity-90">Tổng món</div>
+        </div>
+        <div class="bg-white/20 rounded-xl p-3 backdrop-blur-sm">
           <div class="text-xl sm:text-2xl font-bold">{{ shiftStatus.in_progress_count || 0 }}</div>
-          <div class="text-xs opacity-90">Đang pha chế</div>
+          <div class="text-xs opacity-90">Đang pha</div>
         </div>
       </div>
 

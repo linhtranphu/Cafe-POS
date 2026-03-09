@@ -31,6 +31,20 @@ export const orderService = {
     return response.data
   },
 
+  async printTemporaryBill(id) {
+    const response = await api.post(`/waiter/orders/${id}/print-temp-bill`)
+    return response.data
+  },
+
+  async mergeOrders(orderIds, customerName, note) {
+    const response = await api.post('/waiter/orders/merge', {
+      order_ids: orderIds,
+      customer_name: customerName,
+      note: note
+    })
+    return response.data
+  },
+
   async refundPartial(id, amount, reason) {
     const response = await api.post(`/cashier/orders/${id}/refund`, { amount, reason })
     return response.data

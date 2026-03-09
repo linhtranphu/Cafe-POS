@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        /* Reset & Base optimized for Thermal Printing */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            width: 576px;
+            background: white;
+            color: black;
+            font-family: "Arial", sans-serif;
+            padding: 10px;
+        }
+
+        /* Thay thế Watermark bằng Banner thông báo (In nhiệt không hỗ trợ độ mờ tốt) */
+        .status-banner {
+            border: 3px solid black;
+            text-align: center;
+            padding: 10px;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .logo {
+            width: 120px;
+            margin-right: 20px;
+        }
+        
+        .logo img {
+            width: 100%;
+            height: auto;
+            filter: grayscale(100%); /* Máy in nhiệt chỉ in đen trắng */
+        }
+        
+        .shop-info {
+            flex: 1;
+        }
+        
+        .shop-name {
+            font-size: 26px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .shop-address, .shop-phone {
+            font-size: 18px;
+            line-height: 1.4;
+        }
+
+        .bill-title {
+            text-align: center;
+            font-size: 32px;
+            font-weight: bold;
+            margin: 15px 0;
+            border-top: 2px dashed black;
+            border-bottom: 2px dashed black;
+            padding: 10px 0;
+        }
+
+        .order-info {
+            width: 100%;
+            font-size: 19px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .customer-info {
+            border-top: 1px dotted black;
+            margin-top: 5px;
+            padding-top: 5px;
+            font-weight: bold;
+        }
+
+        /* Table Design */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+        
+        th {
+            font-size: 20px;
+            border-bottom: 2px solid black;
+            text-align: left;
+            padding: 8px 0;
+        }
+        
+        td {
+            font-size: 20px;
+            padding: 10px 0;
+            vertical-align: top;
+        }
+        
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+
+        .item-note {
+            font-size: 16px;
+            font-style: italic;
+            display: block;
+        }
+
+        /* Totals */
+        .total-section {
+            border-top: 2px solid black;
+            padding-top: 10px;
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .total-label {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .total-amount {
+            font-size: 30px;
+            font-weight: 900;
+        }
+
+        .footer {
+            margin-top: 25px;
+            text-align: center;
+        }
+
+        .payment-remind {
+            border: 2px solid black;
+            padding: 10px;
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .thanks {
+            font-size: 22px;
+            font-weight: bold;
+        }
+
+        /* Khoảng trống để máy cắt giấy không lẹm vào chữ */
+        .cut-space {
+            height: 60px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Thông báo trạng thái rõ ràng thay cho Watermark mờ -->
+    <div class="status-banner">
+        BILL TẠM - CHƯA THANH TOÁN
+    </div>
+
+    <div class="header">
+        {{if .ShowLogo}}
+        <div class="logo">
+            <img src="data:image/png;base64,{{.LogoBase64}}" />
+        </div>
+        {{end}}
+  
+    </div>
+    
+    <div class="bill-title">PHIẾU TẠM TÍNH</div>
+    
+    <div class="order-info">
+        <div class="row">
+            <div>Số đơn: <strong>{{.OrderNumber}}</strong></div>
+            <div>NV: {{.WaiterName}}</div>
+        </div>
+        <div class="row">
+            <div>Ngày: {{.CreatedDate}}</div>
+        </div>
+        <div class="customer-info">
+            Khách hàng: {{if .CustomerName}}{{.CustomerName}}{{else}}Khách lẻ{{end}}
+        </div>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 10%;">SL</th>
+                <th style="width: 50%;">Tên món</th>
+                <th style="width: 40%;" class="text-right">Thành tiền</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Items}}
+            <tr>
+                <td class="text-center">{{.Quantity}}</td>
+                <td>
+                    {{.Name}}
+                    {{if .Note}}<span class="item-note">({{.Note}})</span>{{end}}
+                </td>
+                <td class="text-right">{{.Total}}</td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+    
+  
+
+    <div class="cut-space"></div>
+</body>
+</html>

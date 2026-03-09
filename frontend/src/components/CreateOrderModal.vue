@@ -14,24 +14,49 @@
         </div>
       </div>
 
+      <!-- Category Filter Buttons -->
+      <div class="bg-white border-b px-4 py-2 flex flex-wrap gap-2 flex-shrink-0">
+        <button
+          @click="selectedCategory = 'all'"
+          :class="[
+            'py-2 px-4 rounded-xl text-sm font-semibold transition-all touch-manipulation active:scale-95',
+            selectedCategory === 'all'
+              ? 'bg-blue-500 text-white shadow-md'
+              : 'bg-gray-100 text-gray-600 active:bg-gray-200'
+          ]">
+          📋 Tất cả
+        </button>
+        <button
+          v-for="cat in props.categories.filter(c => c.id !== 'all')" :key="cat.id"
+          @click="selectedCategory = cat.id"
+          :class="[
+            'py-2 px-4 rounded-xl text-sm font-semibold transition-all touch-manipulation active:scale-95',
+            selectedCategory === cat.id
+              ? 'bg-blue-500 text-white shadow-md'
+              : 'bg-gray-100 text-gray-600 active:bg-gray-200'
+          ]">
+          {{ cat.icon }} {{ cat.name }}
+        </button>
+      </div>
+
       <!-- Grouped Menu Items -->
       <div class="flex-1 overflow-y-auto bg-gray-50" 
         :style="{ paddingBottom: totalItems > 0 ? '100px' : '20px' }">
         
         <!-- Empty State -->
-        <div v-if="groupedItems.length === 0" class="text-center py-20">
+        <div v-if="filteredGroupedItems.length === 0" class="text-center py-20">
           <div class="text-6xl mb-3">🍽️</div>
           <p class="text-gray-500 font-medium">Không có món nào</p>
         </div>
 
         <!-- Category Groups -->
-        <div v-for="group in groupedItems" :key="group.category.id" class="mb-6">
+        <div v-for="group in filteredGroupedItems" :key="group.category.id" class="mb-6">
           <!-- Category Header (Sticky) -->
           <div class="sticky top-0 z-10 bg-gradient-to-b from-gray-50 to-gray-100 px-4 py-3 border-b-2 border-gray-200">
             <div class="flex items-center gap-2">
-              <span class="text-xl">{{ group.category.icon }}</span>
-              <span class="font-bold text-gray-800 text-base">{{ group.category.name }}</span>
-              <span class="text-sm text-gray-500">({{ group.items.length }})</span>
+              <span class="text-2xl">{{ group.category.icon }}</span>
+              <span class="font-bold text-gray-800 text-lg">{{ group.category.name }}</span>
+              <span class="text-base text-gray-500">({{ group.items.length }})</span>
             </div>
           </div>
 
@@ -48,10 +73,10 @@
                 ]">
                 <!-- Item Info -->
                 <div class="flex-1 mb-3">
-                  <h3 class="font-bold text-gray-900 mb-2 line-clamp-2 min-h-[2.5rem] leading-tight text-sm">
+                  <h3 class="font-bold text-gray-900 mb-2 line-clamp-2 min-h-[2.5rem] leading-tight text-base">
                     {{ item.name }}
                   </h3>
-                  <p class="text-base font-bold text-blue-600">
+                  <p class="text-lg font-bold text-blue-600">
                     {{ formatPrice(item.price) }}
                   </p>
                 </div>
@@ -110,7 +135,7 @@
                 ]">
                 <!-- Item Info -->
                 <div class="mb-3">
-                  <h3 class="font-bold text-gray-900 mb-2 line-clamp-2 min-h-[2.5rem] leading-tight text-sm">
+                  <h3 class="font-bold text-gray-900 mb-2 line-clamp-2 min-h-[2.5rem] leading-tight text-base">
                     {{ item.name }}
                   </h3>
                 </div>
@@ -121,8 +146,8 @@
                     class="space-y-1">
                     <div class="flex items-center justify-between gap-2">
                       <div class="flex-1">
-                        <p class="text-xs font-semibold text-gray-700">{{ variant.name }}</p>
-                        <p class="text-sm font-bold text-blue-600">{{ formatPrice(variant.price) }}</p>
+                        <p class="text-sm font-semibold text-gray-700">{{ variant.name }}</p>
+                        <p class="text-base font-bold text-blue-600">{{ formatPrice(variant.price) }}</p>
                       </div>
                       
                       <!-- Variant Controls -->
@@ -215,12 +240,13 @@ const emit = defineEmits(['update:modelValue', 'confirm'])
 
 // Cart state - using object for better performance
 const cart = ref({})
+const selectedCategory = ref('all')
 
-// Sugar level state - default is 100%
+// Sugar level state - DISABLED (bỏ mục Đường)
 const sugarLevels = [
-  { value: 25, label: '25%' },
-  { value: 50, label: '50%' },
-  { value: 100, label: '100%' }
+  // { value: 25, label: '25%' },
+  // { value: 50, label: '50%' },
+  // { value: 100, label: '100%' }
 ]
 const itemSugarLevels = ref({}) // { itemId: level, itemId_variantId: level }
 
@@ -290,6 +316,11 @@ const groupedItems = computed(() => {
   return Object.values(groups).filter(g => g.items.length > 0)
 })
 
+const filteredGroupedItems = computed(() => {
+  if (selectedCategory.value === 'all') return groupedItems.value
+  return groupedItems.value.filter(g => g.category.id === selectedCategory.value)
+})
+
 const totalItems = computed(() => {
   return Object.values(cart.value).reduce((sum, qty) => sum + qty, 0)
 })
@@ -340,7 +371,7 @@ const handleConfirm = () => {
     
     if (item) {
       const sugarLevel = itemSugarLevels.value[key] || 100
-      const note = sugarLevel === 100 ? '' : `${sugarLevel}% đường` // Only add note if not 100%
+      const note = sugarLevel === 100 ? '' : `${sugarLevel}%` // Only add note if not 100%
       
       if (variantId) {
         const variant = item.variants?.find(v => v.id === variantId)
@@ -376,6 +407,7 @@ const handleConfirm = () => {
 const resetCart = () => {
   cart.value = {}
   itemSugarLevels.value = {}
+  selectedCategory.value = 'all'
 }
 
 defineExpose({ resetCart })

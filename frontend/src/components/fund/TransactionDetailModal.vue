@@ -99,6 +99,116 @@
           </div>
         </div>
 
+        <!-- Source Record Details -->
+        <div v-if="transaction.source_type && transaction.source_detail" class="bg-purple-50 rounded-lg p-4">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">{{ getSourceTypeIcon(transaction.source_type) }}</span>
+              <div class="text-sm font-semibold text-purple-800">
+                {{ getSourceTypeLabel(transaction.source_type) }}
+              </div>
+            </div>
+            <button
+              @click="navigateToSource"
+              class="text-xs px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors flex items-center gap-1"
+            >
+              <span>Xem chi tiết</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </button>
+          </div>
+          
+          <!-- Expense details -->
+          <div v-if="transaction.source_type === 'expense'" class="space-y-2 text-sm text-purple-700">
+            <div class="flex justify-between">
+              <span class="text-purple-600">Số tiền:</span>
+              <span class="font-semibold">{{ formatCurrency(transaction.source_detail.amount) }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-purple-600">Mô tả:</span>
+              <span class="font-semibold">{{ transaction.source_detail.description }}</span>
+            </div>
+            <div v-if="transaction.source_detail.vendor" class="flex justify-between">
+              <span class="text-purple-600">Nhà cung cấp:</span>
+              <span class="font-semibold">{{ transaction.source_detail.vendor }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-purple-600">Ngày:</span>
+              <span class="font-semibold">{{ new Date(transaction.source_detail.date).toLocaleDateString('vi-VN') }}</span>
+            </div>
+          </div>
+          
+          <!-- Ingredient restock details -->
+          <div v-if="transaction.source_type === 'ingredient'" class="space-y-2 text-sm text-purple-700">
+            <div class="flex justify-between">
+              <span class="text-purple-600">Số lượng:</span>
+              <span class="font-semibold">{{ transaction.source_detail.quantity }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-purple-600">Đơn giá:</span>
+              <span class="font-semibold">{{ formatCurrency(transaction.source_detail.cost_per_unit) }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-purple-600">Tổng chi phí:</span>
+              <span class="font-semibold">{{ formatCurrency(transaction.source_detail.total_cost) }}</span>
+            </div>
+            <div v-if="transaction.source_detail.reason" class="flex justify-between">
+              <span class="text-purple-600">Lý do:</span>
+              <span class="font-semibold">{{ transaction.source_detail.reason }}</span>
+            </div>
+            <div v-if="transaction.source_detail.performed_by" class="flex justify-between">
+              <span class="text-purple-600">Người thực hiện:</span>
+              <span class="font-semibold">{{ transaction.source_detail.performed_by }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Audit Trail Information -->
+        <div v-if="transaction.balance_before && transaction.balance_after" class="bg-gray-50 rounded-lg p-4">
+          <div class="text-sm font-semibold text-gray-700 mb-3">Thông tin kiểm toán</div>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between items-center">
+              <span class="text-gray-600">Số dư trước:</span>
+              <span class="font-semibold text-gray-800">{{ formatCurrency(transaction.balance_before.total) }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-600">Số dư sau:</span>
+              <span class="font-semibold text-gray-800">{{ formatCurrency(transaction.balance_after.total) }}</span>
+            </div>
+            <div class="border-t border-gray-200 pt-2 mt-2">
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <div class="text-gray-500 mb-1">Trước giao dịch:</div>
+                  <div class="space-y-1">
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">💵 Mặt:</span>
+                      <span class="font-medium">{{ formatCurrency(transaction.balance_before.cash) }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">💳 CK:</span>
+                      <span class="font-medium">{{ formatCurrency(transaction.balance_before.transfer) }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <div class="text-gray-500 mb-1">Sau giao dịch:</div>
+                  <div class="space-y-1">
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">💵 Mặt:</span>
+                      <span class="font-medium">{{ formatCurrency(transaction.balance_after.cash) }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">💳 CK:</span>
+                      <span class="font-medium">{{ formatCurrency(transaction.balance_after.transfer) }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Close Button -->
         <button
           @click="$emit('close')"
@@ -113,6 +223,7 @@
 
 <script setup>
 import { defineProps, defineEmits } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   formatCurrency,
   formatFullDateTime,
@@ -120,8 +231,12 @@ import {
   getTransactionTypeLabel,
   getAmountColor,
   getAmountPrefix,
-  getRoleLabel
+  getRoleLabel,
+  getSourceTypeLabel,
+  getSourceTypeIcon
 } from '../../constants/fund'
+
+const router = useRouter()
 
 const props = defineProps({
   transaction: {
@@ -136,6 +251,19 @@ const emit = defineEmits(['close'])
 const copyTransactionId = () => {
   navigator.clipboard.writeText(props.transaction.id)
   alert('Đã sao chép mã giao dịch')
+}
+
+const navigateToSource = () => {
+  if (!props.transaction.source_type || !props.transaction.source_id) return
+  
+  emit('close')
+  
+  // Navigate based on source type
+  if (props.transaction.source_type === 'expense') {
+    router.push(`/expenses/${props.transaction.source_id}`)
+  } else if (props.transaction.source_type === 'ingredient') {
+    router.push(`/ingredients?restock_id=${props.transaction.source_id}`)
+  }
 }
 </script>
 

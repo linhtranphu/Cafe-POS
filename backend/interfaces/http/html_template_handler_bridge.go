@@ -284,6 +284,7 @@ func prepareBillData(ord *order.Order, settings *settings.ShopSettings) map[stri
 			"Quantity":  item.Quantity,
 			"UnitPrice": formatMoneyVNBridge(item.Price),
 			"Total":     formatMoneyVNBridge(item.Subtotal),
+			"Note":      item.Note,
 		})
 	}
 
@@ -370,4 +371,56 @@ func copyFileBridge(src, dst string) error {
 func sendToPrinterBridge(printerIP string, data []byte) error {
 	// Reuse existing printer sending logic
 	return sendToPrinterChromedp(printerIP, data)
+}
+
+// GetTempBillTemplate handles GET /api/html-templates/temp-bill
+func (h *HTMLTemplateHandlerBridge) GetTempBillTemplate(c *gin.Context) {
+	// Read temp bill template file
+	tempBillPath := "./application/services/templates/temp_bill_template.html"
+	content, err := os.ReadFile(tempBillPath)
+	if err != nil {
+		log.Printf("Failed to read temp bill template: %v", err)
+		c.JSON(500, gin.H{"error": "Failed to read temp bill template"})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"success":  true,
+		"content":  string(content),
+		"path":     tempBillPath,
+		"filename": filepath.Base(tempBillPath),
+	})
+}
+
+// UpdateTempBillTemplate handles PUT /api/html-templates/temp-bill
+func (h *HTMLTemplateHandlerBridge) UpdateTempBillTemplate(c *gin.Context) {
+	var req struct {
+		Content string `json:"content" binding:"required"`
+	}
+	
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid request: " + err.Error()})
+		return
+	}
+
+	tempBillPath := "./application/services/templates/temp_bill_template.html"
+
+	// Backup current template
+	backupPath := tempBillPath + ".backup"
+	if err := copyFileBridge(tempBillPath, backupPath); err != nil {
+		log.Printf("Warning: Failed to create backup: %v", err)
+	}
+
+	// Write new template
+	if err := os.WriteFile(tempBillPath, []byte(req.Content), 0644); err != nil {
+		log.Printf("Failed to write temp bill template: %v", err)
+		c.JSON(500, gin.H{"error": "Failed to save temp bill template"})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"success": true,
+		"message": "Temp bill template saved successfully",
+		"backup":  backupPath,
+	})
 }

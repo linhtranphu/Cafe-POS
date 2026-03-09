@@ -4,13 +4,15 @@
 export const PAYMENT_METHODS = {
   CASH: 'cash',
   BANK: 'bank',
-  CARD: 'card'
+  CARD: 'card',
+  FUND: 'fund'
 }
 
 export const PAYMENT_METHOD_OPTIONS = [
   { value: PAYMENT_METHODS.CASH, label: 'Tiền mặt' },
   { value: PAYMENT_METHODS.BANK, label: 'Chuyển khoản' },
-  { value: PAYMENT_METHODS.CARD, label: 'Thẻ' }
+  { value: PAYMENT_METHODS.CARD, label: 'Thẻ' },
+  { value: PAYMENT_METHODS.FUND, label: 'Từ quỹ' }
 ]
 
 // Recurring Expense Frequencies

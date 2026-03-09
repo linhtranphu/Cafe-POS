@@ -643,6 +643,91 @@
 
             <!-- Scrollable Content -->
             <div class="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+              <!-- Paid from Fund Checkbox (only for ADD type) -->
+              <div v-if="adjustData.type === ADJUSTMENT_TYPES.ADD" class="bg-purple-50 rounded-xl p-4 border-2 border-purple-300">
+                <label class="flex items-start gap-3 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    v-model="adjustData.paidFromFund"
+                    @change="onPaidFromFundChange"
+                    class="mt-1 w-5 h-5 text-purple-600 rounded focus:ring-2 focus:ring-purple-500" />
+                  <div class="flex-1">
+                    <div class="font-semibold text-gray-800 mb-1">💰 Chi từ quỹ</div>
+                    <p class="text-xs text-gray-600">
+                      Tự động trừ tiền từ quỹ và ghi nhận giao dịch
+                    </p>
+                    <!-- Fund Balance Display -->
+                    <div v-if="adjustData.paidFromFund" class="mt-3 bg-white rounded-lg p-3 border border-purple-300">
+                      <div v-if="fundBalanceLoading" class="text-xs text-gray-500">
+                        Đang tải số dư quỹ...
+                      </div>
+                      <div v-else-if="fundBalanceError" class="text-xs text-red-600">
+                        ⚠️ {{ fundBalanceError }}
+                      </div>
+                      <div v-else>
+                        <div class="text-xs text-gray-600 mb-1">Số dư quỹ hiện tại:</div>
+                        <div class="text-lg font-bold text-purple-700">
+                          {{ formatCurrency(fundBalance?.total || 0) }}
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1">
+                          Tiền mặt: {{ formatCurrency(fundBalance?.cash || 0) }} • 
+                          Chuyển khoản: {{ formatCurrency(fundBalance?.transfer || 0) }}
+                        </div>
+                        
+                        <!-- Money Type Selector -->
+                        <div class="mt-3 pt-3 border-t border-purple-200">
+                          <label class="block text-xs font-medium text-gray-700 mb-2">Trừ từ *</label>
+                          <div class="grid grid-cols-2 gap-2">
+                            <button type="button"
+                              @click="adjustData.money_type = 'cash'"
+                              :class="adjustData.money_type === 'cash' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700'"
+                              class="py-2 px-3 rounded-lg text-sm font-medium transition-colors">
+                              💵 Tiền mặt
+                            </button>
+                            <button type="button"
+                              @click="adjustData.money_type = 'transfer'"
+                              :class="adjustData.money_type === 'transfer' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'"
+                              class="py-2 px-3 rounded-lg text-sm font-medium transition-colors">
+                              💳 Chuyển khoản
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- Insufficient Balance Warning -->
+                    <div v-if="adjustData.paidFromFund && !fundBalanceLoading && !fundBalanceError && adjustExpenseAmount > 0" 
+                      class="mt-2">
+                      <!-- Check specific money type balance -->
+                      <div v-if="adjustData.money_type === 'cash' && adjustExpenseAmount > (fundBalance?.cash || 0)"
+                        class="bg-red-50 border border-red-300 rounded-lg p-2">
+                        <div class="flex items-start gap-2">
+                          <span class="text-red-600 text-lg">⚠️</span>
+                          <div class="flex-1">
+                            <p class="text-xs font-semibold text-red-800">Tiền mặt trong quỹ không đủ!</p>
+                            <p class="text-xs text-red-600 mt-1">
+                              Cần: {{ formatCurrency(adjustExpenseAmount) }} • 
+                              Có: {{ formatCurrency(fundBalance?.cash || 0) }}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div v-else-if="adjustData.money_type === 'transfer' && adjustExpenseAmount > (fundBalance?.transfer || 0)"
+                        class="bg-red-50 border border-red-300 rounded-lg p-2">
+                        <div class="flex items-start gap-2">
+                          <span class="text-red-600 text-lg">⚠️</span>
+                          <div class="flex-1">
+                            <p class="text-xs font-semibold text-red-800">Tiền chuyển khoản trong quỹ không đủ!</p>
+                            <p class="text-xs text-red-600 mt-1">
+                              Cần: {{ formatCurrency(adjustExpenseAmount) }} • 
+                              Có: {{ formatCurrency(fundBalance?.transfer || 0) }}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </label>
+              </div>
               <!-- Loại điều chỉnh -->
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-3">Loại điều chỉnh *</label>
@@ -810,22 +895,25 @@
 
               <!-- Auto-Expense Indicator for Stock IN -->
               <div v-if="adjustData.type === ADJUSTMENT_TYPES.ADD && adjustData.quantity > 0 && adjustExpenseAmount > 0" 
-                class="bg-green-50 border-2 border-green-300 rounded-xl p-4">
+                :class="adjustData.paidFromFund ? 'bg-purple-50 border-purple-300' : 'bg-green-50 border-green-300'"
+                class="border-2 rounded-xl p-4">
                 <div class="flex items-start gap-3">
-                  <span class="text-green-600 text-2xl flex-shrink-0">✅</span>
+                  <span :class="adjustData.paidFromFund ? 'text-purple-600' : 'text-green-600'" class="text-2xl flex-shrink-0">✅</span>
                   <div class="flex-1 min-w-0">
-                    <p class="text-sm font-semibold text-green-800 mb-2">Tự động ghi nhận chi phí</p>
+                    <p :class="adjustData.paidFromFund ? 'text-purple-800' : 'text-green-800'" class="text-sm font-semibold mb-2">
+                      {{ adjustData.paidFromFund ? 'Chi phí sẽ được trừ từ quỹ' : 'Tự động ghi nhận chi phí' }}
+                    </p>
                     <div class="bg-white rounded-lg p-3 mb-2">
                       <div class="text-xs text-gray-600 mb-1">Chi phí nhập thêm:</div>
-                      <div class="text-base font-bold text-green-700">
+                      <div :class="adjustData.paidFromFund ? 'text-purple-700' : 'text-green-700'" class="text-base font-bold">
                         {{ formatCurrency(adjustExpenseAmount) }}
                       </div>
                       <div class="text-xs text-gray-500 mt-1">
                         = {{ adjustData.quantity }} {{ currentIngredient.unit }} × {{ formatCurrency(effectiveAdjustPrice) }}/{{ currentIngredient.unit }}
                       </div>
                     </div>
-                    <p class="text-xs text-green-600">
-                      📝 Danh mục: "Nguyên liệu" • 💵 Phương thức: Tiền mặt
+                    <p :class="adjustData.paidFromFund ? 'text-purple-600' : 'text-green-600'" class="text-xs">
+                      📝 Danh mục: "Nguyên liệu" • 💵 {{ adjustData.paidFromFund ? 'Nguồn: Quỹ' : 'Phương thức: Tiền mặt' }}
                     </p>
                   </div>
                 </div>
@@ -900,30 +988,57 @@
                     </span>
                   </div>
 
+                  <!-- Fund Payment Badge -->
+                  <div v-if="record.paid_from_fund" class="mb-2">
+                    <span class="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-[10px] font-bold">
+                      💰 Chi từ quỹ
+                    </span>
+                  </div>
+
                   <!-- Price Info - Compact for purchases -->
                   <div v-if="record.cost_per_unit > 0 && record.quantity > 0" 
-                    class="bg-white rounded-lg p-2 mb-2 border border-green-300">
+                    :class="record.paid_from_fund ? 'border-purple-300 bg-purple-50' : 'border-green-300 bg-white'"
+                    class="rounded-lg p-2 mb-2 border">
                     <div class="flex items-center justify-between mb-1">
                       <span class="text-[10px] text-gray-600">Đơn giá:</span>
-                      <span class="text-xs font-bold text-green-700">
+                      <span :class="record.paid_from_fund ? 'text-purple-700' : 'text-green-700'" class="text-xs font-bold">
                         {{ formatCurrency(record.cost_per_unit) }}
                       </span>
                     </div>
                     <div class="flex items-center justify-between">
                       <span class="text-[10px] text-gray-600">Tổng:</span>
-                      <span class="text-sm font-bold text-green-800">
+                      <span :class="record.paid_from_fund ? 'text-purple-800' : 'text-green-800'" class="text-sm font-bold">
                         {{ formatCurrency(record.total_cost || 0) }}
                       </span>
                     </div>
                     <!-- Price comparison - compact -->
                     <div v-if="currentIngredient?.cost_per_unit !== record.cost_per_unit" 
-                      class="flex items-center justify-center gap-1 text-[10px] mt-1 pt-1 border-t border-green-200">
+                      :class="record.paid_from_fund ? 'border-purple-200' : 'border-green-200'"
+                      class="flex items-center justify-center gap-1 text-[10px] mt-1 pt-1 border-t">
                       <span :class="record.cost_per_unit > currentIngredient?.cost_per_unit ? 'text-red-600' : 'text-green-600'" 
                         class="font-semibold">
                         {{ record.cost_per_unit > currentIngredient?.cost_per_unit ? '↑' : '↓' }}
                         {{ formatCurrency(Math.abs(record.cost_per_unit - currentIngredient?.cost_per_unit)) }}
                       </span>
                       <span class="text-gray-500">vs hiện tại</span>
+                    </div>
+                  </div>
+
+                  <!-- Fund Transaction Link -->
+                  <div v-if="record.paid_from_fund && (record.fund_transaction_id || record.expense_id)" 
+                    class="mb-2 bg-purple-50 rounded-lg p-2 border border-purple-200">
+                    <div class="text-[10px] text-gray-600 mb-1">Liên kết:</div>
+                    <div class="flex flex-wrap gap-1">
+                      <a v-if="record.expense_id" 
+                        :href="`#/expenses/${record.expense_id}`"
+                        class="inline-flex items-center gap-1 px-2 py-0.5 bg-white border border-purple-300 rounded text-[10px] text-purple-700 hover:bg-purple-100">
+                        📝 Chi phí
+                      </a>
+                      <a v-if="record.fund_transaction_id" 
+                        :href="`#/fund/transactions/${record.fund_transaction_id}`"
+                        class="inline-flex items-center gap-1 px-2 py-0.5 bg-white border border-purple-300 rounded text-[10px] text-purple-700 hover:bg-purple-100">
+                        💰 Giao dịch quỹ
+                      </a>
                     </div>
                   </div>
 
@@ -971,6 +1086,8 @@ import {
   getAdjustmentTypeClass,
   getAdjustmentTypeText
 } from '../constants/ingredient'
+import { getBalance } from '../services/fund'
+import { fundIngredientService } from '../services/fundIngredientService'
 
 export default {
   name: 'IngredientManagementView',
@@ -1211,8 +1328,15 @@ export default {
       type: ADJUSTMENT_TYPES.ADD,
       quantity: 0,
       reason: '',
-      cost_per_unit: 0 // Price for this transaction (optional)
+      cost_per_unit: 0, // Price for this transaction (optional)
+      paidFromFund: false, // NEW: Flag for fund payment
+      money_type: 'cash' // NEW: Money type for fund payment (cash or transfer)
     })
+
+    // Fund balance state
+    const fundBalance = ref(null)
+    const fundBalanceLoading = ref(false)
+    const fundBalanceError = ref(null)
 
     // Price input mode for adjust modal
     const adjustPriceMode = ref('total') // Default to total price mode
@@ -1436,12 +1560,43 @@ export default {
         type: ADJUSTMENT_TYPES.ADD,
         quantity: 0,
         reason: '',
-        cost_per_unit: 0 // Will use current price if left as 0
+        cost_per_unit: 0, // Will use current price if left as 0
+        paidFromFund: false,
+        money_type: 'cash' // Default to cash
       }
       adjustPriceMode.value = 'total' // Default to total price mode
       adjustTotalPrice.value = 0
       isAdjusting.value = false // Reset loading state
+      
+      // Reset fund balance state
+      fundBalance.value = null
+      fundBalanceError.value = null
+      
       showAdjustModal.value = true
+    }
+
+    // Fetch fund balance when "paid from fund" is checked
+    const fetchFundBalance = async () => {
+      fundBalanceLoading.value = true
+      fundBalanceError.value = null
+      try {
+        const response = await getBalance()
+        console.log('Fund balance response:', response)
+        // Backend returns current_balance object
+        fundBalance.value = response.current_balance
+      } catch (error) {
+        console.error('Error fetching fund balance:', error)
+        fundBalanceError.value = 'Không thể tải số dư quỹ. Vui lòng thử lại.'
+      } finally {
+        fundBalanceLoading.value = false
+      }
+    }
+
+    // Handle paid from fund checkbox change
+    const onPaidFromFundChange = () => {
+      if (adjustData.value.paidFromFund) {
+        fetchFundBalance()
+      }
     }
 
     const closeAdjustModal = () => {
@@ -1507,18 +1662,61 @@ export default {
         alert('Số lượng sau điều chỉnh không được âm')
         return
       }
+
+      // Validate fund balance if paying from fund
+      if (adjustData.value.paidFromFund && adjustData.value.type === ADJUSTMENT_TYPES.ADD) {
+        if (!fundBalance.value) {
+          alert('Không thể tải số dư quỹ. Vui lòng thử lại.')
+          return
+        }
+        
+        const totalCost = adjustExpenseAmount.value
+        if (totalCost > fundBalance.value.total) {
+          alert(`Số dư quỹ không đủ!\nCần: ${formatCurrency(totalCost)}\nCó: ${formatCurrency(fundBalance.value.total)}`)
+          return
+        }
+      }
       
       isAdjusting.value = true
       try {
         // Use new API methods based on operation type
         if (adjustData.value.type === ADJUSTMENT_TYPES.ADD) {
-          // Stock IN
-          const data = {
-            quantity: adjustData.value.quantity,
-            cost_per_unit: adjustData.value.cost_per_unit || 0,
-            reason: adjustData.value.reason
+          // Stock IN - check if paid from fund
+          if (adjustData.value.paidFromFund) {
+            // Validate money_type selection
+            if (!adjustData.value.money_type) {
+              alert('Vui lòng chọn loại tiền (Tiền mặt hoặc Chuyển khoản)')
+              return
+            }
+            
+            // Validate balance for selected money type
+            const totalCost = adjustData.value.quantity * (adjustData.value.cost_per_unit || currentIngredient.value.cost_per_unit || 0)
+            if (adjustData.value.money_type === 'cash' && totalCost > (fundBalance.value?.cash || 0)) {
+              alert(`Tiền mặt trong quỹ không đủ!\nCần: ${formatCurrency(totalCost)}\nCó: ${formatCurrency(fundBalance.value?.cash || 0)}`)
+              return
+            }
+            if (adjustData.value.money_type === 'transfer' && totalCost > (fundBalance.value?.transfer || 0)) {
+              alert(`Tiền chuyển khoản trong quỹ không đủ!\nCần: ${formatCurrency(totalCost)}\nCó: ${formatCurrency(fundBalance.value?.transfer || 0)}`)
+              return
+            }
+            
+            // Use fund ingredient service
+            const data = {
+              quantity: adjustData.value.quantity,
+              cost_per_unit: adjustData.value.cost_per_unit || currentIngredient.value.cost_per_unit || 0,
+              reason: adjustData.value.reason,
+              money_type: adjustData.value.money_type // Add money_type
+            }
+            await fundIngredientService.restockIngredientFromFund(currentIngredient.value.id, data)
+          } else {
+            // Regular stock in
+            const data = {
+              quantity: adjustData.value.quantity,
+              cost_per_unit: adjustData.value.cost_per_unit || 0,
+              reason: adjustData.value.reason
+            }
+            await ingredientStore.stockIn(currentIngredient.value.id, data)
           }
-          await ingredientStore.stockIn(currentIngredient.value.id, data)
         } else if (adjustData.value.type === ADJUSTMENT_TYPES.REMOVE) {
           // Stock OUT
           const data = {
@@ -1554,7 +1752,7 @@ export default {
         closeAdjustModal()
       } catch (error) {
         console.error('Error adjusting stock:', error)
-        alert('Có lỗi xảy ra khi điều chỉnh tồn kho')
+        alert(error.message || 'Có lỗi xảy ra khi điều chỉnh tồn kho')
       } finally {
         isAdjusting.value = false
       }
@@ -1579,7 +1777,15 @@ export default {
 
     const viewHistory = async (ingredient) => {
       currentIngredient.value = ingredient
-      stockHistory.value = await ingredientStore.fetchStockHistory(ingredient.id)
+      try {
+        // Try to use the new fund-aware API first
+        const response = await fundIngredientService.getRestockHistory(ingredient.id)
+        stockHistory.value = response.history || response.records || []
+      } catch (error) {
+        console.error('Error fetching fund restock history, falling back to regular history:', error)
+        // Fallback to regular stock history if fund API fails
+        stockHistory.value = await ingredientStore.fetchStockHistory(ingredient.id)
+      }
       showHistoryModal.value = true
     }
 
@@ -1637,12 +1843,17 @@ export default {
       adjustExpenseAmount,
       adjustPriceMode,
       adjustTotalPrice,
+      fundBalance,
+      fundBalanceLoading,
+      fundBalanceError,
       togglePriceInputMode,
       calculateUnitPrice,
       toggleAdjustPriceMode,
       calculateAdjustUnitPrice,
       onAdjustQuantityChange,
       calculateAdjustExpense,
+      fetchFundBalance,
+      onPaidFromFundChange,
       getStockStatusClass,
       getStockStatusText,
       getAdjustmentTypeClass,

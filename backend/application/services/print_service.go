@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
 	"cafe-pos/backend/domain/order"
@@ -21,6 +22,9 @@ import (
 type PrintService interface {
 	// CreatePrintJobsForOrder creates print jobs (1 bill + N labels) for an order
 	CreatePrintJobsForOrder(ctx context.Context, ord *order.Order) error
+
+	// CreateTempBillJob creates a temporary bill print job for an order
+	CreateTempBillJob(ctx context.Context, ord *order.Order) error
 
 	// ReprintBill creates a new bill print job for an existing order
 	ReprintBill(ctx context.Context, orderID primitive.ObjectID) error
@@ -474,13 +478,20 @@ func (s *printService) prepareBillData(ord *order.Order, shopSettings *settings.
 			itemName = fmt.Sprintf("%s (%s)", item.Name, item.VariantName)
 		}
 
-		items = append(items, map[string]interface{}{
+		itemData := map[string]interface{}{
 			"STT":       i + 1,
 			"Name":      itemName,
 			"Quantity":  item.Quantity,
 			"UnitPrice": formatMoneyVN(item.Price),
 			"Total":     formatMoneyVN(item.Subtotal),
-		})
+		}
+		
+		// Add note if present (e.g., "50%", "25%")
+		if item.Note != "" {
+			itemData["Note"] = item.Note
+		}
+		
+		items = append(items, itemData)
 	}
 
 	data := map[string]interface{}{
@@ -503,4 +514,110 @@ func (s *printService) prepareBillData(ord *order.Order, shopSettings *settings.
 	}
 	
 	return data
+}
+
+// CreateTempBillJob creates a temporary bill print job for an order
+func (s *printService) CreateTempBillJob(ctx context.Context, ord *order.Order) error {
+	if ord == nil {
+		return fmt.Errorf("order cannot be nil")
+	}
+
+	log.Printf("[PRINT] Creating temporary bill job for order %s (ID: %s)", ord.OrderNumber, ord.ID.Hex())
+
+	// Get default bill printer
+	billPrinter, err := s.printerConfigRepo.FindDefault(ctx, printing.PrinterTypeBill)
+	if err != nil {
+		log.Printf("[PRINT ERROR] Failed to get default bill printer for order %s: %v", ord.OrderNumber, err)
+		return fmt.Errorf("failed to get default bill printer: %w", err)
+	}
+	if billPrinter == nil {
+		log.Printf("[PRINT ERROR] No default bill printer configured for order %s", ord.OrderNumber)
+		return fmt.Errorf("no default bill printer configured")
+	}
+
+	// Fetch shop settings
+	shopSettings, err := s.shopSettingsRepo.GetSettings(ctx)
+	if err != nil {
+		log.Printf("[PRINT ERROR] Failed to fetch shop settings for temp bill - order_id=%s, error=%v", ord.ID.Hex(), err)
+		return fmt.Errorf("failed to fetch shop settings: %w", err)
+	}
+
+	var content string
+	var contentType string
+
+	// Render temp bill HTML
+	htmlContent, err := s.renderTempBillHTML(ord, shopSettings)
+	if err != nil {
+		log.Printf("[PRINT ERROR] Failed to render temp bill HTML - order_id=%s, error=%v", ord.ID.Hex(), err)
+		return fmt.Errorf("failed to render temp bill HTML: %w", err)
+	}
+	content = htmlContent
+	contentType = "html"
+	log.Printf("[PRINT] Using temp bill HTML template - order_id=%s", ord.OrderNumber)
+
+	// Create print job
+	job := &printing.PrintJob{
+		Type:        printing.PrintJobTypeBill,
+		OrderID:     ord.ID,
+		OrderNumber: ord.OrderNumber,
+		PrinterID:   billPrinter.ID,
+		Content:     content,
+		ContentType: contentType,
+		Status:      printing.PrintJobStatusPending,
+		RetryCount:  0,
+		MaxRetries:  3,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	if err := s.printJobRepo.Create(ctx, job); err != nil {
+		log.Printf("[PRINT ERROR] Failed to save temp bill print job - order_id=%s, error=%v", ord.ID.Hex(), err)
+		return fmt.Errorf("failed to create print job: %w", err)
+	}
+
+	log.Printf("[PRINT] Temporary bill job created - job_id=%s, order_id=%s", job.ID.Hex(), ord.ID.Hex())
+	
+	// Broadcast WebSocket event
+	if s.wsBroadcaster != nil {
+		s.wsBroadcaster.BroadcastPrintJobCreated(job)
+	}
+
+	return nil
+}
+
+// renderTempBillHTML renders temporary bill HTML from template file
+func (s *printService) renderTempBillHTML(ord *order.Order, shopSettings *settings.ShopSettings) (string, error) {
+	// Read temp bill HTML template file
+	templatePath := "./application/services/templates/temp_bill_template.html"
+	
+	// Log the absolute path for debugging
+	absPath, _ := filepath.Abs(templatePath)
+	log.Printf("[PRINT] Reading temp bill template from: %s", absPath)
+	
+	templateContent, err := os.ReadFile(templatePath)
+	if err != nil {
+		log.Printf("[PRINT ERROR] Failed to read temp bill template from %s: %v", absPath, err)
+		return "", fmt.Errorf("failed to read temp bill HTML template: %w", err)
+	}
+	
+	log.Printf("[PRINT] Temp bill template loaded successfully, size: %d bytes", len(templateContent))
+
+	// Parse template
+	tmpl, err := template.New("temp_bill").Parse(string(templateContent))
+	if err != nil {
+		return "", fmt.Errorf("failed to parse temp bill HTML template: %w", err)
+	}
+
+	// Prepare data (same as regular bill)
+	data := s.prepareBillData(ord, shopSettings)
+
+	// Execute template
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("failed to execute temp bill HTML template: %w", err)
+	}
+	
+	log.Printf("[PRINT] Temp bill HTML rendered successfully, size: %d bytes", buf.Len())
+
+	return buf.String(), nil
 }

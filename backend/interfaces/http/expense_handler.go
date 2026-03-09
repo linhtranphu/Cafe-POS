@@ -5,17 +5,22 @@ import (
 	"time"
 	"cafe-pos/backend/application/services"
 	"cafe-pos/backend/domain/expense"
+	"cafe-pos/backend/domain/user"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type ExpenseHandler struct {
-	service *services.ExpenseService
+	service                       *services.ExpenseService
+	fundExpenseIntegrationService *services.FundExpenseIntegrationService
 }
 
-func NewExpenseHandler(service *services.ExpenseService) *ExpenseHandler {
-	return &ExpenseHandler{service: service}
+func NewExpenseHandler(service *services.ExpenseService, fundExpenseIntegrationService *services.FundExpenseIntegrationService) *ExpenseHandler {
+	return &ExpenseHandler{
+		service:                       service,
+		fundExpenseIntegrationService: fundExpenseIntegrationService,
+	}
 }
 
 func (h *ExpenseHandler) CreateExpense(c *gin.Context) {
@@ -83,6 +88,103 @@ func (h *ExpenseHandler) CreateExpense(c *gin.Context) {
 	c.JSON(http.StatusCreated, e)
 }
 
+// CreateExpenseFromFund creates an expense paid from fund
+// Requirements: 1.1, 1.2, 1.3, 6.4
+func (h *ExpenseHandler) CreateExpenseFromFund(c *gin.Context) {
+	var req struct {
+		Date        string  `json:"date" binding:"required"`
+		CategoryID  string  `json:"category_id" binding:"required"`
+		Amount      float64 `json:"amount" binding:"required,gt=0"`
+		Description string  `json:"description" binding:"required"`
+		Vendor      string  `json:"vendor,omitempty"`
+		Notes       string  `json:"notes,omitempty"`
+		MoneyType   string  `json:"money_type,omitempty"` // "cash" or "transfer"
+	}
+	
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	
+	// Parse date - support both ISO format and YYYY-MM-DD
+	var date time.Time
+	var err error
+	
+	// Try ISO format first (YYYY-MM-DDTHH:MM:SSZ)
+	date, err = time.Parse(time.RFC3339, req.Date)
+	if err != nil {
+		// Fallback to YYYY-MM-DD format
+		date, err = time.Parse("2006-01-02", req.Date)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date format. Use ISO format (YYYY-MM-DDTHH:MM:SSZ) or YYYY-MM-DD"})
+			return
+		}
+	}
+	
+	// Parse category ID
+	categoryID, err := primitive.ObjectIDFromHex(req.CategoryID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid category_id"})
+		return
+	}
+	
+	// Extract user info from JWT token (set by auth middleware)
+	username, _ := c.Get("username")
+	userID, _ := c.Get("user_id")
+	userRole, _ := c.Get("role")
+	
+	userName := ""
+	if u, ok := username.(string); ok {
+		userName = u
+	}
+	
+	userIDObj := primitive.NilObjectID
+	if uid, ok := userID.(string); ok {
+		if oid, err := primitive.ObjectIDFromHex(uid); err == nil {
+			userIDObj = oid
+		}
+	}
+	
+	// Role is stored as user.Role type in context, convert to string
+	role := ""
+	if r, ok := userRole.(user.Role); ok {
+		role = string(r)
+	}
+	
+	// Create request for service
+	serviceReq := services.CreateExpenseFromFundRequest{
+		Date:        date,
+		CategoryID:  categoryID,
+		Amount:      req.Amount,
+		Description: req.Description,
+		Vendor:      req.Vendor,
+		Notes:       req.Notes,
+		MoneyType:   req.MoneyType,
+		UserID:      userIDObj,
+		UserName:    userName,
+		UserRole:    role,
+	}
+	
+	// Call service to create expense from fund
+	// Requirements 1.2, 1.3: Validate balance and create withdrawal
+	result, err := h.fundExpenseIntegrationService.CreateExpenseFromFund(c.Request.Context(), serviceReq)
+	if err != nil {
+		// Requirement 6.4: Handle errors (insufficient balance, validation errors)
+		if err == services.ErrInsufficientFundBalance {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	
+	// Return expense and fund transaction details
+	c.JSON(http.StatusCreated, gin.H{
+		"expense":          result.Expense,
+		"fund_transaction": result.FundTransaction,
+	})
+}
+
 func (h *ExpenseHandler) GetExpenses(c *gin.Context) {
 	filter := bson.M{}
 	if startDate := c.Query("start_date"); startDate != "" {
@@ -104,12 +206,59 @@ func (h *ExpenseHandler) GetExpenses(c *gin.Context) {
 			filter["category_id"] = id
 		}
 	}
+	
+	// Requirement 4.3: Add paid_from_fund filter
+	if paidFromFund := c.Query("paid_from_fund"); paidFromFund != "" {
+		if paidFromFund == "true" {
+			filter["paid_from_fund"] = true
+		} else if paidFromFund == "false" {
+			filter["paid_from_fund"] = false
+		}
+	}
+	
 	expenses, err := h.service.GetExpenses(c.Request.Context(), filter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, expenses)
+}
+
+// GetExpenseByID retrieves a single expense by ID
+// Requirement 4.2: Include fund_transaction_id in response
+func (h *ExpenseHandler) GetExpenseByID(c *gin.Context) {
+	id, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid expense ID"})
+		return
+	}
+	
+	// Get expense by ID
+	expenses, err := h.service.GetExpenses(c.Request.Context(), bson.M{"_id": id})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	
+	if len(expenses) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Expense not found"})
+		return
+	}
+	
+	expense := expenses[0]
+	
+	// Requirement 4.2: Include fund transaction details if expense was paid from fund
+	response := gin.H{
+		"expense": expense,
+	}
+	
+	// If expense was paid from fund, include fund transaction details
+	if expense.PaidFromFund && !expense.FundTransactionID.IsZero() {
+		response["has_fund_transaction"] = true
+		response["fund_transaction_id"] = expense.FundTransactionID.Hex()
+	}
+	
+	c.JSON(http.StatusOK, response)
 }
 
 func (h *ExpenseHandler) UpdateExpense(c *gin.Context) {

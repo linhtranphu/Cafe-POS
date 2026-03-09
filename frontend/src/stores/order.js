@@ -108,6 +108,18 @@ export const useOrderStore = defineStore('order', {
       }
     },
 
+    async printTemporaryBill(id) {
+      this.error = null
+      try {
+        const order = await orderService.printTemporaryBill(id)
+        this.updateOrderInList(order)
+        return order
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi in bill tạm'
+        throw error
+      }
+    },
+
     async refundPartial(id, amount, reason) {
       this.error = null
       try {
@@ -116,6 +128,21 @@ export const useOrderStore = defineStore('order', {
         return order
       } catch (error) {
         this.error = error.response?.data?.error || 'Lỗi hoàn tiền'
+        throw error
+      }
+    },
+
+    async mergeOrders(orderIds, customerName, note) {
+      this.error = null
+      try {
+        const response = await orderService.mergeOrders(orderIds, customerName, note)
+        // Remove cancelled orders from list
+        this.orders = this.orders.filter(o => !orderIds.includes(o.id))
+        // Add merged order to list
+        this.orders.unshift(response.merged_order)
+        return response
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi gộp bill'
         throw error
       }
     },
