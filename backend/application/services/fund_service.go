@@ -546,12 +546,13 @@ func (s *FundService) RecordHandover(
 	if err != nil {
 		return fmt.Errorf("failed to build handover transaction: %w", err)
 	}
-	transaction.SetFundType(fund.FundTypeCashDrawer)
+	handoverFundType := fund.FundTypeForSource(fund.SourceTypeHandover)
+	transaction.SetFundType(handoverFundType)
 	if err := transaction.SetSource(fund.SourceTypeHandover, shiftID); err != nil {
 		return err
 	}
 
-	balanceBefore, err := s.CalculateBalanceByFundType(ctx, fund.FundTypeCashDrawer)
+	balanceBefore, err := s.CalculateBalanceByFundType(ctx, handoverFundType)
 	if err != nil {
 		return fmt.Errorf("failed to calculate balance before handover: %w", err)
 	}

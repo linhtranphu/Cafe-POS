@@ -102,18 +102,32 @@ type RestockFromFundResult struct {
 // ValidateFundBalance validates that the fund has sufficient balance for the requested amount
 // Requirements: 6.1, 6.2, 6.3
 func (s *FundExpenseIntegrationService) ValidateFundBalance(ctx context.Context, requiredAmount float64) error {
-	// Get current fund balance
 	currentBalance, err := s.fundService.CalculateCurrentBalance(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to calculate fund balance: %w", err)
 	}
-
-	// Check if balance is sufficient
 	if requiredAmount > currentBalance.Total {
-		return fmt.Errorf("%w: required=%.2f, available=%.2f", 
+		return fmt.Errorf("%w: required=%.2f, available=%.2f",
 			ErrInsufficientFundBalance, requiredAmount, currentBalance.Total)
 	}
+	return nil
+}
 
+// ValidateFundBalanceForType validates that a specific fund has sufficient balance
+func (s *FundExpenseIntegrationService) ValidateFundBalanceForType(ctx context.Context, requiredAmount float64, moneyType string, fundType fund.FundType) error {
+	b, err := s.fundService.CalculateBalanceByFundType(ctx, fundType)
+	if err != nil {
+		return fmt.Errorf("failed to calculate fund balance: %w", err)
+	}
+	if moneyType == "transfer" {
+		if requiredAmount > b.Transfer {
+			return fmt.Errorf("%w (%s - chuyển khoản): cần=%.2f, có=%.2f", ErrInsufficientFundBalance, fundType, requiredAmount, b.Transfer)
+		}
+	} else {
+		if requiredAmount > b.Cash {
+			return fmt.Errorf("%w (%s - tiền mặt): cần=%.2f, có=%.2f", ErrInsufficientFundBalance, fundType, requiredAmount, b.Cash)
+		}
+	}
 	return nil
 }
 
@@ -133,9 +147,8 @@ func (s *FundExpenseIntegrationService) CreateExpenseFromFund(
 		req.MoneyType = "cash"
 	}
 
-	// Validate fund balance before starting transaction
-	// Requirement 6.1, 6.2: Check balance before processing
-	if err := s.ValidateFundBalance(ctx, req.Amount); err != nil {
+	expenseFundType := fund.FundTypeForSource(fund.SourceTypeExpense)
+	if err := s.ValidateFundBalanceForType(ctx, req.Amount, req.MoneyType, expenseFundType); err != nil {
 		return nil, err
 	}
 
@@ -154,26 +167,21 @@ func (s *FundExpenseIntegrationService) CreateExpenseFromFund(
 			return err
 		}
 
-		// Get current balance for audit
-		balanceBefore, err := s.fundService.CalculateCurrentBalance(sc)
+		balanceBefore, err := s.fundService.CalculateBalanceByFundType(sc, expenseFundType)
 		if err != nil {
 			session.AbortTransaction(sc)
 			return fmt.Errorf("failed to calculate balance: %w", err)
 		}
 
-		// Double-check balance within transaction and validate per money type
-		// Requirement 6.2: Validate sufficient balance
 		if req.MoneyType == "transfer" {
 			if req.Amount > balanceBefore.Transfer {
 				session.AbortTransaction(sc)
-				return fmt.Errorf("insufficient fund balance (chuyển khoản): cần=%.2f, có=%.2f",
-					req.Amount, balanceBefore.Transfer)
+				return fmt.Errorf("insufficient %s fund (chuyển khoản): cần=%.2f, có=%.2f", expenseFundType, req.Amount, balanceBefore.Transfer)
 			}
 		} else {
 			if req.Amount > balanceBefore.Cash {
 				session.AbortTransaction(sc)
-				return fmt.Errorf("insufficient fund balance (tiền mặt): cần=%.2f, có=%.2f",
-					req.Amount, balanceBefore.Cash)
+				return fmt.Errorf("insufficient %s fund (tiền mặt): cần=%.2f, có=%.2f", expenseFundType, req.Amount, balanceBefore.Cash)
 			}
 		}
 
@@ -234,6 +242,7 @@ func (s *FundExpenseIntegrationService) CreateExpenseFromFund(
 			session.AbortTransaction(sc)
 			return fmt.Errorf("failed to set fund transaction source: %w", err)
 		}
+		fundTx.SetFundType(expenseFundType)
 
 		// Set balance information for audit - Requirement 1.4
 		fundTx.SetBalances(balanceBefore, balanceAfter)
@@ -287,9 +296,8 @@ func (s *FundExpenseIntegrationService) RestockIngredientFromFund(
 
 	totalCost := req.Quantity * req.CostPerUnit
 
-	// Validate fund balance before starting transaction
-	// Requirement 2.2: Check balance before processing
-	if err := s.ValidateFundBalance(ctx, totalCost); err != nil {
+	ingredientFundType := fund.FundTypeForSource(fund.SourceTypeIngredient)
+	if err := s.ValidateFundBalanceForType(ctx, totalCost, req.MoneyType, ingredientFundType); err != nil {
 		return nil, err
 	}
 
@@ -315,25 +323,23 @@ func (s *FundExpenseIntegrationService) RestockIngredientFromFund(
 			return err
 		}
 
-		// Get current balance for audit
-		balanceBefore, err := s.fundService.CalculateCurrentBalance(sc)
+		balanceBefore, err := s.fundService.CalculateBalanceByFundType(sc, ingredientFundType)
 		if err != nil {
 			session.AbortTransaction(sc)
 			return fmt.Errorf("failed to calculate balance: %w", err)
 		}
 
-		// Double-check balance within transaction based on money_type
 		if req.MoneyType == "transfer" {
 			if totalCost > balanceBefore.Transfer {
 				session.AbortTransaction(sc)
-				return fmt.Errorf("%w (transfer): required=%.2f, available=%.2f", 
-					ErrInsufficientFundBalance, totalCost, balanceBefore.Transfer)
+				return fmt.Errorf("%w %s (transfer): required=%.2f, available=%.2f",
+					ErrInsufficientFundBalance, ingredientFundType, totalCost, balanceBefore.Transfer)
 			}
 		} else {
 			if totalCost > balanceBefore.Cash {
 				session.AbortTransaction(sc)
-				return fmt.Errorf("%w (cash): required=%.2f, available=%.2f", 
-					ErrInsufficientFundBalance, totalCost, balanceBefore.Cash)
+				return fmt.Errorf("%w %s (cash): required=%.2f, available=%.2f",
+					ErrInsufficientFundBalance, ingredientFundType, totalCost, balanceBefore.Cash)
 			}
 		}
 
@@ -445,6 +451,7 @@ func (s *FundExpenseIntegrationService) RestockIngredientFromFund(
 			session.AbortTransaction(sc)
 			return fmt.Errorf("failed to set fund transaction source: %w", err)
 		}
+		fundTx.SetFundType(ingredientFundType)
 
 		fundTx.SetBalances(balanceBefore, balanceAfter)
 
@@ -552,8 +559,8 @@ func (s *FundExpenseIntegrationService) PurchaseFacilityFromFund(
 
 	totalCost := req.Facility.Cost
 
-	// Validate fund balance before starting transaction
-	if err := s.ValidateFundBalance(ctx, totalCost); err != nil {
+	facilityFundType := fund.FundTypeForSource(fund.SourceTypeFacility)
+	if err := s.ValidateFundBalanceForType(ctx, totalCost, req.MoneyType, facilityFundType); err != nil {
 		return nil, err
 	}
 
@@ -570,25 +577,23 @@ func (s *FundExpenseIntegrationService) PurchaseFacilityFromFund(
 			return err
 		}
 
-		// Get current balance for audit
-		balanceBefore, err := s.fundService.CalculateCurrentBalance(sc)
+		balanceBefore, err := s.fundService.CalculateBalanceByFundType(sc, facilityFundType)
 		if err != nil {
 			session.AbortTransaction(sc)
 			return fmt.Errorf("failed to calculate balance: %w", err)
 		}
 
-		// Double-check balance within transaction based on money_type
 		if req.MoneyType == "transfer" {
 			if totalCost > balanceBefore.Transfer {
 				session.AbortTransaction(sc)
-				return fmt.Errorf("%w (chuyển khoản): cần=%.2f, có=%.2f",
-					ErrInsufficientFundBalance, totalCost, balanceBefore.Transfer)
+				return fmt.Errorf("%w %s (chuyển khoản): cần=%.2f, có=%.2f",
+					ErrInsufficientFundBalance, facilityFundType, totalCost, balanceBefore.Transfer)
 			}
 		} else {
 			if totalCost > balanceBefore.Cash {
 				session.AbortTransaction(sc)
-				return fmt.Errorf("%w (tiền mặt): cần=%.2f, có=%.2f",
-					ErrInsufficientFundBalance, totalCost, balanceBefore.Cash)
+				return fmt.Errorf("%w %s (tiền mặt): cần=%.2f, có=%.2f",
+					ErrInsufficientFundBalance, facilityFundType, totalCost, balanceBefore.Cash)
 			}
 		}
 
@@ -678,6 +683,7 @@ func (s *FundExpenseIntegrationService) PurchaseFacilityFromFund(
 			session.AbortTransaction(sc)
 			return fmt.Errorf("failed to set fund transaction source: %w", err)
 		}
+		fundTx.SetFundType(facilityFundType)
 		fundTx.SetBalances(balanceBefore, balanceAfter)
 
 		if err := s.fundTxRepo.Create(sc, fundTx); err != nil {

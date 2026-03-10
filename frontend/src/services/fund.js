@@ -46,7 +46,7 @@ export const getTransactionDetail = async (id) => {
 // Get all 4 fund balances
 export const getAllBalances = async () => {
   const response = await api.get('/manager/fund/balances')
-  return response.data
+  return response.data.balances || response.data
 }
 
 // Transfer between fund accounts

@@ -330,6 +330,8 @@ func main() {
 	expenseService := services.NewExpenseService(expenseRepo)
 	fundExpenseIntegrationService := services.NewFundExpenseIntegrationService(expenseRepo, fundTransactionRepo, ingredientRepo, ingredientRestockRepo, facilityRepo, fundService, client)
 	expenseHandler := http.NewExpenseHandler(expenseService, fundExpenseIntegrationService)
+	ingredientHandler.SetFundExpenseIntegrationService(fundExpenseIntegrationService)
+	facilityHandler.SetFundExpenseIntegrationService(fundExpenseIntegrationService)
 
 	// Menu cost and profit analysis handlers
 	menuCostHandler := http.NewMenuCostHandler(profitAnalyzerService, costCalculatorService, costRecalculationService, menuRepo)
