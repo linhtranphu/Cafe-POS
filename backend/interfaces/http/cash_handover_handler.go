@@ -36,7 +36,8 @@ func (h *CashHandoverHandler) CreateHandover(c *gin.Context) {
 		TransferAmount float64               `json:"transfer_amount"`
 		HandoverType   handover.HandoverType `json:"handover_type" binding:"required"`
 		WaiterNote     string                `json:"waiter_note"`
-		EndCash        float64               `json:"end_cash"`
+		EndCash        float64               `json:"end_cash"`     // Tiền mặt cuối ca
+		EndTransfer    float64               `json:"end_transfer"` // Tiền CK cuối ca
 	}
 
 	if err := c.ShouldBindJSON(&reqBody); err != nil {
@@ -55,6 +56,7 @@ func (h *CashHandoverHandler) CreateHandover(c *gin.Context) {
 		reqBody.HandoverType,
 		reqBody.WaiterNote,
 		reqBody.EndCash,
+		reqBody.EndTransfer,
 		userID.(string),
 		username.(string),
 	)

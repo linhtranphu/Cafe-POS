@@ -206,9 +206,20 @@
               <span class="text-sm text-gray-600">Loại</span>
               <span class="text-sm">{{ getHandoverTypeText(selectedHandover?.handover_type) }}</span>
             </div>
-            <div v-if="selectedHandover?.handover_type === 'END_SHIFT'" class="flex justify-between items-center mt-2 pt-2 border-t">
-              <span class="text-sm text-gray-600">Tiền cuối ca waiter nhập</span>
-              <span class="font-bold text-gray-800">{{ formatPrice(selectedHandover?.end_cash || 0) }}</span>
+            <div v-if="selectedHandover?.handover_type === 'END_SHIFT'" class="mt-2 pt-2 border-t space-y-1">
+              <div v-if="selectedHandover?.end_cash > 0 || selectedHandover?.end_transfer > 0" class="text-xs text-gray-500 mb-1">Tiền cuối ca waiter khai báo</div>
+              <div v-if="selectedHandover?.end_cash > 0" class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">💵 Tiền mặt cuối ca</span>
+                <span class="font-bold text-green-700">{{ formatPrice(selectedHandover.end_cash) }}</span>
+              </div>
+              <div v-if="selectedHandover?.end_transfer > 0" class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">💳 Tiền CK cuối ca</span>
+                <span class="font-bold text-blue-700">{{ formatPrice(selectedHandover.end_transfer) }}</span>
+              </div>
+              <div v-if="selectedHandover?.end_cash === 0 && selectedHandover?.end_transfer === 0" class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">Tiền cuối ca</span>
+                <span class="font-bold text-gray-800">0 ₫</span>
+              </div>
             </div>
           </div>
           

@@ -65,8 +65,9 @@ type Shift struct {
 	UserID        primitive.ObjectID `bson:"user_id" json:"user_id"`
 	UserName      string             `bson:"user_name" json:"user_name"`
 	
-	StartCash     float64            `bson:"start_cash" json:"start_cash"`
-	EndCash       float64            `bson:"end_cash" json:"end_cash"`
+	StartCash   float64 `bson:"start_cash" json:"start_cash"`
+	EndCash     float64 `bson:"end_cash" json:"end_cash"`         // Tiền mặt cuối ca
+	EndTransfer float64 `bson:"end_transfer" json:"end_transfer"` // Tiền CK cuối ca
 	TotalRevenue  float64            `bson:"total_revenue" json:"total_revenue"`
 	TotalOrders   int                `bson:"total_orders" json:"total_orders"`
 	

@@ -593,24 +593,37 @@
                   {{ formatPrice((currentShift?.remaining_cash || 0) + (currentShift?.remaining_transfer || 0)) }}
                 </span>
               </div>
-              <div class="flex justify-between items-center text-sm pt-2 border-t border-orange-200">
-                <span class="text-gray-500">Tiền cuối ca</span>
+              <div v-if="(currentShift?.remaining_cash || 0) > 0" class="flex justify-between items-center text-sm pt-2 border-t border-orange-200">
+                <span class="text-gray-500">💵 Tiền mặt cuối ca</span>
                 <span class="font-medium">{{ formatPrice(handoverEndShiftForm.end_cash) }}</span>
+              </div>
+              <div v-if="(currentShift?.remaining_transfer || 0) > 0" class="flex justify-between items-center text-sm">
+                <span class="text-gray-500">💳 Tiền CK cuối ca</span>
+                <span class="font-medium">{{ formatPrice(handoverEndShiftForm.end_transfer) }}</span>
               </div>
             </div>
           </div>
           
           <form @submit.prevent="createHandoverAndEndShift" class="space-y-4">
-            <!-- End Cash Input -->
-            <div>
-              <label class="block text-sm font-medium mb-2">Tiền cuối ca (VNĐ) *</label>
-              <input v-model.number="handoverEndShiftForm.end_cash" 
-                type="number" 
-                min="0" 
-                step="1000" 
-                required 
+            <!-- End Cash Input - chỉ hiện khi có tiền mặt -->
+            <div v-if="(currentShift?.remaining_cash || 0) > 0">
+              <label class="block text-sm font-medium mb-2">💵 Tiền mặt cuối ca (VNĐ)</label>
+              <input v-model.number="handoverEndShiftForm.end_cash"
+                type="number"
+                min="0"
+                step="1000"
                 class="w-full p-3 border rounded-xl text-lg font-bold focus:ring-2 focus:ring-orange-500">
-              <p class="text-xs text-gray-500 mt-1">Tiền còn lại sau khi bàn giao (thường là 0)</p>
+              <p class="text-xs text-gray-500 mt-1">Tiền mặt còn lại sau khi bàn giao (thường là 0)</p>
+            </div>
+            <!-- End Transfer Input - chỉ hiện khi có tiền CK -->
+            <div v-if="(currentShift?.remaining_transfer || 0) > 0">
+              <label class="block text-sm font-medium mb-2">💳 Tiền CK cuối ca (VNĐ)</label>
+              <input v-model.number="handoverEndShiftForm.end_transfer"
+                type="number"
+                min="0"
+                step="1000"
+                class="w-full p-3 border rounded-xl text-lg font-bold focus:ring-2 focus:ring-blue-500">
+              <p class="text-xs text-gray-500 mt-1">Tiền CK còn lại sau khi bàn giao (thường là 0)</p>
             </div>
             
             <!-- Note -->
@@ -693,6 +706,7 @@ const partialHandoverForm = ref({
 
 const handoverEndShiftForm = ref({
   end_cash: 0,
+  end_transfer: 0,
   waiter_note: ''
 })
 
@@ -845,7 +859,8 @@ const createHandoverAndEndShift = async () => {
       transfer_amount: currentShift.value?.remaining_transfer || 0,
       handover_type: 'END_SHIFT',
       waiter_note: handoverEndShiftForm.value.waiter_note,
-      end_cash: handoverEndShiftForm.value.end_cash
+      end_cash: handoverEndShiftForm.value.end_cash,
+      end_transfer: handoverEndShiftForm.value.end_transfer
     }
     
     // Validate at least one amount
@@ -856,7 +871,7 @@ const createHandoverAndEndShift = async () => {
     
     await shiftStore.createCashHandover(currentShift.value.id, handoverData)
     showHandoverEndShiftForm.value = false
-    handoverEndShiftForm.value = { end_cash: 0, waiter_note: '' }
+    handoverEndShiftForm.value = { end_cash: 0, end_transfer: 0, waiter_note: '' }
     
     // Refresh data
     await shiftStore.fetchCurrentShift()

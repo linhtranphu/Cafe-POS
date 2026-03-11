@@ -72,7 +72,8 @@ type CashHandover struct {
 	ReconciledAt *time.Time `bson:"reconciled_at,omitempty" json:"reconciled_at,omitempty"`
 
 	// Metadata
-	EndCash          float64            `bson:"end_cash,omitempty" json:"end_cash,omitempty"`
+	EndCash     float64 `bson:"end_cash,omitempty" json:"end_cash,omitempty"`         // Tiền mặt cuối ca
+	EndTransfer float64 `bson:"end_transfer,omitempty" json:"end_transfer,omitempty"` // Tiền CK cuối ca
 	RequiresApproval bool               `bson:"requires_approval" json:"requires_approval"`
 	ApprovedBy       primitive.ObjectID `bson:"approved_by,omitempty" json:"approved_by,omitempty"`
 	ApprovedAt       *time.Time         `bson:"approved_at,omitempty" json:"approved_at,omitempty"`
@@ -138,7 +139,8 @@ func (r *CreateHandoverRequest) GetTotalAmount() float64 {
 type CreateHandoverAndEndShiftRequest struct {
 	DeclaredAmount float64 `json:"declared_amount" binding:"required,gt=0"`
 	WaiterNote     string  `json:"waiter_note"`
-	EndCash        float64 `json:"end_cash" binding:"min=0"`
+	EndCash        float64 `json:"end_cash" binding:"min=0"`     // Tiền mặt cuối ca
+	EndTransfer    float64 `json:"end_transfer" binding:"min=0"` // Tiền CK cuối ca
 }
 
 type ConfirmHandoverRequest struct {

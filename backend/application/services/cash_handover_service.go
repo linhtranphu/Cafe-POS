@@ -59,7 +59,7 @@ func (s *CashHandoverService) CreateHandover(
 	cashAmount, transferAmount float64,
 	handoverType handover.HandoverType,
 	waiterNote string,
-	endCash float64,
+	endCash, endTransfer float64,
 	waiterID, waiterName string,
 ) (*handover.CashHandover, error) {
 	fmt.Printf("🔵 [CREATE HANDOVER] Starting - Cash: %.0f, Transfer: %.0f\n", cashAmount, transferAmount)
@@ -136,6 +136,7 @@ func (s *CashHandoverService) CreateHandover(
 		Status:         handover.StatusPending,
 		WaiterNote:     waiterNote,
 		EndCash:        endCash,
+		EndTransfer:    endTransfer,
 		HandoverAt:     time.Now(),
 		CreatedAt:      time.Now(),
 		UpdatedAt:      time.Now(),
@@ -373,6 +374,7 @@ func (s *CashHandoverService) updateBalances(ctx context.Context, h *handover.Ca
 
 		waiterShift.Status = order.ShiftClosed
 		waiterShift.EndCash = h.EndCash
+		waiterShift.EndTransfer = h.EndTransfer
 		waiterShift.TotalRevenue = cashRevenue + transferRevenue
 		waiterShift.TotalOrders = len(orders)
 		waiterShift.EndedAt = &now
