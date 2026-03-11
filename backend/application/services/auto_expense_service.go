@@ -40,7 +40,7 @@ func (s *AutoExpenseService) GetOrCreateCategory(ctx context.Context, categoryNa
 	s.cacheMutex.RUnlock()
 
 	// Not in cache, query database
-	categories, err := s.expenseService.GetCategories(ctx)
+	categories, err := s.expenseService.GetCategories(ctx, "")
 	if err != nil {
 		return primitive.NilObjectID, fmt.Errorf("failed to get categories: %w", err)
 	}

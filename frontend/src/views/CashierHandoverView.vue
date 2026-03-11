@@ -206,6 +206,10 @@
               <span class="text-sm text-gray-600">Loại</span>
               <span class="text-sm">{{ getHandoverTypeText(selectedHandover?.handover_type) }}</span>
             </div>
+            <div v-if="selectedHandover?.handover_type === 'END_SHIFT'" class="flex justify-between items-center mt-2 pt-2 border-t">
+              <span class="text-sm text-gray-600">Tiền cuối ca waiter nhập</span>
+              <span class="font-bold text-gray-800">{{ formatPrice(selectedHandover?.end_cash || 0) }}</span>
+            </div>
           </div>
           
           <form @submit.prevent="confirmHandover" class="space-y-4">
@@ -213,26 +217,34 @@
             <div v-if="confirmAction === 'CONFIRMED'">
               <!-- Cash Actual Amount -->
               <div v-if="selectedHandover?.cash_declared_amount > 0" class="mb-4">
-                <label class="block text-sm font-medium mb-2">💵 Số tiền mặt thực nhận (VNĐ) *</label>
-                <input v-model.number="confirmForm.actual_cash_amount" 
-                  type="number" 
-                  min="0" 
-                  step="1000" 
-                  required 
+                <label class="block text-sm font-medium mb-1">💵 Số tiền mặt thực nhận (VNĐ) *</label>
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-xs text-gray-500">Waiter bàn giao:</span>
+                  <span class="text-sm font-bold text-green-600">{{ formatPrice(selectedHandover.cash_declared_amount) }}</span>
+                </div>
+                <input v-model.number="confirmForm.actual_cash_amount"
+                  type="number"
+                  min="0"
+                  step="1000"
+                  required
                   class="w-full p-3 border rounded-xl text-lg font-bold focus:ring-2 focus:ring-green-500">
-                <p class="text-xs text-gray-500 mt-1">Đếm tiền mặt thực tế nhận được</p>
+                <p class="text-xs text-gray-400 mt-1">Nhập số tiền mặt bạn đếm thực tế</p>
               </div>
-              
+
               <!-- Transfer Actual Amount -->
               <div v-if="selectedHandover?.transfer_declared_amount > 0" class="mb-4">
-                <label class="block text-sm font-medium mb-2">💳 Số tiền CK thực nhận (VNĐ) *</label>
-                <input v-model.number="confirmForm.actual_transfer_amount" 
-                  type="number" 
-                  min="0" 
-                  step="1000" 
-                  required 
+                <label class="block text-sm font-medium mb-1">💳 Số tiền CK thực nhận (VNĐ) *</label>
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-xs text-gray-500">Waiter bàn giao:</span>
+                  <span class="text-sm font-bold text-blue-600">{{ formatPrice(selectedHandover.transfer_declared_amount) }}</span>
+                </div>
+                <input v-model.number="confirmForm.actual_transfer_amount"
+                  type="number"
+                  min="0"
+                  step="1000"
+                  required
                   class="w-full p-3 border rounded-xl text-lg font-bold focus:ring-2 focus:ring-blue-500">
-                <p class="text-xs text-gray-500 mt-1">Kiểm tra số dư tài khoản ngân hàng</p>
+                <p class="text-xs text-gray-400 mt-1">Kiểm tra số dư tài khoản ngân hàng</p>
               </div>
             </div>
             

@@ -287,6 +287,20 @@ export const useShiftStore = defineStore('shift', {
         this.error = error.response?.data?.error || 'Lỗi hủy bàn giao'
         throw error
       }
+    },
+
+    /**
+     * Get pending orders for a shift
+     * @param {string} shiftId - Shift ID
+     * @returns {Promise<Object>} { pending_orders: [], count: number }
+     */
+    async getPendingOrders(shiftId) {
+      try {
+        return await shiftService.getPendingOrders(shiftId)
+      } catch (error) {
+        console.error('Error fetching pending orders:', error)
+        return { pending_orders: [], count: 0 }
+      }
     }
   }
 })

@@ -365,7 +365,7 @@ func (s *FundExpenseIntegrationService) RestockIngredientFromFund(
 		}
 
 		// Find or create "ingredient purchase" expense category
-		categories, err := s.expenseRepo.GetCategories(sc)
+		categories, err := s.expenseRepo.GetCategories(sc, "")
 		if err != nil {
 			session.AbortTransaction(sc)
 			return fmt.Errorf("failed to get expense categories: %w", err)
@@ -608,7 +608,7 @@ func (s *FundExpenseIntegrationService) PurchaseFacilityFromFund(
 		}
 
 		// Find or create "facility purchase" expense category
-		categories, err := s.expenseRepo.GetCategories(sc)
+		categories, err := s.expenseRepo.GetCategories(sc, "")
 		if err != nil {
 			session.AbortTransaction(sc)
 			return fmt.Errorf("failed to get expense categories: %w", err)

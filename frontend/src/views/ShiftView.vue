@@ -151,14 +151,14 @@
           
           <!-- Handover and End Shift Button -->
           <button v-if="(currentShift.remaining_cash > 0 || currentShift.remaining_transfer > 0) && !pendingHandover"
-            @click="showHandoverEndShiftForm = true"
+            @click="checkPendingOrdersThenShowHandoverEnd"
             class="w-full bg-orange-500 active:bg-orange-600 text-white px-4 py-3.5 rounded-xl font-bold shadow-lg touch-manipulation active:scale-98 transition-all">
             🏁 Bàn giao và đóng ca
           </button>
-          
+
           <!-- Regular End Shift Button (only when no remaining cash/transfer) -->
           <button v-if="currentShift.remaining_cash === 0 && currentShift.remaining_transfer === 0 && !pendingHandover"
-            @click="showEndShiftForm = true" 
+            @click="checkPendingOrdersThenShowEndShift"
             class="w-full bg-white text-blue-600 active:bg-blue-50 px-4 py-3.5 rounded-xl font-bold shadow-lg touch-manipulation active:scale-98 transition-all">
             Kết thúc ca
           </button>
@@ -330,6 +330,62 @@
 
     <!-- Bottom Navigation -->
     <BottomNav />
+
+    <!-- Pending Orders Warning Modal -->
+    <transition name="slide-up">
+      <div v-if="showPendingOrdersWarning" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-end">
+        <div class="bg-white rounded-t-3xl w-full p-6 max-h-[85vh] overflow-y-auto">
+          <div class="flex items-center gap-3 mb-4">
+            <span class="text-3xl">⚠️</span>
+            <div>
+              <h3 class="text-xl font-bold text-red-600">Còn order chưa hoàn thành</h3>
+              <p class="text-sm text-gray-500">Đóng ca sẽ hủy tất cả các order này</p>
+            </div>
+          </div>
+
+          <div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-5">
+            <p class="text-sm font-semibold text-red-700 mb-3">
+              {{ pendingOrdersList.length }} order đang pending sẽ bị hủy:
+            </p>
+            <div class="space-y-2 max-h-48 overflow-y-auto">
+              <div v-for="o in pendingOrdersList" :key="o.id"
+                class="flex justify-between items-center bg-white rounded-lg p-3 border border-red-100">
+                <div>
+                  <p class="font-semibold text-gray-800">#{{ o.order_number }}</p>
+                  <p v-if="o.customer_name" class="text-xs text-gray-500">{{ o.customer_name }}</p>
+                  <span class="text-xs px-2 py-0.5 rounded-full font-medium"
+                    :class="{
+                      'bg-gray-100 text-gray-700': o.status === 'CREATED',
+                      'bg-blue-100 text-blue-700': o.status === 'PAID',
+                      'bg-yellow-100 text-yellow-700': o.status === 'QUEUED',
+                      'bg-orange-100 text-orange-700': o.status === 'IN_PROGRESS',
+                      'bg-green-100 text-green-700': o.status === 'READY',
+                    }">
+                    {{ getOrderStatusText(o.status) }}
+                  </span>
+                </div>
+                <p class="font-bold text-gray-800">{{ formatPrice(o.total) }}</p>
+              </div>
+            </div>
+          </div>
+
+          <p class="text-sm text-gray-600 mb-5">
+            Bạn có chắc chắn muốn <strong class="text-red-600">hủy {{ pendingOrdersList.length }} order</strong> và tiếp tục đóng ca?
+          </p>
+
+          <div class="flex gap-3">
+            <button @click="showPendingOrdersWarning = false; pendingOrdersAction = null"
+              class="flex-1 bg-gray-200 text-gray-700 px-4 py-3.5 rounded-xl font-bold">
+              Quay lại
+            </button>
+            <button @click="confirmPendingOrdersAndProceed"
+              class="flex-1 bg-red-500 active:bg-red-600 text-white px-4 py-3.5 rounded-xl font-bold">
+              Xác nhận hủy & đóng ca
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
 
     <!-- End Shift Modal -->
     <transition name="slide-up">
@@ -610,6 +666,11 @@ const showHandoverEndShiftForm = ref(false)
 const pendingHandover = ref(null)
 const handoverHistory = ref([])
 
+// Pending orders warning refs
+const showPendingOrdersWarning = ref(false)
+const pendingOrdersList = ref([])
+const pendingOrdersAction = ref(null) // 'endShift' | 'handoverEnd'
+
 const startForm = ref({
   type: '',
   start_cash: 0
@@ -783,7 +844,8 @@ const createHandoverAndEndShift = async () => {
       cash_amount: currentShift.value?.remaining_cash || 0,
       transfer_amount: currentShift.value?.remaining_transfer || 0,
       handover_type: 'END_SHIFT',
-      waiter_note: handoverEndShiftForm.value.waiter_note
+      waiter_note: handoverEndShiftForm.value.waiter_note,
+      end_cash: handoverEndShiftForm.value.end_cash
     }
     
     // Validate at least one amount
@@ -825,6 +887,54 @@ const cancelHandover = async (handoverId) => {
       console.error('Cancel handover error:', error)
     }
   }
+}
+
+// Pending orders check helpers
+const checkPendingOrdersThenShowEndShift = async () => {
+  await checkPendingOrdersAndShow('endShift')
+}
+
+const checkPendingOrdersThenShowHandoverEnd = async () => {
+  await checkPendingOrdersAndShow('handoverEnd')
+}
+
+const checkPendingOrdersAndShow = async (action) => {
+  if (!currentShift.value?.id) return
+  try {
+    const result = await shiftStore.getPendingOrders(currentShift.value.id)
+    if (result.count > 0) {
+      pendingOrdersList.value = result.pending_orders
+      pendingOrdersAction.value = action
+      showPendingOrdersWarning.value = true
+    } else {
+      // No pending orders - proceed directly
+      if (action === 'endShift') showEndShiftForm.value = true
+      else showHandoverEndShiftForm.value = true
+    }
+  } catch (error) {
+    // On error, just proceed without the check
+    if (action === 'endShift') showEndShiftForm.value = true
+    else showHandoverEndShiftForm.value = true
+  }
+}
+
+const confirmPendingOrdersAndProceed = () => {
+  showPendingOrdersWarning.value = false
+  if (pendingOrdersAction.value === 'endShift') showEndShiftForm.value = true
+  else if (pendingOrdersAction.value === 'handoverEnd') showHandoverEndShiftForm.value = true
+  pendingOrdersAction.value = null
+  pendingOrdersList.value = []
+}
+
+const getOrderStatusText = (status) => {
+  const statuses = {
+    CREATED: 'Chưa thanh toán',
+    PAID: 'Đã thanh toán',
+    QUEUED: 'Chờ pha chế',
+    IN_PROGRESS: 'Đang pha chế',
+    READY: 'Sẵn sàng giao'
+  }
+  return statuses[status] || status
 }
 
 const getShiftTypeText = (type) => {

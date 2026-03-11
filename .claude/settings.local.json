@@ -23,7 +23,19 @@
       "Bash(curl -s http://localhost:5173)",
       "Bash(lsof -t -i:3000)",
       "Bash(xxd)",
-      "Bash(go build .)"
+      "Bash(go build .)",
+      "Bash(go build -o cafe-pos-backend .)",
+      "Bash(lsof -i :8080)",
+      "Bash(lsof -i :8000)",
+      "Bash(kill 97426)",
+      "Bash(curl -s http://localhost:8080/health)",
+      "Bash(curl -s http://localhost:8080/api/health)",
+      "Read(//private/tmp/**)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X POST http://localhost:3000/api/manager/ingredients/test/restock/from-fund -H \"Content-Type: application/json\")",
+      "Bash(python3 -m json.tool)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(''OK - user:'', d[''user''][''username''], ''role:'', d[''user''][''role'']\\)\")",
+      "Read(//Volumes/Linh-DAT/Misc\\\\ Projects/Cafe\\\\ POS/backend/interfaces/http/**)",
+      "Read(//Volumes/Linh-DAT/Misc\\\\ Projects/Cafe\\\\ POS/backend/**)"
     ]
   }
 }

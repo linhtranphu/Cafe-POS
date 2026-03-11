@@ -232,6 +232,12 @@ const routes = [
     name: 'FundManagement',
     component: () => import('../views/FundManagementView.vue'),
     meta: { requiresAuth: true, requiresManager: true }
+  },
+  {
+    path: '/operating-expenses',
+    name: 'OperatingExpenses',
+    component: () => import('../views/OperatingExpenseView.vue'),
+    meta: { requiresAuth: true, requiresManager: true }
   }
 ]
 

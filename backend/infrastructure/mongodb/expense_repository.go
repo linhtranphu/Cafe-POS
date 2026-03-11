@@ -72,8 +72,18 @@ func (r *ExpenseRepository) CreateCategory(ctx context.Context, c *expense.Categ
 	return err
 }
 
-func (r *ExpenseRepository) GetCategories(ctx context.Context) ([]expense.Category, error) {
-	cursor, err := r.categories.Find(ctx, bson.M{})
+func (r *ExpenseRepository) GetCategories(ctx context.Context, categoryType string) ([]expense.Category, error) {
+	filter := bson.M{}
+	if categoryType == "operating" {
+		filter["type"] = "operating"
+	} else if categoryType == "general" || categoryType == "" {
+		filter["$or"] = []bson.M{
+			{"type": bson.M{"$exists": false}},
+			{"type": ""},
+			{"type": bson.M{"$ne": "operating"}},
+		}
+	}
+	cursor, err := r.categories.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}

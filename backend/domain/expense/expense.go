@@ -58,6 +58,7 @@ type Expense struct {
 type Category struct {
 	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	Name      string             `bson:"name" json:"name"`
+	Type      string             `bson:"type,omitempty" json:"type,omitempty"` // "operating" | "" (general)
 	CreatedAt time.Time          `bson:"created_at" json:"created_at"`
 }
 

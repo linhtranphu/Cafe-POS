@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"cafe-pos/backend/application/services"
@@ -335,7 +336,7 @@ func (h *IngredientHandler) RestockFromFund(c *gin.Context) {
 	var req struct {
 		Quantity    float64 `json:"quantity" binding:"required,gt=0"`
 		CostPerUnit float64 `json:"cost_per_unit" binding:"required,gte=0"`
-		Reason      string  `json:"reason" binding:"required"`
+		Reason      string  `json:"reason"`
 		MoneyType   string  `json:"money_type"` // "cash" or "transfer"
 	}
 
@@ -418,7 +419,7 @@ func (h *IngredientHandler) RestockFromFund(c *gin.Context) {
 	if err != nil {
 		fmt.Printf("ERROR: RestockIngredientFromFund failed: %v\n", err)
 		// Handle specific errors
-		if err == services.ErrInsufficientFundBalance {
+		if errors.Is(err, services.ErrInsufficientFundBalance) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"net/http"
 	"time"
 	"cafe-pos/backend/application/services"
@@ -169,8 +170,7 @@ func (h *ExpenseHandler) CreateExpenseFromFund(c *gin.Context) {
 	// Requirements 1.2, 1.3: Validate balance and create withdrawal
 	result, err := h.fundExpenseIntegrationService.CreateExpenseFromFund(c.Request.Context(), serviceReq)
 	if err != nil {
-		// Requirement 6.4: Handle errors (insufficient balance, validation errors)
-		if err == services.ErrInsufficientFundBalance {
+		if errors.Is(err, services.ErrInsufficientFundBalance) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -359,7 +359,8 @@ func (h *ExpenseHandler) CreateCategory(c *gin.Context) {
 }
 
 func (h *ExpenseHandler) GetCategories(c *gin.Context) {
-	categories, err := h.service.GetCategories(c.Request.Context())
+	categoryType := c.Query("type") // "" = general, "operating" = operating
+	categories, err := h.service.GetCategories(c.Request.Context(), categoryType)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

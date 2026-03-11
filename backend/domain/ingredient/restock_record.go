@@ -48,10 +48,6 @@ func NewIngredientRestockRecord(
 	if performedByName == "" {
 		return nil, errors.New("performed_by_name is required")
 	}
-	if reason == "" {
-		return nil, errors.New("reason is required")
-	}
-	
 	totalCost := quantity * costPerUnit
 	
 	return &IngredientRestockRecord{
@@ -87,10 +83,7 @@ func (r *IngredientRestockRecord) Validate() error {
 	if r.PerformedByName == "" {
 		return errors.New("performed_by_name is required")
 	}
-	if r.Reason == "" {
-		return errors.New("reason is required")
-	}
-	
+
 	// Validate fund payment consistency
 	// Requirement 2.3, 2.4: When paid from fund, expense_id and fund_transaction_id must be set
 	if r.PaidFromFund {

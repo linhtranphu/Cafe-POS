@@ -31,8 +31,8 @@ export const fundExpenseService = {
         throw new Error(error.response?.data?.error || 'Dữ liệu không hợp lệ')
       }
       
-      // Handle other errors
-      throw new Error('Không thể tạo chi phí từ quỹ. Vui lòng thử lại.')
+      // Handle other errors - expose actual backend error message
+      throw new Error(error.response?.data?.error || 'Không thể tạo chi phí từ quỹ. Vui lòng thử lại.')
     }
   },
 

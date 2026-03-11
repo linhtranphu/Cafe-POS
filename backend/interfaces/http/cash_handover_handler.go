@@ -36,8 +36,9 @@ func (h *CashHandoverHandler) CreateHandover(c *gin.Context) {
 		TransferAmount float64               `json:"transfer_amount"`
 		HandoverType   handover.HandoverType `json:"handover_type" binding:"required"`
 		WaiterNote     string                `json:"waiter_note"`
+		EndCash        float64               `json:"end_cash"`
 	}
-	
+
 	if err := c.ShouldBindJSON(&reqBody); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -53,6 +54,7 @@ func (h *CashHandoverHandler) CreateHandover(c *gin.Context) {
 		reqBody.TransferAmount,
 		reqBody.HandoverType,
 		reqBody.WaiterNote,
+		reqBody.EndCash,
 		userID.(string),
 		username.(string),
 	)

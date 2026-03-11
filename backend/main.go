@@ -404,7 +404,8 @@ func main() {
 				shifts.GET("/current", shiftHandler.GetCurrentShift)
 				shifts.GET("/my", shiftHandler.GetMyShifts)
 				shifts.GET("/:id", shiftHandler.GetShift)
-				
+				shifts.GET("/:id/pending-orders", shiftHandler.GetPendingOrders)
+
 				// Cash handover routes (waiter)
 				shifts.POST("/:id/handover", cashHandoverHandler.CreateHandover)
 				// shifts.POST("/:id/handover-and-end", cashHandoverHandler.CreateHandoverAndEndShift) // Not needed - use regular handover
@@ -656,6 +657,8 @@ func main() {
 				manager.POST("/ingredients/:id/stock-out", ingredientHandler.StockOut)     // Remove stock (usage/waste)
 				manager.POST("/ingredients/:id/stock-adjust", ingredientHandler.StockAdjust) // Set to specific quantity
 				manager.POST("/ingredients/:id/adjust", ingredientHandler.AdjustStock)     // Legacy endpoint
+				manager.POST("/ingredients/:id/restock/from-fund", ingredientHandler.RestockFromFund) // Restock paid from fund
+				manager.GET("/ingredients/:id/restock-history", ingredientHandler.GetRestockHistory)  // Restock history
 				
 				// Ingredient category routes
 				manager.POST("/ingredient-categories", ingredientHandler.CreateCategory)
@@ -698,6 +701,7 @@ func main() {
 				
 				// Expense management routes
 				manager.POST("/expenses", expenseHandler.CreateExpense)
+				manager.POST("/expenses/from-fund", expenseHandler.CreateExpenseFromFund) // Operating expense from fund
 				manager.GET("/expenses", expenseHandler.GetExpenses)
 				manager.PUT("/expenses/:id", expenseHandler.UpdateExpense)
 				manager.DELETE("/expenses/:id", expenseHandler.DeleteExpense)

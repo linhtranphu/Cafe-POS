@@ -368,24 +368,50 @@
               </p>
             </div>
 
-            <!-- Auto-Expense Indicator -->
-            <div v-if="!isEditing && formData.quantity > 0 && formData.cost_per_unit > 0" 
-              class="bg-green-50 border-2 border-green-300 rounded-xl p-4">
-              <div class="flex items-start gap-3">
-                <span class="text-green-600 text-2xl flex-shrink-0">✅</span>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-semibold text-green-800 mb-2">Tự động ghi nhận chi phí</p>
-                  <div class="bg-white rounded-lg p-3 mb-2">
-                    <div class="text-xs text-gray-600 mb-1">Chi phí sẽ được ghi:</div>
-                    <div class="text-base font-bold text-green-700">{{ formatCurrency(totalCost) }}</div>
-                    <div class="text-xs text-gray-500 mt-1">
-                      ({{ formData.quantity }} {{ formData.unit }} × {{ formatCurrency(formData.cost_per_unit) }})
-                    </div>
-                  </div>
-                  <p class="text-xs text-green-600">
-                    📝 Danh mục: "Nguyên liệu" • 💵 Phương thức: Tiền mặt
-                  </p>
+            <!-- Fund deduction section (only when creating with cost > 0) -->
+            <div v-if="!isEditing && formData.quantity > 0 && formData.cost_per_unit > 0" class="space-y-3">
+              <!-- Inventory fund balance -->
+              <div class="bg-purple-50 border border-purple-200 rounded-xl p-3">
+                <div class="text-xs font-semibold text-purple-700 mb-1">📦 Quỹ hàng hóa (Inventory Fund)</div>
+                <div v-if="fundBalanceLoading" class="text-xs text-gray-500">Đang tải...</div>
+                <div v-else-if="fundBalance" class="text-sm text-purple-800">
+                  💵 Tiền mặt: <span class="font-bold">{{ formatCurrency(fundBalance.cash || 0) }}</span>
+                  &nbsp;|&nbsp;
+                  💳 CK: <span class="font-bold">{{ formatCurrency(fundBalance.transfer || 0) }}</span>
                 </div>
+              </div>
+
+              <!-- Money type selector -->
+              <div>
+                <div class="text-sm font-medium text-gray-700 mb-2">Thanh toán từ quỹ bằng</div>
+                <div class="grid grid-cols-2 gap-2">
+                  <button type="button" @click="formData.money_type = 'cash'"
+                    :class="['py-3 rounded-xl font-semibold text-sm transition-colors',
+                      formData.money_type !== 'transfer' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700']">
+                    💵 Tiền mặt
+                  </button>
+                  <button type="button" @click="formData.money_type = 'transfer'"
+                    :class="['py-3 rounded-xl font-semibold text-sm transition-colors',
+                      formData.money_type === 'transfer' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700']">
+                    💳 Chuyển khoản
+                  </button>
+                </div>
+              </div>
+
+              <!-- Deduction summary -->
+              <div class="bg-orange-50 border-2 border-orange-300 rounded-xl p-3">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-lg">📦</span>
+                  <span class="text-sm font-semibold text-orange-800">Tự động trừ Quỹ hàng hóa</span>
+                </div>
+                <div class="text-xl font-bold text-orange-700">{{ formatCurrency(totalCost) }}</div>
+                <div class="text-xs text-gray-500 mt-1">
+                  {{ formData.quantity }} {{ formData.unit }} × {{ formatCurrency(formData.cost_per_unit) }}
+                </div>
+                <div v-if="formData.money_type !== 'transfer' && totalCost > (fundBalance?.cash || 0)"
+                  class="text-xs text-red-600 mt-1 font-semibold">⚠️ Tiền mặt quỹ không đủ!</div>
+                <div v-if="formData.money_type === 'transfer' && totalCost > (fundBalance?.transfer || 0)"
+                  class="text-xs text-red-600 mt-1 font-semibold">⚠️ Tiền chuyển khoản quỹ không đủ!</div>
               </div>
             </div>
 
@@ -496,15 +522,53 @@
                 </div>
               </div>
 
-              <!-- Auto-expense indicator -->
-              <div v-if="quickInData.quantity > 0 && quickInExpenseAmount > 0" 
-                class="bg-green-50 border-2 border-green-300 rounded-xl p-3">
-                <div class="flex items-center gap-2 mb-2">
-                  <span class="text-green-600 text-xl">✅</span>
-                  <span class="text-sm font-semibold text-green-800">Tự động ghi chi phí</span>
+              <!-- Fund deduction indicator -->
+              <div v-if="quickInData.quantity > 0 && quickInExpenseAmount > 0" class="space-y-3">
+                <!-- Inventory fund balance -->
+                <div class="bg-purple-50 border border-purple-200 rounded-xl p-3">
+                  <div class="text-xs font-semibold text-purple-700 mb-1">Quỹ hàng hóa (Inventory Fund)</div>
+                  <div v-if="fundBalanceLoading" class="text-xs text-gray-500">Đang tải...</div>
+                  <div v-else class="text-sm text-purple-800">
+                    💵 Tiền mặt: <span class="font-bold">{{ formatCurrency(fundBalance?.cash || 0) }}</span>
+                    &nbsp;|&nbsp;
+                    💳 CK: <span class="font-bold">{{ formatCurrency(fundBalance?.transfer || 0) }}</span>
+                  </div>
                 </div>
-                <div class="text-lg font-bold text-green-700">
-                  {{ formatCurrency(quickInExpenseAmount) }}
+
+                <!-- Money type selector -->
+                <div>
+                  <div class="text-xs font-medium text-gray-700 mb-2">Thanh toán bằng</div>
+                  <div class="grid grid-cols-2 gap-2">
+                    <button type="button" @click="quickInData.money_type = 'cash'"
+                      :class="['py-2 px-3 rounded-lg text-sm font-medium transition-colors',
+                        quickInData.money_type === 'cash' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700']">
+                      💵 Tiền mặt
+                    </button>
+                    <button type="button" @click="quickInData.money_type = 'transfer'"
+                      :class="['py-2 px-3 rounded-lg text-sm font-medium transition-colors',
+                        quickInData.money_type === 'transfer' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700']">
+                      💳 Chuyển khoản
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Deduction summary -->
+                <div class="bg-orange-50 border-2 border-orange-300 rounded-xl p-3">
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="text-orange-600 text-lg">📦</span>
+                    <span class="text-sm font-semibold text-orange-800">Tự động trừ Quỹ hàng hóa</span>
+                  </div>
+                  <div class="text-lg font-bold text-orange-700">
+                    {{ formatCurrency(quickInExpenseAmount) }}
+                  </div>
+                  <div v-if="quickInData.money_type === 'cash' && quickInExpenseAmount > (fundBalance?.cash || 0)"
+                    class="text-xs text-red-600 mt-1 font-semibold">
+                    ⚠️ Tiền mặt quỹ không đủ!
+                  </div>
+                  <div v-if="quickInData.money_type === 'transfer' && quickInExpenseAmount > (fundBalance?.transfer || 0)"
+                    class="text-xs text-red-600 mt-1 font-semibold">
+                    ⚠️ Tiền chuyển khoản quỹ không đủ!
+                  </div>
                 </div>
               </div>
             </div>
@@ -665,7 +729,7 @@
                         ⚠️ {{ fundBalanceError }}
                       </div>
                       <div v-else>
-                        <div class="text-xs text-gray-600 mb-1">Số dư quỹ hiện tại:</div>
+                        <div class="text-xs text-gray-600 mb-1">Quỹ hàng hóa (Inventory Fund):</div>
                         <div class="text-lg font-bold text-purple-700">
                           {{ formatCurrency(fundBalance?.total || 0) }}
                         </div>
@@ -1086,7 +1150,7 @@ import {
   getAdjustmentTypeClass,
   getAdjustmentTypeText
 } from '../constants/ingredient'
-import { getBalance } from '../services/fund'
+import { getAllBalances } from '../services/fund'
 import { fundIngredientService } from '../services/fundIngredientService'
 
 export default {
@@ -1158,11 +1222,13 @@ export default {
       currentIngredient.value = ingredient
       quickInData.value = {
         quantity: 0,
-        cost_per_unit: 0
+        cost_per_unit: 0,
+        money_type: 'cash'
       }
       quickInPriceMode.value = 'total'
       quickInTotalPrice.value = 0
       showQuickInModal.value = true
+      fetchFundBalance()
     }
 
     const closeQuickInModal = () => {
@@ -1181,17 +1247,29 @@ export default {
 
       isAdjusting.value = true
       try {
-        const data = {
-          quantity: quickInData.value.quantity,
-          cost_per_unit: quickInData.value.cost_per_unit || 0,
-          reason: 'Nhập kho'
+        const costPerUnit = quickInData.value.cost_per_unit || 0
+        if (costPerUnit > 0) {
+          // Auto-deduct from inventory fund
+          const data = {
+            quantity: quickInData.value.quantity,
+            cost_per_unit: costPerUnit,
+            reason: 'Nhập kho',
+            money_type: quickInData.value.money_type || 'cash'
+          }
+          await fundIngredientService.restockIngredientFromFund(currentIngredient.value.id, data)
+        } else {
+          // No cost — just update stock without fund deduction
+          const data = {
+            quantity: quickInData.value.quantity,
+            cost_per_unit: 0,
+            reason: 'Nhập kho'
+          }
+          await ingredientStore.stockIn(currentIngredient.value.id, data)
         }
-        
-        await ingredientStore.stockIn(currentIngredient.value.id, data)
         closeQuickInModal()
       } catch (error) {
         console.error('Error quick stock in:', error)
-        alert('Có lỗi xảy ra khi nhập kho')
+        alert(error.message || 'Có lỗi xảy ra khi nhập kho')
       } finally {
         isAdjusting.value = false
       }
@@ -1528,11 +1606,13 @@ export default {
         cost_per_unit: 0,
         supplier: '',
         notes: '',
-        created_date: defaultDateTime
+        created_date: defaultDateTime,
+        money_type: 'cash'
       }
       priceInputMode.value = 'total' // Default to total price mode
       totalPriceInput.value = 0
       showModal.value = true
+      fetchFundBalance()
     }
 
     const openEditModal = (ingredient) => {
@@ -1575,18 +1655,17 @@ export default {
       showAdjustModal.value = true
     }
 
-    // Fetch fund balance when "paid from fund" is checked
+    // Fetch inventory fund balance
     const fetchFundBalance = async () => {
       fundBalanceLoading.value = true
       fundBalanceError.value = null
       try {
-        const response = await getBalance()
-        console.log('Fund balance response:', response)
-        // Backend returns current_balance object
-        fundBalance.value = response.current_balance
+        const data = await getAllBalances()
+        // Get inventory fund balance specifically
+        fundBalance.value = data?.['inventory'] || { cash: 0, transfer: 0, total: 0 }
       } catch (error) {
         console.error('Error fetching fund balance:', error)
-        fundBalanceError.value = 'Không thể tải số dư quỹ. Vui lòng thử lại.'
+        fundBalanceError.value = 'Không thể tải số dư quỹ hàng hóa. Vui lòng thử lại.'
       } finally {
         fundBalanceLoading.value = false
       }
@@ -1630,12 +1709,34 @@ export default {
         if (isEditing.value) {
           await ingredientStore.updateIngredient(currentIngredient.value.id, formData.value)
         } else {
-          await ingredientStore.createIngredient(formData.value)
+          const initialQty = formData.value.quantity || 0
+          const costPerUnit = formData.value.cost_per_unit || 0
+          // Create ingredient with quantity=0 first, then restock from fund if needed
+          const payload = { ...formData.value, quantity: 0 }
+          const newIngredient = await ingredientStore.createIngredient(payload)
+          if (!newIngredient) throw new Error('Không thể tạo nguyên liệu')
+
+          if (initialQty > 0 && costPerUnit > 0 && newIngredient.id) {
+            // Deduct from inventory fund
+            await fundIngredientService.restockIngredientFromFund(newIngredient.id, {
+              quantity: initialQty,
+              cost_per_unit: costPerUnit,
+              reason: 'Nhập kho ban đầu',
+              money_type: formData.value.money_type || 'cash'
+            })
+          } else if (initialQty > 0) {
+            // No cost → just add stock without fund deduction
+            await ingredientStore.stockIn(newIngredient.id, {
+              quantity: initialQty,
+              cost_per_unit: costPerUnit,
+              reason: 'Nhập kho ban đầu'
+            })
+          }
         }
         closeModal()
       } catch (error) {
         console.error('Error saving ingredient:', error)
-        alert('Có lỗi xảy ra khi lưu nguyên liệu')
+        alert(error.message || 'Có lỗi xảy ra khi lưu nguyên liệu')
       } finally {
         isSubmitting.value = false
       }
@@ -1648,11 +1749,6 @@ export default {
       // Validation
       if (!adjustData.value.quantity || adjustData.value.quantity < 0) {
         alert('Vui lòng nhập số lượng hợp lệ')
-        return
-      }
-      
-      if (!adjustData.value.reason || adjustData.value.reason.trim() === '') {
-        alert('Vui lòng nhập lý do điều chỉnh')
         return
       }
       

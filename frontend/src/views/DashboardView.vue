@@ -133,11 +133,17 @@
               <div class="font-bold text-base">Chi phí</div>
               <div class="text-xs opacity-80 mt-1">Theo dõi chi tiêu</div>
             </button>
-            <button @click="$router.push('/facilities')" 
+            <button @click="$router.push('/facilities')"
               class="bg-gradient-to-br from-cyan-500 to-blue-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
               <div class="text-4xl mb-2">🏢</div>
               <div class="font-bold text-base">Cơ sở vật chất</div>
               <div class="text-xs opacity-80 mt-1">Tài sản & bảo trì</div>
+            </button>
+            <button @click="$router.push('/operating-expenses')"
+              class="bg-gradient-to-br from-orange-500 to-red-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+              <div class="text-4xl mb-2">⚡</div>
+              <div class="font-bold text-base">Chi phí vận hành</div>
+              <div class="text-xs opacity-80 mt-1">Trừ từ quỹ vận hành</div>
             </button>
           </div>
         </div>
@@ -367,7 +373,7 @@
                   <div class="text-4xl mb-2">🏢</div>
                   <div class="font-bold">Cơ sở</div>
                 </button>
-                <button v-if="user?.role === USER_ROLES.MANAGER" @click="$router.push('/expenses')" 
+                <button v-if="user?.role === USER_ROLES.MANAGER" @click="$router.push('/expenses')"
                   class="bg-gradient-to-br from-pink-500 to-purple-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
                   <div class="text-4xl mb-2">💸</div>
                   <div class="font-bold">Chi phí</div>
@@ -392,6 +398,103 @@
       </div>
     </div>
 
+    <!-- Quick Operating Expense Modal -->
+    <transition name="slide-up">
+      <div v-if="showQuickExpenseModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
+        <div class="bg-white w-full max-h-[85vh] flex flex-col rounded-t-3xl">
+          <div class="sticky top-0 bg-white px-4 py-3 border-b flex items-center justify-between rounded-t-3xl">
+            <button @click="showQuickExpenseModal = false" class="text-2xl text-gray-600">×</button>
+            <h2 class="text-base font-bold text-gray-800">⚡ Chi phí vận hành</h2>
+            <div class="w-6"></div>
+          </div>
+
+          <div class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+            <!-- Operating fund balance -->
+            <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
+              <div class="text-xs font-semibold text-blue-700 mb-1">⚙️ Quỹ vận hành (Operating Fund)</div>
+              <div v-if="quickExpenseFundLoading" class="text-xs text-gray-500">Đang tải...</div>
+              <div v-else-if="quickExpenseFundBalance" class="text-sm text-blue-800">
+                💵 Tiền mặt: <span class="font-bold">{{ formatCurrency(quickExpenseFundBalance.cash || 0) }}</span>
+                &nbsp;|&nbsp;
+                💳 CK: <span class="font-bold">{{ formatCurrency(quickExpenseFundBalance.transfer || 0) }}</span>
+              </div>
+            </div>
+
+            <!-- Description -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Mô tả chi phí *</label>
+              <input v-model="quickExpenseData.description" type="text"
+                placeholder="VD: Tiền điện, tiền nước, vật tư..."
+                class="w-full px-4 py-3 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500" />
+            </div>
+
+            <!-- Amount -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Số tiền *</label>
+              <input v-model.number="quickExpenseData.amount" type="number" min="0" step="1000"
+                placeholder="0"
+                class="w-full px-4 py-4 text-xl font-bold border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500" />
+            </div>
+
+            <!-- Money type -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Thanh toán bằng</label>
+              <div class="grid grid-cols-2 gap-2">
+                <button type="button" @click="quickExpenseData.money_type = 'cash'"
+                  :class="['py-3 rounded-xl font-semibold text-sm transition-colors',
+                    quickExpenseData.money_type === 'cash' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700']">
+                  💵 Tiền mặt
+                </button>
+                <button type="button" @click="quickExpenseData.money_type = 'transfer'"
+                  :class="['py-3 rounded-xl font-semibold text-sm transition-colors',
+                    quickExpenseData.money_type === 'transfer' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700']">
+                  💳 Chuyển khoản
+                </button>
+              </div>
+            </div>
+
+            <!-- Notes -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Ghi chú</label>
+              <input v-model="quickExpenseData.notes" type="text"
+                placeholder="Ghi chú thêm (tùy chọn)"
+                class="w-full px-4 py-3 text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500" />
+            </div>
+
+            <!-- Insufficient balance warning -->
+            <div v-if="quickExpenseFundBalance && quickExpenseData.amount > 0">
+              <div v-if="quickExpenseData.money_type === 'cash' && quickExpenseData.amount > (quickExpenseFundBalance.cash || 0)"
+                class="bg-red-50 border border-red-300 rounded-xl p-3 text-xs text-red-700 font-semibold">
+                ⚠️ Tiền mặt quỹ vận hành không đủ! Cần: {{ formatCurrency(quickExpenseData.amount) }} • Có: {{ formatCurrency(quickExpenseFundBalance.cash || 0) }}
+              </div>
+              <div v-else-if="quickExpenseData.money_type === 'transfer' && quickExpenseData.amount > (quickExpenseFundBalance.transfer || 0)"
+                class="bg-red-50 border border-red-300 rounded-xl p-3 text-xs text-red-700 font-semibold">
+                ⚠️ Tiền CK quỹ vận hành không đủ! Cần: {{ formatCurrency(quickExpenseData.amount) }} • Có: {{ formatCurrency(quickExpenseFundBalance.transfer || 0) }}
+              </div>
+            </div>
+
+            <!-- Error -->
+            <div v-if="quickExpenseError" class="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-600">
+              {{ quickExpenseError }}
+            </div>
+          </div>
+
+          <div class="flex-shrink-0 bg-white px-4 py-3 border-t flex gap-3 pb-safe">
+            <button @click="showQuickExpenseModal = false"
+              class="flex-1 bg-gray-200 text-gray-700 py-4 rounded-xl font-bold text-base">
+              Hủy
+            </button>
+            <button @click="submitQuickExpense"
+              :disabled="quickExpenseSubmitting || !quickExpenseData.amount || !quickExpenseData.description.trim()"
+              class="flex-1 bg-orange-500 text-white py-4 rounded-xl font-bold text-base disabled:opacity-50 flex items-center justify-center gap-2">
+              <span v-if="quickExpenseSubmitting" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              {{ quickExpenseSubmitting ? 'Đang xử lý...' : '⚡ Xác nhận' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
     <!-- Bottom Navigation -->
     <BottomNav />
   </div>
@@ -409,6 +512,8 @@ import CashierShiftManager from '../components/CashierShiftManager.vue'
 import { usePullToRefresh } from '../composables/usePullToRefresh'
 import { USER_ROLES } from '../constants/user'
 import { ORDER_STATUS } from '../constants/order'
+import { getAllBalances } from '../services/fund'
+import { fundExpenseService } from '../services/fundExpenseService'
 
 const authStore = useAuthStore()
 const shiftStore = useShiftStore()
@@ -724,6 +829,60 @@ const refreshData = async () => {
   }
 }
 
+// ─── Quick Operating Expense ──────────────────────────────────────────────────
+
+const showQuickExpenseModal = ref(false)
+const quickExpenseSubmitting = ref(false)
+const quickExpenseError = ref('')
+const quickExpenseFundBalance = ref(null)
+const quickExpenseFundLoading = ref(false)
+const quickExpenseData = ref({ description: '', amount: 0, money_type: 'cash', notes: '' })
+
+const formatCurrency = (val) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val)
+
+const openQuickExpenseModal = async () => {
+  quickExpenseData.value = { description: '', amount: 0, money_type: 'cash', notes: '' }
+  quickExpenseError.value = ''
+  showQuickExpenseModal.value = true
+  quickExpenseFundLoading.value = true
+  try {
+    const data = await getAllBalances()
+    quickExpenseFundBalance.value = data?.['operating'] || { cash: 0, transfer: 0, total: 0 }
+  } catch {
+    quickExpenseFundBalance.value = null
+  } finally {
+    quickExpenseFundLoading.value = false
+  }
+}
+
+const submitQuickExpense = async () => {
+  if (quickExpenseSubmitting.value) return
+  if (!quickExpenseData.value.amount || quickExpenseData.value.amount <= 0) {
+    quickExpenseError.value = 'Vui lòng nhập số tiền hợp lệ'
+    return
+  }
+  if (!quickExpenseData.value.description.trim()) {
+    quickExpenseError.value = 'Vui lòng nhập mô tả chi phí'
+    return
+  }
+  quickExpenseSubmitting.value = true
+  quickExpenseError.value = ''
+  try {
+    await fundExpenseService.createExpenseFromFund({
+      date: new Date().toISOString(),
+      amount: quickExpenseData.value.amount,
+      description: quickExpenseData.value.description,
+      notes: quickExpenseData.value.notes,
+      money_type: quickExpenseData.value.money_type
+    })
+    showQuickExpenseModal.value = false
+  } catch (err) {
+    quickExpenseError.value = err.message || 'Không thể tạo chi phí. Vui lòng thử lại.'
+  } finally {
+    quickExpenseSubmitting.value = false
+  }
+}
+
 // Pull to refresh
 const { pullDistance, isRefreshing } = usePullToRefresh(refreshData)
 
@@ -743,6 +902,9 @@ onUnmounted(() => {
 
 
 <style scoped>
+.slide-up-enter-active, .slide-up-leave-active { transition: transform 0.3s ease; }
+.slide-up-enter-from, .slide-up-leave-to { transform: translateY(100%); }
+
 .active\:scale-95:active {
   transform: scale(0.95);
 }

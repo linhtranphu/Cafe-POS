@@ -41,7 +41,7 @@ type CreateIngredientRequest struct {
 	Name              string    `json:"name" binding:"required"`
 	Category          string    `json:"category" binding:"required"`
 	Unit              UnitType  `json:"unit" binding:"required"`
-	Quantity          float64   `json:"quantity" binding:"required,min=0"`
+	Quantity          float64   `json:"quantity" binding:"min=0"`
 	MinStock          float64   `json:"min_stock" binding:"min=0"`
 	CostPerUnit       float64   `json:"cost_per_unit" binding:"min=0"`
 	Supplier          string    `json:"supplier"`

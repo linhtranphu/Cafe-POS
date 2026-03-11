@@ -81,6 +81,16 @@ export const shiftService = {
   async getShift(id) {
     const response = await api.get(`/shifts/${id}`)
     return response.data
+  },
+
+  /**
+   * Get pending orders for a shift (CREATED, PAID, QUEUED, IN_PROGRESS, READY)
+   * @param {string} id - Shift ID
+   * @returns {Promise<Object>} { pending_orders: [], count: number }
+   */
+  async getPendingOrders(id) {
+    const response = await api.get(`/shifts/${id}/pending-orders`)
+    return response.data
   }
 }
 

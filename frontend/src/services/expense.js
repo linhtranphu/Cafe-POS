@@ -40,6 +40,17 @@ export const expenseService = {
     await api.delete(`/manager/expense-categories/${id}`)
   },
 
+  // Operating expense categories (type=operating, separate from general)
+  async getOperatingCategories() {
+    const response = await api.get('/manager/expense-categories?type=operating')
+    return response.data
+  },
+
+  async createOperatingCategory(name) {
+    const response = await api.post('/manager/expense-categories', { name, type: 'operating' })
+    return response.data
+  },
+
   // FR-EX-04: Recurring expenses
   async getRecurringExpenses() {
     const response = await api.get('/manager/recurring-expenses')

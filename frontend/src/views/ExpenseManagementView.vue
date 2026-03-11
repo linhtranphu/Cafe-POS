@@ -521,6 +521,7 @@ const fundBalanceLoading = ref(false)
 const fundBalanceError = ref(false)
 const loadingBalance = ref(false)
 
+
 const expenses = computed(() => expenseStore.expenses || [])
 const categories = computed(() => expenseStore.categories || [])
 

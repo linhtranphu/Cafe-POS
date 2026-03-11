@@ -29,10 +29,10 @@ export const useIngredientStore = defineStore('ingredient', {
       try {
         const newItem = await ingredientService.createIngredient(ingredient)
         this.items.push(newItem)
-        return true
+        return newItem
       } catch (error) {
         this.error = error.response?.data?.error || 'Lỗi tạo nguyên liệu'
-        return false
+        return null
       }
     },
 

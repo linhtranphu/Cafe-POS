@@ -148,6 +148,29 @@ func (s *ShiftService) GetShift(ctx context.Context, id primitive.ObjectID) (*or
 	return s.shiftRepo.FindByID(ctx, id)
 }
 
+func (s *ShiftService) GetPendingOrdersByShift(ctx context.Context, shiftID primitive.ObjectID) ([]*order.Order, error) {
+	orders, err := s.orderRepo.FindByShiftID(ctx, shiftID)
+	if err != nil {
+		return nil, err
+	}
+
+	pendingStatuses := map[order.OrderStatus]bool{
+		order.StatusCreated:    true,
+		order.StatusPaid:       true,
+		order.StatusQueued:     true,
+		order.StatusInProgress: true,
+		order.StatusReady:      true,
+	}
+
+	var pending []*order.Order
+	for _, o := range orders {
+		if pendingStatuses[o.Status] {
+			pending = append(pending, o)
+		}
+	}
+	return pending, nil
+}
+
 func (s *ShiftService) CloseShiftAndLockOrders(ctx context.Context, shiftID primitive.ObjectID, req *order.EndShiftRequest) (*order.Shift, error) {
 	// Get shift first to validate
 	shift, err := s.shiftRepo.FindByID(ctx, shiftID)
@@ -166,13 +189,22 @@ func (s *ShiftService) CloseShiftAndLockOrders(ctx context.Context, shiftID prim
 		return nil, err
 	}
 
+	now := time.Now()
 	orders, _ := s.orderRepo.FindByShiftID(ctx, shiftID)
 	for _, o := range orders {
-		// Lock orders that are completed (served or cancelled)
+		// First pass: cancel any pending orders
+		switch o.Status {
+		case order.StatusCreated, order.StatusPaid, order.StatusQueued, order.StatusInProgress, order.StatusReady:
+			o.Status = order.StatusCancelled
+			o.CancelReason = "Ca làm việc đã kết thúc"
+			o.UpdatedAt = now
+			s.orderRepo.Update(ctx, o.ID, o)
+		}
+		// Second pass: lock all completed/cancelled orders
 		if o.Status == order.StatusServed || o.Status == order.StatusCancelled {
-			now := time.Now()
 			o.Status = order.StatusLocked
 			o.LockedAt = &now
+			o.UpdatedAt = now
 			s.orderRepo.Update(ctx, o.ID, o)
 		}
 	}

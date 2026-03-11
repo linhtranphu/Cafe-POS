@@ -36,8 +36,8 @@ func (s *ExpenseService) CreateCategory(ctx context.Context, c *expense.Category
 	return s.repo.CreateCategory(ctx, c)
 }
 
-func (s *ExpenseService) GetCategories(ctx context.Context) ([]expense.Category, error) {
-	return s.repo.GetCategories(ctx)
+func (s *ExpenseService) GetCategories(ctx context.Context, categoryType string) ([]expense.Category, error) {
+	return s.repo.GetCategories(ctx, categoryType)
 }
 
 func (s *ExpenseService) DeleteCategory(ctx context.Context, id primitive.ObjectID) error {

@@ -222,3 +222,23 @@ func (h *ShiftHandler) GetShift(c *gin.Context) {
 	// No need to recalculate - values are updated realtime on payment
 	c.JSON(http.StatusOK, shift)
 }
+
+func (h *ShiftHandler) GetPendingOrders(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	orders, err := h.shiftService.GetPendingOrdersByShift(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"pending_orders": orders,
+		"count":          len(orders),
+	})
+}
