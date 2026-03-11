@@ -21,28 +21,25 @@ import (
 // between cashier shifts and waiter/barista shifts.
 type CashierShiftService struct {
 	cashierShiftRepo    *mongodb.CashierShiftRepository
-	fundHandoverRepo    *mongodb.FundHandoverRepository
 	waiterShiftRepo     ShiftRepository // To check if waiter shifts are closed
 	stateMachineManager *domain.StateMachineManager
-	fundService         *FundService
+	journalService      *JournalService // double-entry for all fund moves
 	mongoClient         *mongo.Client
 }
 
 // NewCashierShiftService creates a new service for managing cashier shifts.
 func NewCashierShiftService(
 	cashierShiftRepo *mongodb.CashierShiftRepository,
-	fundHandoverRepo *mongodb.FundHandoverRepository,
 	waiterShiftRepo ShiftRepository,
 	stateMachineManager *domain.StateMachineManager,
-	fundService *FundService,
+	journalService *JournalService,
 	mongoClient *mongo.Client,
 ) *CashierShiftService {
 	return &CashierShiftService{
 		cashierShiftRepo:    cashierShiftRepo,
-		fundHandoverRepo:    fundHandoverRepo,
 		waiterShiftRepo:     waiterShiftRepo,
 		stateMachineManager: stateMachineManager,
-		fundService:         fundService,
+		journalService:      journalService,
 		mongoClient:         mongoClient,
 	}
 }
@@ -82,52 +79,18 @@ func (s *CashierShiftService) StartCashierShift(
 	// Create new cashier shift
 	shift := cashier.NewCashierShift(cashierID, cashierName, startingFloat)
 
-	// If starting float > 0, create fund withdrawal transaction
-	// Use MongoDB transaction for atomicity
+	// Persist shift first to get its ID
+	if err := s.cashierShiftRepo.Create(ctx, shift); err != nil {
+		return nil, fmt.Errorf("failed to create cashier shift: %w", err)
+	}
+
+	// If starting float > 0, record double-entry journal: operating → cash_drawer
 	if startingFloat > 0 {
-		session, err := s.mongoClient.StartSession()
-		if err != nil {
-			return nil, fmt.Errorf("failed to start session: %w", err)
-		}
-		defer session.EndSession(ctx)
-
-		err = mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
-			if err := session.StartTransaction(); err != nil {
-				return err
-			}
-
-			// Create cashier shift first to get the ID
-			if err := s.cashierShiftRepo.Create(sc, shift); err != nil {
-				session.AbortTransaction(sc)
-				return fmt.Errorf("failed to create cashier shift: %w", err)
-			}
-
-			// Create fund withdrawal for starting float
-			reason := fmt.Sprintf("Tiền đầu ca cho thu ngân %s", cashierName)
-			_, _, err := s.fundService.CreateWithdrawal(
-				sc,
-				startingFloat, // cash amount
-				0,             // transfer amount
-				reason,
-				cashierID,
-				cashierName,
-				"cashier",
-			)
-			if err != nil {
-				session.AbortTransaction(sc)
-				return fmt.Errorf("failed to create fund withdrawal for starting float: %w", err)
-			}
-
-			return session.CommitTransaction(sc)
-		})
-
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// No starting float, just create the shift
-		if err := s.cashierShiftRepo.Create(ctx, shift); err != nil {
-			return nil, err
+		if _, err := s.journalService.RecordCashierShiftStart(ctx, startingFloat, shift.ID, cashierID, cashierName); err != nil {
+			// Non-fatal: shift is already created. Log and continue.
+			log.Printf("⚠️ [CASHIER START] Failed to record journal entry for starting float: %v", err)
+		} else {
+			log.Printf("✅ [CASHIER START] Journal entry recorded: operating → cash_drawer %.0f for %s", startingFloat, cashierName)
 		}
 	}
 
@@ -639,6 +602,7 @@ type ManagedFundsSummary struct {
 	StartingFloat     float64            `json:"starting_float"`
 	ReceivedCash      float64            `json:"received_cash"`
 	ReceivedTransfer  float64            `json:"received_transfer"`
+	DistributedCash   float64            `json:"distributed_cash"`
 	TotalManagedFunds float64            `json:"total_managed_funds"`
 	ExpectedCash      float64            `json:"expected_cash"`
 	HandoverCount     int                `json:"handover_count"`
@@ -668,8 +632,9 @@ func (s *CashierShiftService) GetManagedFunds(
 		StartingFloat:     shift.StartingFloat,
 		ReceivedCash:      shift.ReceivedCash,
 		ReceivedTransfer:  shift.ReceivedTransfer,
-		TotalManagedFunds: shift.ReceivedCash + shift.ReceivedTransfer,
-		ExpectedCash:      shift.StartingFloat + shift.ReceivedCash,
+		DistributedCash:   shift.DistributedCash,
+		TotalManagedFunds: shift.StartingFloat + shift.ReceivedCash + shift.ReceivedTransfer - shift.DistributedCash,
+		ExpectedCash:      shift.StartingFloat + shift.ReceivedCash - shift.DistributedCash,
 		HandoverCount:     shift.HandoverCount,
 	}, nil
 }
@@ -738,8 +703,8 @@ func (s *CashierShiftService) CloseShiftWithFundHandover(
 			return nil, fmt.Errorf("cannot close cashier shift: %d waiter shift(s) still open", len(openShifts))
 		}
 
-		// 4. Calculate expected cash
-		expectedCash := shift.StartingFloat + shift.ReceivedCash
+		// 4. Calculate expected cash (matches GetManagedFunds formula)
+		expectedCash := shift.StartingFloat + shift.ReceivedCash - shift.DistributedCash
 
 		// 5. Create fund handover record
 		handover := cashier.NewFundHandover(
@@ -779,24 +744,19 @@ func (s *CashierShiftService) CloseShiftWithFundHandover(
 			return nil, fmt.Errorf("fund handover validation failed: %w", err)
 		}
 
-		// 9. Save fund handover record
-		if err := s.fundHandoverRepo.Create(sessCtx, handover); err != nil {
-			return nil, fmt.Errorf("failed to create fund handover: %w", err)
-		}
-
-		// 9b. Record FundTransaction for this handover (cash_drawer fund)
-		if s.fundService != nil {
-			if err := s.fundService.RecordHandover(
-				sessCtx,
-				handover.CashAmount,
-				handover.TransferAmount,
-				shift.ID,
-				shift.CashierID,
-				shift.CashierName,
-				"cashier",
-			); err != nil {
-				log.Printf("⚠️ [FUND HANDOVER TX] Failed to record fund transaction: %v (non-fatal)", err)
-			}
+		// 9. Record double-entry journal: cash_drawer → operating
+		if _, err := s.journalService.RecordCashierShiftEnd(
+			sessCtx,
+			actualCash, handover.TransferAmount,
+			shift.ID,
+			shift.CashierID,
+			shift.CashierName,
+		); err != nil {
+			// Log but don't fail the closure — financial integrity is important
+			// but closure state must still be persisted
+			log.Printf("⚠️ [CASHIER CLOSE] Failed to record journal entry: %v", err)
+		} else {
+			log.Printf("✅ [CASHIER CLOSE] Journal entry recorded: cash_drawer → operating for shift %s", shift.ID.Hex())
 		}
 
 		// 10. Initiate closure
@@ -850,28 +810,3 @@ func (s *CashierShiftService) CloseShiftWithFundHandover(
 	return updatedShift, fundHandover, nil
 }
 
-// GetFundHandoverByShift retrieves the fund handover record for a cashier shift
-func (s *CashierShiftService) GetFundHandoverByShift(
-	ctx context.Context,
-	shiftID primitive.ObjectID,
-) (*cashier.FundHandover, error) {
-	return s.fundHandoverRepo.FindByCashierShift(ctx, shiftID)
-}
-
-// GetFundHandoverHistory retrieves fund handover history for a cashier
-func (s *CashierShiftService) GetFundHandoverHistory(
-	ctx context.Context,
-	cashierID primitive.ObjectID,
-	page, pageSize int,
-) ([]*cashier.FundHandover, int64, error) {
-	return s.fundHandoverRepo.FindByCashier(ctx, cashierID, page, pageSize)
-}
-
-// GetFundHandoversByDateRange retrieves fund handovers within a date range
-func (s *CashierShiftService) GetFundHandoversByDateRange(
-	ctx context.Context,
-	startDate, endDate time.Time,
-	page, pageSize int,
-) ([]*cashier.FundHandover, int64, error) {
-	return s.fundHandoverRepo.FindByDateRange(ctx, startDate, endDate, page, pageSize)
-}

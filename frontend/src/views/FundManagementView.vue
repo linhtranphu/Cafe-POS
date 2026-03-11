@@ -45,11 +45,11 @@
       </div>
     </div>
 
-    <!-- 4 Fund Balance Cards -->
+    <!-- 5 Fund Balance Cards -->
     <div class="px-4 pb-4">
       <div class="grid grid-cols-2 gap-3">
         <template v-if="loadingAllBalances">
-          <div v-for="i in 4" :key="i" class="bg-white rounded-xl p-4 shadow animate-pulse">
+          <div v-for="i in 5" :key="i" class="bg-white rounded-xl p-4 shadow animate-pulse">
             <div class="h-4 bg-gray-200 rounded w-3/4 mb-3"></div>
             <div class="h-6 bg-gray-200 rounded w-1/2 mb-2"></div>
             <div class="h-3 bg-gray-100 rounded w-full"></div>
@@ -111,53 +111,25 @@
       <div class="bg-white rounded-xl p-4 shadow space-y-3">
         <div class="grid grid-cols-2 gap-3">
           <select
-            v-model="filters.type"
-            @change="loadTransactions"
+            v-model="filters.event_type"
+            @change="loadEntries"
             class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
           >
             <option
-              v-for="option in TRANSACTION_TYPE_FILTER_OPTIONS"
+              v-for="option in EVENT_TYPE_FILTER_OPTIONS"
               :key="option.value"
               :value="option.value"
             >
               {{ option.label }}
             </option>
           </select>
-          <select
-            v-model="filters.money_type"
-            @change="loadTransactions"
-            class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-          >
-            <option
-              v-for="option in MONEY_TYPE_FILTER_OPTIONS"
-              :key="option.value"
-              :value="option.value"
-            >
-              {{ option.label }}
-            </option>
-          </select>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
           <select
             v-model="filters.fund_type"
-            @change="loadTransactions"
+            @change="loadEntries"
             class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
           >
             <option
               v-for="option in FUND_TYPE_FILTER_OPTIONS"
-              :key="option.value"
-              :value="option.value"
-            >
-              {{ option.label }}
-            </option>
-          </select>
-          <select
-            v-model="filters.source_type"
-            @change="loadTransactions"
-            class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-          >
-            <option
-              v-for="option in SOURCE_TYPE_FILTER_OPTIONS"
               :key="option.value"
               :value="option.value"
             >
@@ -173,7 +145,7 @@
       <div class="text-sm font-semibold text-gray-700 mb-3">Lịch sử giao dịch</div>
 
       <!-- Loading skeleton -->
-      <div v-if="loadingTransactions" class="space-y-3">
+      <div v-if="loadingEntries" class="space-y-3">
         <div v-for="i in 3" :key="i" class="bg-white rounded-xl p-4 shadow animate-pulse">
           <div class="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
           <div class="h-3 bg-gray-200 rounded w-1/2"></div>
@@ -181,64 +153,61 @@
       </div>
 
       <!-- Empty state -->
-      <div v-else-if="transactions.length === 0" class="bg-white rounded-xl p-8 shadow text-center">
+      <div v-else-if="entries.length === 0" class="bg-white rounded-xl p-8 shadow text-center">
         <div class="text-4xl mb-2">📋</div>
         <div class="text-gray-500">Chưa có giao dịch nào</div>
       </div>
 
-      <!-- Transaction cards -->
+      <!-- Journal entry cards -->
       <div v-else class="space-y-3">
         <div
-          v-for="tx in transactions"
-          :key="tx.id"
-          @click="viewTransactionDetail(tx)"
+          v-for="entry in entries"
+          :key="entry.id"
+          @click="viewEntryDetail(entry)"
           class="bg-white rounded-xl p-4 shadow hover:shadow-md transition-shadow cursor-pointer"
         >
           <div class="flex items-start justify-between mb-2">
             <div class="flex items-center gap-2 flex-1">
-              <span class="text-2xl">{{ getTransactionTypeIcon(tx.type) }}</span>
+              <span class="text-2xl">{{ getEventTypeIcon(entry.event_type) }}</span>
               <div class="flex-1">
                 <div class="flex items-center gap-1.5 flex-wrap">
-                  <span class="font-semibold text-gray-800">{{ getTransactionTypeLabel(tx.type) }}</span>
-                  <!-- Fund type badge -->
+                  <span class="font-semibold text-gray-800">{{ getEventTypeLabel(entry.event_type) }}</span>
+                  <!-- Affected fund badges -->
                   <span
-                    v-if="tx.fund_type"
+                    v-for="line in realLines(entry)"
+                    :key="line.fund_type"
                     class="text-xs px-1.5 py-0.5 rounded-full font-medium"
-                    :class="`bg-${FUND_TYPE_COLORS[tx.fund_type] || 'gray'}-100 text-${FUND_TYPE_COLORS[tx.fund_type] || 'gray'}-700`"
+                    :class="`bg-${FUND_TYPE_COLORS[line.fund_type] || 'gray'}-100 text-${FUND_TYPE_COLORS[line.fund_type] || 'gray'}-700`"
                   >
-                    {{ FUND_TYPE_ICONS[tx.fund_type] }} {{ FUND_TYPE_LABELS[tx.fund_type] || tx.fund_type }}
-                  </span>
-                  <!-- Source type badge -->
-                  <span
-                    v-if="tx.source_type"
-                    class="text-xs px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium"
-                  >
-                    {{ SOURCE_TYPE_ICONS[tx.source_type] }} {{ SOURCE_TYPE_LABELS[tx.source_type] || tx.source_type }}
+                    {{ FUND_TYPE_ICONS[line.fund_type] }} {{ FUND_TYPE_LABELS[line.fund_type] || line.fund_type }}
+                    <span class="opacity-70">{{ line.direction === 'debit' ? '▲' : '▼' }}</span>
                   </span>
                 </div>
-                <div class="text-xs text-gray-500">{{ tx.performed_by_name }} • {{ tx.performed_by_role }}</div>
+                <div class="text-xs text-gray-500">{{ entry.performed_by_name }} • {{ entry.performed_by_role }}</div>
               </div>
             </div>
-            <div class="text-right">
+            <div class="text-right shrink-0 ml-2">
               <div
                 class="text-lg font-bold"
-                :class="getAmountColor(tx.type)"
+                :class="entryAmountColor(entry)"
               >
-                {{ getAmountPrefix(tx.type) }}{{ formatCurrency(tx.total_amount) }}
+                {{ entryAmountPrefix(entry) }}{{ formatCurrency(entryAmount(entry)) }}
               </div>
-              <div class="text-xs text-gray-500">{{ formatDateTime(tx.timestamp) }}</div>
+              <div class="text-xs text-gray-500">{{ formatDateTime(entry.timestamp) }}</div>
             </div>
           </div>
-          <div class="text-sm text-gray-600 line-clamp-2">{{ tx.description || tx.reason }}</div>
+          <div class="text-sm text-gray-600 line-clamp-2">{{ entry.description }}</div>
 
-          <!-- Money breakdown -->
-          <div v-if="tx.cash_amount > 0 || tx.transfer_amount > 0" class="flex gap-3 mt-2 text-xs">
-            <span v-if="tx.cash_amount > 0" class="text-green-600">
-              💵 {{ formatCurrency(tx.cash_amount) }}
-            </span>
-            <span v-if="tx.transfer_amount > 0" class="text-blue-600">
-              💳 {{ formatCurrency(tx.transfer_amount) }}
-            </span>
+          <!-- Money breakdown from lines -->
+          <div class="flex gap-3 mt-2 text-xs flex-wrap">
+            <template v-for="line in realLines(entry)" :key="line.fund_type + line.direction">
+              <span v-if="line.cash_amount > 0" class="text-green-600">
+                💵 {{ formatCurrency(line.cash_amount) }}
+              </span>
+              <span v-if="line.transfer_amount > 0" class="text-blue-600">
+                💳 {{ formatCurrency(line.transfer_amount) }}
+              </span>
+            </template>
           </div>
         </div>
       </div>
@@ -265,7 +234,7 @@
     <!-- Withdraw Modal -->
     <WithdrawModal
       v-if="showWithdrawModal"
-      :current-balance="balance.current_balance"
+      :current-balance="null"
       @close="showWithdrawModal = false"
       @success="handleWithdrawSuccess"
     />
@@ -350,7 +319,6 @@
               placeholder="Nhập số tiền..."
               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
             />
-            <!-- Source fund balance hint -->
             <div class="text-xs text-gray-500 mt-1">
               Số dư quỹ nguồn: {{ formatCurrency(sourceBalance) }}
             </div>
@@ -379,12 +347,78 @@
       </div>
     </div>
 
-    <!-- Transaction Detail Modal -->
-    <TransactionDetailModal
-      v-if="showDetailModal"
-      :transaction="selectedTransaction"
-      @close="showDetailModal = false"
-    />
+    <!-- Journal Entry Detail Modal -->
+    <div
+      v-if="showDetailModal && selectedEntry"
+      class="fixed inset-0 bg-black/50 z-50 flex items-end justify-center"
+      @click.self="showDetailModal = false"
+    >
+      <div class="bg-white w-full max-w-lg rounded-t-2xl p-6 slide-up max-h-[80vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-bold text-gray-800">
+            {{ getEventTypeIcon(selectedEntry.event_type) }} {{ getEventTypeLabel(selectedEntry.event_type) }}
+          </h2>
+          <button @click="showDetailModal = false" class="p-2 hover:bg-gray-100 rounded-lg">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="space-y-3 text-sm">
+          <div class="flex justify-between">
+            <span class="text-gray-500">Mô tả</span>
+            <span class="text-gray-800 font-medium text-right max-w-xs">{{ selectedEntry.description }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-500">Thực hiện bởi</span>
+            <span class="text-gray-800">{{ selectedEntry.performed_by_name }} ({{ selectedEntry.performed_by_role }})</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-500">Thời gian</span>
+            <span class="text-gray-800">{{ formatFullDateTime(selectedEntry.timestamp) }}</span>
+          </div>
+
+          <div class="border-t pt-3">
+            <div class="text-sm font-semibold text-gray-700 mb-2">Các dòng kế toán</div>
+            <div class="space-y-2">
+              <div
+                v-for="line in selectedEntry.lines"
+                :key="line.fund_type + line.direction"
+                class="bg-gray-50 rounded-lg p-3"
+              >
+                <div class="flex items-center justify-between mb-1">
+                  <span class="font-medium text-gray-800">
+                    {{ FUND_TYPE_ICONS[line.fund_type] || '💰' }} {{ FUND_TYPE_LABELS[line.fund_type] || line.fund_type }}
+                  </span>
+                  <span
+                    class="text-xs px-2 py-0.5 rounded-full font-semibold"
+                    :class="line.direction === 'debit' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+                  >
+                    {{ line.direction === 'debit' ? 'DEBIT ▲' : 'CREDIT ▼' }}
+                  </span>
+                </div>
+                <div class="text-gray-700 font-semibold">{{ formatCurrency(line.total_amount) }}</div>
+                <div class="flex gap-3 text-xs text-gray-500 mt-1">
+                  <span v-if="line.cash_amount > 0">💵 {{ formatCurrency(line.cash_amount) }}</span>
+                  <span v-if="line.transfer_amount > 0">💳 {{ formatCurrency(line.transfer_amount) }}</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 mt-2 text-xs text-gray-400">
+                  <div>
+                    <div>Trước:</div>
+                    <div>{{ formatCurrency(line.balance_before?.total || 0) }}</div>
+                  </div>
+                  <div>
+                    <div>Sau:</div>
+                    <div class="font-medium text-gray-600">{{ formatCurrency(line.balance_after?.total || 0) }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Bottom Navigation -->
     <BottomNav />
@@ -394,28 +428,26 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { getJournalBalances, getJournalEntries } from '../services/journal'
 import * as fundService from '../services/fund'
 import BottomNav from '../components/BottomNav.vue'
 import DepositModal from '../components/fund/DepositModal.vue'
 import WithdrawModal from '../components/fund/WithdrawModal.vue'
-import TransactionDetailModal from '../components/fund/TransactionDetailModal.vue'
 import {
   formatCurrency,
   formatDateTime,
-  getTransactionTypeIcon,
-  getTransactionTypeLabel,
-  getAmountColor,
-  getAmountPrefix,
-  TRANSACTION_TYPE_FILTER_OPTIONS,
-  MONEY_TYPE_FILTER_OPTIONS,
+  formatFullDateTime,
   FUND_TYPES,
   FUND_TYPE_LABELS,
   FUND_TYPE_ICONS,
   FUND_TYPE_COLORS,
   FUND_TYPE_FILTER_OPTIONS,
-  SOURCE_TYPE_LABELS,
-  SOURCE_TYPE_ICONS,
-  SOURCE_TYPE_FILTER_OPTIONS
+  EVENT_TYPE_FILTER_OPTIONS,
+  EVENT_TYPE_LABELS,
+  EVENT_TYPE_ICONS,
+  INFLOW_EVENTS,
+  getEventTypeLabel,
+  getEventTypeIcon
 } from '../constants/fund'
 
 const router = useRouter()
@@ -423,17 +455,14 @@ const router = useRouter()
 // State
 const loading = ref(false)
 const refreshing = ref(false)
-const loadingTransactions = ref(false)
+const loadingEntries = ref(false)
 const loadingMore = ref(false)
 const loadingAllBalances = ref(false)
-const balance = ref({})
 const allBalances = ref(null)
-const transactions = ref([])
+const entries = ref([])
 const filters = ref({
-  type: 'all',
-  money_type: 'all',
+  event_type: 'all',
   fund_type: 'all',
-  source_type: 'all',
   limit: 20,
   offset: 0
 })
@@ -442,7 +471,7 @@ const showDepositModal = ref(false)
 const showWithdrawModal = ref(false)
 const showTransferModal = ref(false)
 const showDetailModal = ref(false)
-const selectedTransaction = ref(null)
+const selectedEntry = ref(null)
 const transferring = ref(false)
 const transferForm = ref({
   from_fund_type: FUND_TYPES.OPERATING,
@@ -457,7 +486,8 @@ const fundTypeKeys = computed(() => [
   FUND_TYPES.OPERATING,
   FUND_TYPES.INVENTORY,
   FUND_TYPES.PROFIT,
-  FUND_TYPES.CASH_DRAWER
+  FUND_TYPES.CASH_DRAWER,
+  FUND_TYPES.WAITER_FLOAT
 ])
 
 const sourceBalance = computed(() => {
@@ -477,6 +507,34 @@ const isTransferValid = computed(() => {
     f.reason.length >= 10
 })
 
+// Journal entry helpers
+const EXTERNAL_ACCOUNTS = new Set(['external', 'owner', 'supplier', 'customer'])
+const realLines = (entry) => {
+  return (entry.lines || []).filter(l => !EXTERNAL_ACCOUNTS.has(l.fund_type))
+}
+
+const entryAmount = (entry) => {
+  const lines = realLines(entry)
+  // For fund_transfer: both debit and credit are real funds — show the debit amount
+  const debitLines = lines.filter(l => l.direction === 'debit')
+  if (debitLines.length > 0) {
+    return debitLines.reduce((sum, l) => sum + (l.total_amount || 0), 0)
+  }
+  return lines.reduce((sum, l) => sum + (l.total_amount || 0), 0)
+}
+
+const entryAmountColor = (entry) => {
+  if (INFLOW_EVENTS.has(entry.event_type)) return 'text-green-600'
+  if (entry.event_type === 'fund_transfer') return 'text-blue-600'
+  return 'text-red-600'
+}
+
+const entryAmountPrefix = (entry) => {
+  if (INFLOW_EVENTS.has(entry.event_type)) return '+'
+  if (entry.event_type === 'fund_transfer') return '↔'
+  return '-'
+}
+
 // Methods
 const goBack = () => {
   router.push('/dashboard')
@@ -484,35 +542,32 @@ const goBack = () => {
 
 const filterByFund = (fundType) => {
   filters.value.fund_type = fundType
-  loadTransactions()
+  loadEntries()
 }
 
 const refreshData = async () => {
   loading.value = true
   try {
     await Promise.all([
-      loadBalance(),
       loadAllBalances(),
-      loadTransactions()
+      loadEntries()
     ])
   } finally {
     loading.value = false
   }
 }
 
-const loadBalance = async () => {
-  try {
-    balance.value = await fundService.getBalance()
-  } catch (error) {
-    console.error('Failed to load balance:', error)
-  }
-}
-
 const loadAllBalances = async () => {
   loadingAllBalances.value = true
   try {
-    const data = await fundService.getAllBalances()
-    allBalances.value = data
+    const data = await getJournalBalances()
+    const total = { cash: 0, transfer: 0, total: 0 }
+    for (const b of Object.values(data)) {
+      total.cash += b.cash || 0
+      total.transfer += b.transfer || 0
+      total.total += b.total || 0
+    }
+    allBalances.value = { ...data, total }
   } catch (error) {
     console.error('Failed to load all balances:', error)
   } finally {
@@ -520,21 +575,23 @@ const loadAllBalances = async () => {
   }
 }
 
-const loadTransactions = async () => {
-  loadingTransactions.value = true
+const loadEntries = async () => {
+  loadingEntries.value = true
   filters.value.offset = 0
   try {
-    const params = { ...filters.value }
-    if (params.fund_type === 'all') delete params.fund_type
-    if (params.source_type === 'all') delete params.source_type
-    const response = await fundService.getTransactions(params)
-    transactions.value = response.transactions || []
+    const params = {}
+    if (filters.value.event_type !== 'all') params.event_type = filters.value.event_type
+    if (filters.value.fund_type !== 'all') params.fund_type = filters.value.fund_type
+    params.limit = filters.value.limit
+    params.offset = 0
+    const response = await getJournalEntries(params)
+    entries.value = response.entries || []
     hasMore.value = response.total > filters.value.limit
   } catch (error) {
-    console.error('Failed to load transactions:', error)
+    console.error('Failed to load journal entries:', error)
     alert('Không thể tải lịch sử giao dịch')
   } finally {
-    loadingTransactions.value = false
+    loadingEntries.value = false
   }
 }
 
@@ -542,14 +599,16 @@ const loadMore = async () => {
   loadingMore.value = true
   filters.value.offset += filters.value.limit
   try {
-    const params = { ...filters.value }
-    if (params.fund_type === 'all') delete params.fund_type
-    if (params.source_type === 'all') delete params.source_type
-    const response = await fundService.getTransactions(params)
-    transactions.value.push(...(response.transactions || []))
+    const params = {}
+    if (filters.value.event_type !== 'all') params.event_type = filters.value.event_type
+    if (filters.value.fund_type !== 'all') params.fund_type = filters.value.fund_type
+    params.limit = filters.value.limit
+    params.offset = filters.value.offset
+    const response = await getJournalEntries(params)
+    entries.value.push(...(response.entries || []))
     hasMore.value = filters.value.offset + filters.value.limit < response.total
   } catch (error) {
-    console.error('Failed to load more transactions:', error)
+    console.error('Failed to load more entries:', error)
   } finally {
     loadingMore.value = false
   }
@@ -595,8 +654,8 @@ const submitTransfer = async () => {
   }
 }
 
-const viewTransactionDetail = (transaction) => {
-  selectedTransaction.value = transaction
+const viewEntryDetail = (entry) => {
+  selectedEntry.value = entry
   showDetailModal.value = true
 }
 

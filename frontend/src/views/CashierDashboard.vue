@@ -323,6 +323,7 @@ const reprintingLabel = ref(null) // stores {orderId, itemIndex}
 
 // Methods - Define refreshData BEFORE using it in usePullToRefresh
 const refreshData = async () => {
+  await cashierShiftStore.fetchCurrentCashierShift()
   await cashierShiftStore.fetchMyCashierShifts()
   await cashierStore.getPendingDiscrepancies()
   await cashierStore.fetchPendingHandovers()
@@ -491,11 +492,12 @@ const handleReprintLabel = async (orderId, itemIndex) => {
 
 // Lifecycle
 onMounted(async () => {
-  // Fetch cashier shifts for cashier shift manager
+  // Fetch current shift first to set currentCashierShift (needed for hasOpenCashierShift check)
+  await cashierShiftStore.fetchCurrentCashierShift()
   await cashierShiftStore.fetchMyCashierShifts()
   await cashierStore.getPendingDiscrepancies()
   await cashierStore.fetchPendingHandovers()
-  
+
   // Fetch managed funds if there's an open shift
   if (cashierShiftStore.hasOpenCashierShift) {
     await fetchManagedFunds()

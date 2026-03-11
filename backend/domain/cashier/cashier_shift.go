@@ -73,6 +73,9 @@ type CashierShift struct {
 	// Transfer tracking fields
 	ReceivedTransfer float64 `json:"received_transfer" bson:"received_transfer"`
 
+	// DistributedCash is total cash given to waiters as starting float
+	DistributedCash float64 `json:"distributed_cash" bson:"distributed_cash"`
+
 	// CreatedAt is when the shift record was created
 	CreatedAt time.Time `json:"created_at" bson:"created_at"`
 
@@ -103,6 +106,13 @@ func NewCashierShift(cashierID primitive.ObjectID, cashierName string, startingF
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
+}
+
+// AddDistributedCash records cash given to a waiter as starting float.
+// This reduces the cashier's effective managed cash.
+func (cs *CashierShift) AddDistributedCash(amount float64) {
+	cs.DistributedCash += amount
+	cs.UpdatedAt = time.Now()
 }
 
 // InitiateClosure starts the shift closure process by validating the current status

@@ -207,18 +207,18 @@
               <span class="text-sm">{{ getHandoverTypeText(selectedHandover?.handover_type) }}</span>
             </div>
             <div v-if="selectedHandover?.handover_type === 'END_SHIFT'" class="mt-2 pt-2 border-t space-y-1">
-              <div v-if="selectedHandover?.end_cash > 0 || selectedHandover?.end_transfer > 0" class="text-xs text-gray-500 mb-1">Tiền cuối ca waiter khai báo</div>
-              <div v-if="selectedHandover?.end_cash > 0" class="flex justify-between items-center">
+              <p class="text-xs text-gray-500 mb-1">Tiền cuối ca waiter khai báo</p>
+              <div class="flex justify-between items-center">
                 <span class="text-sm text-gray-600">💵 Tiền mặt cuối ca</span>
-                <span class="font-bold text-green-700">{{ formatPrice(selectedHandover.end_cash) }}</span>
+                <span class="font-bold" :class="(selectedHandover?.end_cash || 0) > 0 ? 'text-green-700' : 'text-gray-400'">
+                  {{ formatPrice(selectedHandover?.end_cash || 0) }}
+                </span>
               </div>
-              <div v-if="selectedHandover?.end_transfer > 0" class="flex justify-between items-center">
+              <div class="flex justify-between items-center">
                 <span class="text-sm text-gray-600">💳 Tiền CK cuối ca</span>
-                <span class="font-bold text-blue-700">{{ formatPrice(selectedHandover.end_transfer) }}</span>
-              </div>
-              <div v-if="selectedHandover?.end_cash === 0 && selectedHandover?.end_transfer === 0" class="flex justify-between items-center">
-                <span class="text-sm text-gray-600">Tiền cuối ca</span>
-                <span class="font-bold text-gray-800">0 ₫</span>
+                <span class="font-bold" :class="(selectedHandover?.end_transfer || 0) > 0 ? 'text-blue-700' : 'text-gray-400'">
+                  {{ formatPrice(selectedHandover?.end_transfer || 0) }}
+                </span>
               </div>
             </div>
           </div>
@@ -227,33 +227,43 @@
             <!-- Actual Amounts (only for CONFIRMED) -->
             <div v-if="confirmAction === 'CONFIRMED'">
               <!-- Cash Actual Amount -->
-              <div v-if="selectedHandover?.cash_declared_amount > 0" class="mb-4">
+              <div class="mb-4">
                 <label class="block text-sm font-medium mb-1">💵 Số tiền mặt thực nhận (VNĐ) *</label>
-                <div class="flex items-center gap-2 mb-2">
-                  <span class="text-xs text-gray-500">Waiter bàn giao:</span>
-                  <span class="text-sm font-bold text-green-600">{{ formatPrice(selectedHandover.cash_declared_amount) }}</span>
+                <div class="space-y-1 mb-2">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-500">Waiter bàn giao:</span>
+                    <span class="text-sm font-bold text-green-600">{{ formatPrice(selectedHandover?.cash_declared_amount || 0) }}</span>
+                  </div>
+                  <div v-if="selectedHandover?.end_cash" class="flex items-center gap-2">
+                    <span class="text-xs text-gray-400">Waiter đếm cuối ca:</span>
+                    <span class="text-xs font-medium text-gray-500">{{ formatPrice(selectedHandover.end_cash) }}</span>
+                  </div>
                 </div>
                 <input v-model.number="confirmForm.actual_cash_amount"
                   type="number"
                   min="0"
                   step="1000"
-                  required
                   class="w-full p-3 border rounded-xl text-lg font-bold focus:ring-2 focus:ring-green-500">
                 <p class="text-xs text-gray-400 mt-1">Nhập số tiền mặt bạn đếm thực tế</p>
               </div>
 
               <!-- Transfer Actual Amount -->
-              <div v-if="selectedHandover?.transfer_declared_amount > 0" class="mb-4">
+              <div class="mb-4">
                 <label class="block text-sm font-medium mb-1">💳 Số tiền CK thực nhận (VNĐ) *</label>
-                <div class="flex items-center gap-2 mb-2">
-                  <span class="text-xs text-gray-500">Waiter bàn giao:</span>
-                  <span class="text-sm font-bold text-blue-600">{{ formatPrice(selectedHandover.transfer_declared_amount) }}</span>
+                <div class="space-y-1 mb-2">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-500">Waiter bàn giao:</span>
+                    <span class="text-sm font-bold text-blue-600">{{ formatPrice(selectedHandover?.transfer_declared_amount || 0) }}</span>
+                  </div>
+                  <div v-if="selectedHandover?.end_transfer" class="flex items-center gap-2">
+                    <span class="text-xs text-gray-400">Waiter đếm cuối ca:</span>
+                    <span class="text-xs font-medium text-gray-500">{{ formatPrice(selectedHandover.end_transfer) }}</span>
+                  </div>
                 </div>
                 <input v-model.number="confirmForm.actual_transfer_amount"
                   type="number"
                   min="0"
                   step="1000"
-                  required
                   class="w-full p-3 border rounded-xl text-lg font-bold focus:ring-2 focus:ring-blue-500">
                 <p class="text-xs text-gray-400 mt-1">Kiểm tra số dư tài khoản ngân hàng</p>
               </div>
@@ -417,8 +427,8 @@ const showConfirmModal = (handover, action) => {
   selectedHandover.value = handover
   confirmAction.value = action
   confirmForm.value = {
-    actual_cash_amount: handover.cash_declared_amount || 0, // Default to declared
-    actual_transfer_amount: handover.transfer_declared_amount || 0, // Default to declared
+    actual_cash_amount: handover.end_cash || handover.cash_declared_amount || 0,
+    actual_transfer_amount: handover.end_transfer || handover.transfer_declared_amount || 0,
     cashier_note: '',
     discrepancy_reason: '',
     discrepancy_responsibility: ''
@@ -437,22 +447,10 @@ const confirmHandover = async () => {
     
     // Validate for CONFIRMED
     if (confirmAction.value === 'CONFIRMED') {
-      // Check if at least one actual amount is provided
-      if (selectedHandover.value.cash_declared_amount > 0 && !confirmForm.value.actual_cash_amount) {
-        alert('Vui lòng nhập số tiền mặt thực nhận')
-        return
-      }
-      if (selectedHandover.value.transfer_declared_amount > 0 && !confirmForm.value.actual_transfer_amount) {
-        alert('Vui lòng nhập số tiền CK thực nhận')
-        return
-      }
+      // Both fields are always shown, values default to 0 if not entered
       
-      // Add discrepancy info if exists
+      // Add discrepancy info if exists (not blocking, just recorded)
       if (hasDiscrepancy.value) {
-        if (!confirmForm.value.discrepancy_reason || !confirmForm.value.discrepancy_responsibility) {
-          alert('Vui lòng nhập đầy đủ thông tin chênh lệch')
-          return
-        }
         data.discrepancy_reason = confirmForm.value.discrepancy_reason
         data.discrepancy_responsibility = confirmForm.value.discrepancy_responsibility
       }

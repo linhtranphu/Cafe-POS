@@ -24,6 +24,7 @@ type CashHandoverService struct {
 	cashierShiftRepo     *mongodb.CashierShiftRepository
 	orderRepo            *mongodb.OrderRepository
 	mongoClient          *mongo.Client
+	journalService       *JournalService
 	discrepancyThreshold float64
 }
 
@@ -35,6 +36,7 @@ func NewCashHandoverService(
 	cashierShiftRepo *mongodb.CashierShiftRepository,
 	orderRepo *mongodb.OrderRepository,
 	mongoClient *mongo.Client,
+	journalService *JournalService,
 ) *CashHandoverService {
 	return &CashHandoverService{
 		handoverRepo:         handoverRepo,
@@ -43,6 +45,7 @@ func NewCashHandoverService(
 		cashierShiftRepo:     cashierShiftRepo,
 		orderRepo:            orderRepo,
 		mongoClient:          mongoClient,
+		journalService:       journalService,
 		discrepancyThreshold: 100000, // 100k VND
 	}
 }
@@ -204,13 +207,13 @@ func (s *CashHandoverService) ConfirmHandover(
 		return errors.New("handover is not pending")
 	}
 
-	// 4. Validate actual amounts match declared amounts
+	// 4. If cashier didn't enter actual amounts, default to declared amounts
 	if status == handover.StatusConfirmed {
-		if h.CashDeclaredAmount > 0 && actualCashAmount == 0 {
-			return errors.New("actual_cash_amount is required when cash was declared")
+		if actualCashAmount == 0 {
+			actualCashAmount = h.CashDeclaredAmount
 		}
-		if h.TransferDeclaredAmount > 0 && actualTransferAmount == 0 {
-			return errors.New("actual_transfer_amount is required when transfer was declared")
+		if actualTransferAmount == 0 {
+			actualTransferAmount = h.TransferDeclaredAmount
 		}
 	}
 
@@ -303,10 +306,20 @@ func (s *CashHandoverService) ConfirmHandover(
 			fmt.Printf("✅ [ROLLBACK] Success - Amounts restored\n")
 		}
 
-		// 6e. If confirmed and not requiring approval, update balances
-		if status == handover.StatusConfirmed && !h.RequiresApproval {
+		// 6e. Update balances for all confirmed handovers (including ones requiring approval)
+		// RequiresApproval only flags for manager review, it should not block balance updates
+		if status == handover.StatusConfirmed {
 			if err := s.updateBalances(sessCtx, h); err != nil {
 				return nil, err
+			}
+			// Record double-entry: DEBIT cash_drawer / CREDIT waiter_float
+			if _, err := s.journalService.RecordWaiterHandover(
+				sessCtx,
+				h.CashActualAmount, h.TransferActualAmount,
+				handoverID,
+				h.WaiterID, h.WaiterName,
+			); err != nil {
+				fmt.Printf("⚠️ [WAITER HANDOVER] Failed to record journal entry: %v (non-fatal)\n", err)
 			}
 		}
 
@@ -413,7 +426,7 @@ func (s *CashHandoverService) updateBalances(ctx context.Context, h *handover.Ca
 	}
 	cashierShift.UpdatedAt = now
 
-	fmt.Printf("🟡 [UPDATE BALANCES] Cashier shift after - ReceivedCash: %.0f, ReceivedTransfer: %.0f\n", 
+	fmt.Printf("🟡 [UPDATE BALANCES] Cashier shift after - ReceivedCash: %.0f, ReceivedTransfer: %.0f\n",
 		cashierShift.ReceivedCash, cashierShift.ReceivedTransfer)
 
 	if err := s.cashierShiftRepo.Save(ctx, cashierShift); err != nil {

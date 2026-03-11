@@ -19,58 +19,53 @@ import (
 
 // Custom errors for fund expense integration
 var (
-	ErrInsufficientFundBalance  = errors.New("insufficient fund balance")
-	ErrInvalidSourceType        = errors.New("invalid source type")
-	ErrDuplicateFundTransaction = errors.New("duplicate fund transaction for source")
-	ErrPaymentMethodMismatch    = errors.New("payment method does not match fund payment")
-	ErrCannotModifyFundExpense  = errors.New("cannot modify expense paid from fund")
-	ErrTransactionRollbackFailed = errors.New("transaction rollback failed")
+	ErrInsufficientFundBalance = errors.New("insufficient fund balance")
+	ErrInvalidSourceType       = errors.New("invalid source type")
+	ErrPaymentMethodMismatch   = errors.New("payment method does not match fund payment")
+	ErrCannotModifyFundExpense = errors.New("cannot modify expense paid from fund")
 )
 
 // FundExpenseIntegrationService orchestrates fund-paid operations
 type FundExpenseIntegrationService struct {
-	expenseRepo         *mongodb.ExpenseRepository
-	fundTxRepo          *mongodb.FundTransactionRepository
-	ingredientRepo      *mongodb.IngredientRepository
-	restockRepo         *mongodb.IngredientRestockRepository
-	facilityRepo        *mongodb.FacilityRepository
-	fundService         *FundService
-	mongoClient         *mongo.Client
+	expenseRepo    *mongodb.ExpenseRepository
+	ingredientRepo *mongodb.IngredientRepository
+	restockRepo    *mongodb.IngredientRestockRepository
+	facilityRepo   *mongodb.FacilityRepository
+	journalService *JournalService
+	mongoClient    *mongo.Client
 }
 
 // NewFundExpenseIntegrationService creates a new service instance
 func NewFundExpenseIntegrationService(
 	expenseRepo *mongodb.ExpenseRepository,
-	fundTxRepo *mongodb.FundTransactionRepository,
 	ingredientRepo *mongodb.IngredientRepository,
 	restockRepo *mongodb.IngredientRestockRepository,
 	facilityRepo *mongodb.FacilityRepository,
-	fundService *FundService,
+	journalService *JournalService,
 	mongoClient *mongo.Client,
 ) *FundExpenseIntegrationService {
 	return &FundExpenseIntegrationService{
 		expenseRepo:    expenseRepo,
-		fundTxRepo:     fundTxRepo,
 		ingredientRepo: ingredientRepo,
 		restockRepo:    restockRepo,
 		facilityRepo:   facilityRepo,
-		fundService:    fundService,
+		journalService: journalService,
 		mongoClient:    mongoClient,
 	}
 }
 
 // CreateExpenseFromFundRequest represents the request to create an expense from fund
 type CreateExpenseFromFundRequest struct {
-	Date          time.Time
-	CategoryID    primitive.ObjectID
-	Amount        float64
-	Description   string
-	Vendor        string
-	Notes         string
-	MoneyType     string // "cash" or "transfer"
-	UserID        primitive.ObjectID
-	UserName      string
-	UserRole      string
+	Date        time.Time
+	CategoryID  primitive.ObjectID
+	Amount      float64
+	Description string
+	Vendor      string
+	Notes       string
+	MoneyType   string // "cash" or "transfer"
+	UserID      primitive.ObjectID
+	UserName    string
+	UserRole    string
 }
 
 // RestockFromFundRequest represents the request to restock ingredient from fund
@@ -87,35 +82,21 @@ type RestockFromFundRequest struct {
 
 // ExpenseFromFundResult represents the result of creating an expense from fund
 type ExpenseFromFundResult struct {
-	Expense         *expense.Expense
-	FundTransaction *fund.FundTransaction
+	Expense      *expense.Expense
+	JournalEntry *fund.JournalEntry
 }
 
 // RestockFromFundResult represents the result of restocking ingredient from fund
 type RestockFromFundResult struct {
-	RestockRecord   *ingredient.IngredientRestockRecord
-	Expense         *expense.Expense
-	FundTransaction *fund.FundTransaction
-	UpdatedStock    float64
-}
-
-// ValidateFundBalance validates that the fund has sufficient balance for the requested amount
-// Requirements: 6.1, 6.2, 6.3
-func (s *FundExpenseIntegrationService) ValidateFundBalance(ctx context.Context, requiredAmount float64) error {
-	currentBalance, err := s.fundService.CalculateCurrentBalance(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to calculate fund balance: %w", err)
-	}
-	if requiredAmount > currentBalance.Total {
-		return fmt.Errorf("%w: required=%.2f, available=%.2f",
-			ErrInsufficientFundBalance, requiredAmount, currentBalance.Total)
-	}
-	return nil
+	RestockRecord *ingredient.IngredientRestockRecord
+	Expense       *expense.Expense
+	JournalEntry  *fund.JournalEntry
+	UpdatedStock  float64
 }
 
 // ValidateFundBalanceForType validates that a specific fund has sufficient balance
 func (s *FundExpenseIntegrationService) ValidateFundBalanceForType(ctx context.Context, requiredAmount float64, moneyType string, fundType fund.FundType) error {
-	b, err := s.fundService.CalculateBalanceByFundType(ctx, fundType)
+	b, err := s.journalService.GetFundBalance(ctx, fundType)
 	if err != nil {
 		return fmt.Errorf("failed to calculate fund balance: %w", err)
 	}
@@ -132,17 +113,13 @@ func (s *FundExpenseIntegrationService) ValidateFundBalanceForType(ctx context.C
 }
 
 // CreateExpenseFromFund creates an expense paid from fund with atomicity guarantee
-// Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 9.1, 9.2, 10.1
 func (s *FundExpenseIntegrationService) CreateExpenseFromFund(
 	ctx context.Context,
 	req CreateExpenseFromFundRequest,
 ) (*ExpenseFromFundResult, error) {
-	// Validate amount
 	if req.Amount <= 0 {
 		return nil, errors.New("amount must be greater than 0")
 	}
-
-	// Default money_type to cash
 	if req.MoneyType == "" {
 		req.MoneyType = "cash"
 	}
@@ -152,7 +129,6 @@ func (s *FundExpenseIntegrationService) CreateExpenseFromFund(
 		return nil, err
 	}
 
-	// Start MongoDB session for transaction
 	session, err := s.mongoClient.StartSession()
 	if err != nil {
 		return nil, fmt.Errorf("failed to start session: %w", err)
@@ -161,132 +137,82 @@ func (s *FundExpenseIntegrationService) CreateExpenseFromFund(
 
 	var result *ExpenseFromFundResult
 
-	// Execute transaction
 	err = mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
 		if err := session.StartTransaction(); err != nil {
 			return err
 		}
 
-		balanceBefore, err := s.fundService.CalculateBalanceByFundType(sc, expenseFundType)
-		if err != nil {
-			session.AbortTransaction(sc)
-			return fmt.Errorf("failed to calculate balance: %w", err)
-		}
-
-		if req.MoneyType == "transfer" {
-			if req.Amount > balanceBefore.Transfer {
-				session.AbortTransaction(sc)
-				return fmt.Errorf("insufficient %s fund (chuyển khoản): cần=%.2f, có=%.2f", expenseFundType, req.Amount, balanceBefore.Transfer)
-			}
-		} else {
-			if req.Amount > balanceBefore.Cash {
-				session.AbortTransaction(sc)
-				return fmt.Errorf("insufficient %s fund (tiền mặt): cần=%.2f, có=%.2f", expenseFundType, req.Amount, balanceBefore.Cash)
-			}
-		}
-
 		// Create expense record
-		// Requirements 1.1, 1.5, 10.1: Create expense with fund fields
 		exp := &expense.Expense{
 			Date:          req.Date,
 			CategoryID:    req.CategoryID,
 			Amount:        req.Amount,
 			Description:   req.Description,
-			PaymentMethod: expense.PaymentMethodFund, // Requirement 10.1
+			PaymentMethod: expense.PaymentMethodFund,
 			Vendor:        req.Vendor,
 			Notes:         req.Notes,
 			SourceType:    expense.SourceTypeManual,
-			PaidFromFund:  true, // Requirement 1.1
+			PaidFromFund:  true,
 			CreatedBy:     req.UserName,
 			CreatedAt:     time.Now(),
 			UpdatedAt:     time.Now(),
 		}
-
-		// Create expense
 		if err := s.expenseRepo.CreateExpense(sc, exp); err != nil {
 			session.AbortTransaction(sc)
-			return fmt.Errorf("failed to create expense: %w", err) // Requirement 9.1
+			return fmt.Errorf("failed to create expense: %w", err)
 		}
 
-		// Calculate balance after withdrawal based on money type
+		// Calculate cash/transfer split
 		var cashAmount, transferAmount float64
 		if req.MoneyType == "transfer" {
 			transferAmount = req.Amount
 		} else {
 			cashAmount = req.Amount
 		}
-		balanceAfter := &fund.FundBalance{
-			Cash:     balanceBefore.Cash - cashAmount,
-			Transfer: balanceBefore.Transfer - transferAmount,
-			Total:    balanceBefore.Total - req.Amount,
-		}
 
-		// Create fund withdrawal transaction with source linking
-		// Requirements 1.3, 1.4, 1.6: Create withdrawal with source reference
-		fundTx, err := fund.NewFundTransaction(
-			fund.TransactionTypeWithdrawal,
-			cashAmount,
-			transferAmount,
-			fmt.Sprintf("Chi tiêu: %s", req.Description),
-			req.UserID,
-			req.UserName,
-			req.UserRole,
+		// Record fund withdrawal in journal (within same session/transaction)
+		desc := fmt.Sprintf("Chi tiêu: %s", req.Description)
+		je, err := s.journalService.RecordFundWithdrawalInSession(
+			sc,
+			fund.EventExpense,
+			expenseFundType,
+			fund.FundTypeSupplier, // chi tiêu → trả nhà cung cấp
+			cashAmount, transferAmount,
+			desc,
+			exp.ID,
+			req.UserID, req.UserName, req.UserRole,
 		)
 		if err != nil {
 			session.AbortTransaction(sc)
-			return fmt.Errorf("failed to create fund transaction: %w", err)
+			return fmt.Errorf("failed to record journal entry: %w", err)
 		}
 
-		// Set source linking - Requirement 1.6
-		if err := fundTx.SetSource(fund.SourceTypeExpense, exp.ID); err != nil {
-			session.AbortTransaction(sc)
-			return fmt.Errorf("failed to set fund transaction source: %w", err)
-		}
-		fundTx.SetFundType(expenseFundType)
-
-		// Set balance information for audit - Requirement 1.4
-		fundTx.SetBalances(balanceBefore, balanceAfter)
-
-		// Create fund transaction
-		if err := s.fundTxRepo.Create(sc, fundTx); err != nil {
-			session.AbortTransaction(sc)
-			return fmt.Errorf("failed to create fund transaction: %w", err) // Requirement 9.2
-		}
-
-		// Update expense with fund transaction ID - Requirement 1.5
-		exp.FundTransactionID = fundTx.ID
+		// Store journal entry ID in expense
+		exp.FundTransactionID = je.ID
 		if err := s.expenseRepo.UpdateExpense(sc, exp.ID, exp); err != nil {
 			session.AbortTransaction(sc)
-			return fmt.Errorf("failed to update expense with fund transaction ID: %w", err)
+			return fmt.Errorf("failed to update expense with journal entry ID: %w", err)
 		}
 
-		// Commit transaction
 		if err := session.CommitTransaction(sc); err != nil {
 			return fmt.Errorf("failed to commit transaction: %w", err)
 		}
 
-		result = &ExpenseFromFundResult{
-			Expense:         exp,
-			FundTransaction: fundTx,
-		}
-
+		result = &ExpenseFromFundResult{Expense: exp, JournalEntry: je}
 		return nil
 	})
 
 	if err != nil {
 		return nil, err
 	}
-
 	return result, nil
 }
 
 // RestockIngredientFromFund restocks ingredient paid from fund with atomicity guarantee
-// Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 9.3
 func (s *FundExpenseIntegrationService) RestockIngredientFromFund(
 	ctx context.Context,
 	req RestockFromFundRequest,
 ) (*RestockFromFundResult, error) {
-	// Validate inputs
 	if req.Quantity <= 0 {
 		return nil, errors.New("quantity must be greater than 0")
 	}
@@ -301,13 +227,11 @@ func (s *FundExpenseIntegrationService) RestockIngredientFromFund(
 		return nil, err
 	}
 
-	// Get ingredient to verify it exists
 	ing, err := s.ingredientRepo.FindByID(ctx, req.IngredientID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find ingredient: %w", err)
 	}
 
-	// Start MongoDB session for transaction
 	session, err := s.mongoClient.StartSession()
 	if err != nil {
 		return nil, fmt.Errorf("failed to start session: %w", err)
@@ -316,35 +240,12 @@ func (s *FundExpenseIntegrationService) RestockIngredientFromFund(
 
 	var result *RestockFromFundResult
 
-	// Execute transaction
-	// Requirement 9.3: Use transaction for atomicity
 	err = mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
 		if err := session.StartTransaction(); err != nil {
 			return err
 		}
 
-		balanceBefore, err := s.fundService.CalculateBalanceByFundType(sc, ingredientFundType)
-		if err != nil {
-			session.AbortTransaction(sc)
-			return fmt.Errorf("failed to calculate balance: %w", err)
-		}
-
-		if req.MoneyType == "transfer" {
-			if totalCost > balanceBefore.Transfer {
-				session.AbortTransaction(sc)
-				return fmt.Errorf("%w %s (transfer): required=%.2f, available=%.2f",
-					ErrInsufficientFundBalance, ingredientFundType, totalCost, balanceBefore.Transfer)
-			}
-		} else {
-			if totalCost > balanceBefore.Cash {
-				session.AbortTransaction(sc)
-				return fmt.Errorf("%w %s (cash): required=%.2f, available=%.2f",
-					ErrInsufficientFundBalance, ingredientFundType, totalCost, balanceBefore.Cash)
-			}
-		}
-
-		// Create ingredient restock record
-		// Requirement 2.1: Create restock record
+		// Create restock record
 		restockRecord, err := ingredient.NewIngredientRestockRecord(
 			req.IngredientID,
 			req.Quantity,
@@ -357,8 +258,6 @@ func (s *FundExpenseIntegrationService) RestockIngredientFromFund(
 			session.AbortTransaction(sc)
 			return fmt.Errorf("failed to create restock record: %w", err)
 		}
-		
-		// Create restock record in DB first to get ID
 		if err := s.restockRepo.Create(sc, restockRecord); err != nil {
 			session.AbortTransaction(sc)
 			return fmt.Errorf("failed to create restock record: %w", err)
@@ -378,12 +277,8 @@ func (s *FundExpenseIntegrationService) RestockIngredientFromFund(
 				break
 			}
 		}
-
-		// If category doesn't exist, create it
 		if ingredientCategoryID.IsZero() {
-			cat := &expense.Category{
-				Name: "Mua nguyên liệu",
-			}
+			cat := &expense.Category{Name: "Mua nguyên liệu"}
 			if err := s.expenseRepo.CreateCategory(sc, cat); err != nil {
 				session.AbortTransaction(sc)
 				return fmt.Errorf("failed to create ingredient category: %w", err)
@@ -391,8 +286,7 @@ func (s *FundExpenseIntegrationService) RestockIngredientFromFund(
 			ingredientCategoryID = cat.ID
 		}
 
-		// Create expense record for ingredient purchase
-		// Requirement 2.3: Create expense with category "ingredient purchase"
+		// Create expense record
 		exp := &expense.Expense{
 			Date:          time.Now(),
 			CategoryID:    ingredientCategoryID,
@@ -408,127 +302,92 @@ func (s *FundExpenseIntegrationService) RestockIngredientFromFund(
 			CreatedAt:     time.Now(),
 			UpdatedAt:     time.Now(),
 		}
-
 		if err := s.expenseRepo.CreateExpense(sc, exp); err != nil {
 			session.AbortTransaction(sc)
 			return fmt.Errorf("failed to create expense: %w", err)
 		}
 
-		// Calculate balance after withdrawal based on money_type
+		// Calculate cash/transfer split
 		var cashAmount, transferAmount float64
 		if req.MoneyType == "transfer" {
 			transferAmount = totalCost
-			cashAmount = 0
 		} else {
 			cashAmount = totalCost
-			transferAmount = 0
-		}
-		
-		balanceAfter := &fund.FundBalance{
-			Cash:     balanceBefore.Cash - cashAmount,
-			Transfer: balanceBefore.Transfer - transferAmount,
-			Total:    balanceBefore.Total - totalCost,
 		}
 
-		// Create fund withdrawal transaction
-		// Requirement 2.4: Create withdrawal transaction
-		fundTx, err := fund.NewFundTransaction(
-			fund.TransactionTypeWithdrawal,
-			cashAmount,
-			transferAmount,
-			fmt.Sprintf("Mua nguyên liệu: %s", ing.Name),
-			req.UserID,
-			req.UserName,
-			req.UserRole,
+		// Record fund withdrawal in journal
+		desc := fmt.Sprintf("Mua nguyên liệu: %s", ing.Name)
+		je, err := s.journalService.RecordFundWithdrawalInSession(
+			sc,
+			fund.EventIngredientRestock,
+			ingredientFundType,
+			fund.FundTypeSupplier, // mua nguyên liệu → trả nhà cung cấp
+			cashAmount, transferAmount,
+			desc,
+			restockRecord.ID,
+			req.UserID, req.UserName, req.UserRole,
 		)
 		if err != nil {
 			session.AbortTransaction(sc)
-			return fmt.Errorf("failed to create fund transaction: %w", err)
+			return fmt.Errorf("failed to record journal entry: %w", err)
 		}
 
-		// Set source linking - Requirement 2.6
-		if err := fundTx.SetSource(fund.SourceTypeIngredient, restockRecord.ID); err != nil {
-			session.AbortTransaction(sc)
-			return fmt.Errorf("failed to set fund transaction source: %w", err)
-		}
-		fundTx.SetFundType(ingredientFundType)
-
-		fundTx.SetBalances(balanceBefore, balanceAfter)
-
-		if err := s.fundTxRepo.Create(sc, fundTx); err != nil {
-			session.AbortTransaction(sc)
-			return fmt.Errorf("failed to create fund transaction: %w", err)
-		}
-
-		// Link restock record to expense and fund transaction
-		// Requirement 2.7: Link expense to fund transaction
-		if err := restockRecord.SetFundPayment(exp.ID, fundTx.ID); err != nil {
+		// Link restock record to expense and journal entry
+		if err := restockRecord.SetFundPayment(exp.ID, je.ID); err != nil {
 			session.AbortTransaction(sc)
 			return fmt.Errorf("failed to set fund payment: %w", err)
 		}
-
-		// Update expense with fund transaction ID
-		exp.FundTransactionID = fundTx.ID
+		exp.FundTransactionID = je.ID
 		if err := s.expenseRepo.UpdateExpense(sc, exp.ID, exp); err != nil {
 			session.AbortTransaction(sc)
 			return fmt.Errorf("failed to update expense: %w", err)
 		}
 
 		// Update ingredient stock quantity
-		// Requirement 2.5: Update stock quantity
 		beforeQty := ing.Quantity
 		ing.Quantity += req.Quantity
-		
-		// Update cost per unit using weighted average if new price is different
 		if req.CostPerUnit > 0 && req.CostPerUnit != ing.CostPerUnit && ing.Quantity > 0 {
 			oldValue := beforeQty * ing.CostPerUnit
 			newValue := req.Quantity * req.CostPerUnit
 			ing.CostPerUnit = (oldValue + newValue) / ing.Quantity
 		}
-
 		if err := s.ingredientRepo.Update(sc, req.IngredientID, ing); err != nil {
 			session.AbortTransaction(sc)
 			return fmt.Errorf("failed to update ingredient stock: %w", err)
 		}
 
-		// Commit transaction
 		if err := session.CommitTransaction(sc); err != nil {
 			return fmt.Errorf("failed to commit transaction: %w", err)
 		}
 
 		result = &RestockFromFundResult{
-			RestockRecord:   restockRecord,
-			Expense:         exp,
-			FundTransaction: fundTx,
-			UpdatedStock:    ing.Quantity,
+			RestockRecord: restockRecord,
+			Expense:       exp,
+			JournalEntry:  je,
+			UpdatedStock:  ing.Quantity,
 		}
-
 		return nil
 	})
 
 	if err != nil {
 		return nil, err
 	}
-
 	return result, nil
 }
 
 // GetExpensesPaidFromFund retrieves expenses paid from fund with filtering
-// Requirements: 4.3, 4.4
 func (s *FundExpenseIntegrationService) GetExpensesPaidFromFund(
 	ctx context.Context,
 	limit, offset int,
 ) ([]expense.Expense, error) {
 	filter := bson.M{
-		"paid_from_fund": true,
+		"paid_from_fund":      true,
 		"fund_transaction_id": bson.M{"$exists": true, "$ne": primitive.NilObjectID},
 	}
-
 	expenses, err := s.expenseRepo.GetExpenses(ctx, filter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get expenses paid from fund: %w", err)
 	}
-
 	return expenses, nil
 }
 
@@ -543,9 +402,9 @@ type PurchaseFacilityFromFundRequest struct {
 
 // PurchaseFacilityFromFundResult represents the result of purchasing a facility from fund
 type PurchaseFacilityFromFundResult struct {
-	Facility        *facility.Facility
-	Expense         *expense.Expense
-	FundTransaction *fund.FundTransaction
+	Facility     *facility.Facility
+	Expense      *expense.Expense
+	JournalEntry *fund.JournalEntry
 }
 
 // PurchaseFacilityFromFund creates a facility paid from fund with atomicity guarantee
@@ -558,7 +417,6 @@ func (s *FundExpenseIntegrationService) PurchaseFacilityFromFund(
 	}
 
 	totalCost := req.Facility.Cost
-
 	facilityFundType := fund.FundTypeForSource(fund.SourceTypeFacility)
 	if err := s.ValidateFundBalanceForType(ctx, totalCost, req.MoneyType, facilityFundType); err != nil {
 		return nil, err
@@ -577,26 +435,6 @@ func (s *FundExpenseIntegrationService) PurchaseFacilityFromFund(
 			return err
 		}
 
-		balanceBefore, err := s.fundService.CalculateBalanceByFundType(sc, facilityFundType)
-		if err != nil {
-			session.AbortTransaction(sc)
-			return fmt.Errorf("failed to calculate balance: %w", err)
-		}
-
-		if req.MoneyType == "transfer" {
-			if totalCost > balanceBefore.Transfer {
-				session.AbortTransaction(sc)
-				return fmt.Errorf("%w %s (chuyển khoản): cần=%.2f, có=%.2f",
-					ErrInsufficientFundBalance, facilityFundType, totalCost, balanceBefore.Transfer)
-			}
-		} else {
-			if totalCost > balanceBefore.Cash {
-				session.AbortTransaction(sc)
-				return fmt.Errorf("%w %s (tiền mặt): cần=%.2f, có=%.2f",
-					ErrInsufficientFundBalance, facilityFundType, totalCost, balanceBefore.Cash)
-			}
-		}
-
 		// Create facility record
 		now := time.Now()
 		req.Facility.PaidFromFund = true
@@ -607,13 +445,12 @@ func (s *FundExpenseIntegrationService) PurchaseFacilityFromFund(
 			return fmt.Errorf("failed to create facility: %w", err)
 		}
 
-		// Find or create "facility purchase" expense category
+		// Find or create facility expense category
 		categories, err := s.expenseRepo.GetCategories(sc, "")
 		if err != nil {
 			session.AbortTransaction(sc)
 			return fmt.Errorf("failed to get expense categories: %w", err)
 		}
-
 		var facilityCategoryID primitive.ObjectID
 		for _, cat := range categories {
 			if cat.Name == "Cơ sở vật chất" || cat.Name == "facility purchase" {
@@ -651,58 +488,43 @@ func (s *FundExpenseIntegrationService) PurchaseFacilityFromFund(
 			return fmt.Errorf("failed to create expense: %w", err)
 		}
 
-		// Calculate balance after withdrawal
+		// Calculate cash/transfer split
 		var cashAmount, transferAmount float64
 		if req.MoneyType == "transfer" {
 			transferAmount = totalCost
 		} else {
 			cashAmount = totalCost
 		}
-		balanceAfter := &fund.FundBalance{
-			Cash:     balanceBefore.Cash - cashAmount,
-			Transfer: balanceBefore.Transfer - transferAmount,
-			Total:    balanceBefore.Total - totalCost,
-		}
 
-		// Create fund withdrawal transaction
-		fundTx, err := fund.NewFundTransaction(
-			fund.TransactionTypeWithdrawal,
-			cashAmount,
-			transferAmount,
-			fmt.Sprintf("Mua tài sản: %s", req.Facility.Name),
-			req.UserID,
-			req.UserName,
-			req.UserRole,
+		// Record fund withdrawal in journal
+		desc := fmt.Sprintf("Mua tài sản: %s", req.Facility.Name)
+		je, err := s.journalService.RecordFundWithdrawalInSession(
+			sc,
+			fund.EventFacilityPurchase,
+			facilityFundType,
+			fund.FundTypeSupplier, // mua tài sản → trả nhà cung cấp
+			cashAmount, transferAmount,
+			desc,
+			req.Facility.ID,
+			req.UserID, req.UserName, req.UserRole,
 		)
 		if err != nil {
 			session.AbortTransaction(sc)
-			return fmt.Errorf("failed to create fund transaction: %w", err)
+			return fmt.Errorf("failed to record journal entry: %w", err)
 		}
 
-		if err := fundTx.SetSource(fund.SourceTypeFacility, req.Facility.ID); err != nil {
-			session.AbortTransaction(sc)
-			return fmt.Errorf("failed to set fund transaction source: %w", err)
-		}
-		fundTx.SetFundType(facilityFundType)
-		fundTx.SetBalances(balanceBefore, balanceAfter)
-
-		if err := s.fundTxRepo.Create(sc, fundTx); err != nil {
-			session.AbortTransaction(sc)
-			return fmt.Errorf("failed to create fund transaction: %w", err)
-		}
-
-		// Link facility to expense and fund transaction, then update
+		// Link facility and expense to journal entry
 		req.Facility.ExpenseID = exp.ID
-		req.Facility.FundTransactionID = fundTx.ID
-		exp.FundTransactionID = fundTx.ID
+		req.Facility.FundTransactionID = je.ID
+		exp.FundTransactionID = je.ID
 
 		if err := s.facilityRepo.Update(sc, req.Facility.ID, req.Facility); err != nil {
 			session.AbortTransaction(sc)
-			return fmt.Errorf("failed to update facility with fund links: %w", err)
+			return fmt.Errorf("failed to update facility with journal links: %w", err)
 		}
 		if err := s.expenseRepo.UpdateExpense(sc, exp.ID, exp); err != nil {
 			session.AbortTransaction(sc)
-			return fmt.Errorf("failed to update expense with fund transaction ID: %w", err)
+			return fmt.Errorf("failed to update expense with journal entry ID: %w", err)
 		}
 
 		if err := session.CommitTransaction(sc); err != nil {
@@ -710,9 +532,9 @@ func (s *FundExpenseIntegrationService) PurchaseFacilityFromFund(
 		}
 
 		result = &PurchaseFacilityFromFundResult{
-			Facility:        req.Facility,
-			Expense:         exp,
-			FundTransaction: fundTx,
+			Facility:     req.Facility,
+			Expense:      exp,
+			JournalEntry: je,
 		}
 		return nil
 	})
@@ -720,22 +542,18 @@ func (s *FundExpenseIntegrationService) PurchaseFacilityFromFund(
 	if err != nil {
 		return nil, err
 	}
-
 	return result, nil
 }
 
 // GetRestockHistory retrieves restock history for an ingredient with pagination
-// Requirements: 2.5, 2.6, 2.7
 func (s *FundExpenseIntegrationService) GetRestockHistory(
 	ctx context.Context,
 	ingredientID primitive.ObjectID,
 	limit, offset int,
 ) ([]*ingredient.IngredientRestockRecord, error) {
-	// Query ingredient_restock_history collection
 	records, err := s.restockRepo.FindByIngredientID(ctx, ingredientID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get restock history: %w", err)
 	}
-
 	return records, nil
 }

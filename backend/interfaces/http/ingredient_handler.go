@@ -429,10 +429,10 @@ func (h *IngredientHandler) RestockFromFund(c *gin.Context) {
 
 	// Return restock record, expense, and fund transaction details
 	c.JSON(http.StatusOK, gin.H{
-		"restock_record":   result.RestockRecord,
-		"expense":          result.Expense,
-		"fund_transaction": result.FundTransaction,
-		"updated_stock":    result.UpdatedStock,
+		"restock_record": result.RestockRecord,
+		"expense":        result.Expense,
+		"journal_entry":  result.JournalEntry,
+		"updated_stock":  result.UpdatedStock,
 	})
 }
 

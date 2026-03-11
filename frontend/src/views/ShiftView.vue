@@ -605,25 +605,27 @@
           </div>
           
           <form @submit.prevent="createHandoverAndEndShift" class="space-y-4">
-            <!-- End Cash Input - chỉ hiện khi có tiền mặt -->
-            <div v-if="(currentShift?.remaining_cash || 0) > 0">
-              <label class="block text-sm font-medium mb-2">💵 Tiền mặt cuối ca (VNĐ)</label>
+            <!-- End Cash Input -->
+            <div>
+              <label class="block text-sm font-medium mb-1">💵 Tiền mặt cuối ca (VNĐ)</label>
+              <p class="text-xs text-gray-400 mb-2">Bàn giao: <span class="font-semibold text-green-600">{{ formatPrice(currentShift?.remaining_cash || 0) }}</span></p>
               <input v-model.number="handoverEndShiftForm.end_cash"
                 type="number"
                 min="0"
                 step="1000"
                 class="w-full p-3 border rounded-xl text-lg font-bold focus:ring-2 focus:ring-orange-500">
-              <p class="text-xs text-gray-500 mt-1">Tiền mặt còn lại sau khi bàn giao (thường là 0)</p>
+              <p class="text-xs text-gray-400 mt-1">Tiền mặt còn lại sau khi bàn giao (thường là 0)</p>
             </div>
-            <!-- End Transfer Input - chỉ hiện khi có tiền CK -->
-            <div v-if="(currentShift?.remaining_transfer || 0) > 0">
-              <label class="block text-sm font-medium mb-2">💳 Tiền CK cuối ca (VNĐ)</label>
+            <!-- End Transfer Input -->
+            <div>
+              <label class="block text-sm font-medium mb-1">💳 Tiền CK cuối ca (VNĐ)</label>
+              <p class="text-xs text-gray-400 mb-2">Bàn giao: <span class="font-semibold text-blue-600">{{ formatPrice(currentShift?.remaining_transfer || 0) }}</span></p>
               <input v-model.number="handoverEndShiftForm.end_transfer"
                 type="number"
                 min="0"
                 step="1000"
                 class="w-full p-3 border rounded-xl text-lg font-bold focus:ring-2 focus:ring-blue-500">
-              <p class="text-xs text-gray-500 mt-1">Tiền CK còn lại sau khi bàn giao (thường là 0)</p>
+              <p class="text-xs text-gray-400 mt-1">Tiền CK còn lại sau khi bàn giao (thường là 0)</p>
             </div>
             
             <!-- Note -->

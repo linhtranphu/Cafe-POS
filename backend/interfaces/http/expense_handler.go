@@ -180,8 +180,8 @@ func (h *ExpenseHandler) CreateExpenseFromFund(c *gin.Context) {
 	
 	// Return expense and fund transaction details
 	c.JSON(http.StatusCreated, gin.H{
-		"expense":          result.Expense,
-		"fund_transaction": result.FundTransaction,
+		"expense":       result.Expense,
+		"journal_entry": result.JournalEntry,
 	})
 }
 

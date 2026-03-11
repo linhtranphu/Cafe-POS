@@ -21,10 +21,17 @@ const (
 type FundType string
 
 const (
-	FundTypeOperating  FundType = "operating"
-	FundTypeInventory  FundType = "inventory"
-	FundTypeProfit     FundType = "profit"
-	FundTypeCashDrawer FundType = "cash_drawer"
+	FundTypeOperating   FundType = "operating"
+	FundTypeInventory   FundType = "inventory"
+	FundTypeProfit      FundType = "profit"
+	FundTypeCashDrawer  FundType = "cash_drawer"
+	FundTypeWaiterFloat FundType = "waiter_float" // Tiền waiter đang giữ trong ca
+	// External counterpart accounts (không phải quỹ thực — dùng để cân bằng double-entry)
+	FundTypeOwner        FundType = "owner"         // Chủ quán: nguồn/đích của deposit/withdrawal
+	FundTypeSupplier     FundType = "supplier"      // Nhà cung cấp: đích của chi tiêu/mua nguyên liệu/tài sản
+	FundTypeCustomer     FundType = "customer"      // Khách hàng: nguồn của doanh thu bán hàng
+	FundTypeCashShortage FundType = "cash_shortage" // Waiter bàn giao thiếu tiền
+	FundTypeCashOverage  FundType = "cash_overage"  // Waiter bàn giao thừa tiền
 )
 
 // SourceType represents the origin/source of a fund transaction
@@ -37,6 +44,7 @@ const (
 	SourceTypeHandover     SourceType = "handover"
 	SourceTypeManual       SourceType = "manual"
 	SourceTypeFundTransfer SourceType = "fund_transfer"
+	SourceTypeWaiterStart  SourceType = "waiter_start" // Phát tiền đầu ca cho waiter
 )
 
 // FundBalance represents the balance of the fund

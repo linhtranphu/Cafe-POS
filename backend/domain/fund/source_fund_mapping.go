@@ -9,6 +9,7 @@ var SourceFundTypeMap = map[SourceType]FundType{
 	SourceTypeHandover:     FundTypeCashDrawer, // Bàn giao ca        → ngăn kéo tiền
 	SourceTypeManual:       FundTypeOperating,  // Thủ công            → quỹ vận hành
 	SourceTypeFundTransfer: FundTypeOperating,  // Chuyển quỹ          → xác định lúc runtime
+	SourceTypeWaiterStart:  FundTypeCashDrawer, // Tiền đầu ca waiter  → ngăn kéo tiền
 }
 
 // FundTypeForSource trả về quỹ mặc định cho một loại nguồn.

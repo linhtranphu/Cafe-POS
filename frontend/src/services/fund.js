@@ -1,9 +1,9 @@
 import api from './api'
 
-// Get current fund balance
+// Get current fund balance (operating fund — for backward compat)
 export const getBalance = async () => {
-  const response = await api.get('/manager/fund/balance')
-  return response.data
+  const response = await api.get('/manager/fund/journal-balances')
+  return response.data?.operating || { cash: 0, transfer: 0, total: 0 }
 }
 
 // Get transaction history
@@ -43,10 +43,10 @@ export const getTransactionDetail = async (id) => {
   return response.data
 }
 
-// Get all 4 fund balances
+// Get all fund balances from journal (double-entry source of truth)
 export const getAllBalances = async () => {
-  const response = await api.get('/manager/fund/balances')
-  return response.data.balances || response.data
+  const response = await api.get('/manager/fund/journal-balances')
+  return response.data
 }
 
 // Transfer between fund accounts

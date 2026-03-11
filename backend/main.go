@@ -52,7 +52,7 @@ func main() {
 	operatingExpenseRepo := mongodb.NewOperatingExpenseRepository(db)
 	// Cashier repositories
 	cashierShiftRepo := mongodb.NewCashierShiftRepository(db)
-	fundHandoverRepo := mongodb.NewFundHandoverRepository(db)
+
 	cashReconciliationRepo := mongodb.NewCashReconciliationRepository(db)
 	paymentDiscrepancyRepo := mongodb.NewPaymentDiscrepancyRepository(db)
 	paymentAuditRepo := mongodb.NewPaymentAuditRepository(db)
@@ -71,7 +71,7 @@ func main() {
 	printTemplateRepo := mongodb.NewPrintTemplateRepository(db)
 	printNotificationRepo := mongodb.NewPrintNotificationRepository(db)
 	// Fund repositories
-	fundTransactionRepo := mongodb.NewFundTransactionRepository(db)
+	journalRepo := mongodb.NewJournalRepository(db)
 
 	// State Machine Manager
 	smManager := domain.NewStateMachineManager()
@@ -168,16 +168,16 @@ func main() {
 	// Wire up print service for auto-printing
 	orderService.SetPrintService(printService)
 	orderService.SetSettingsRepository(shopSettingsRepo)
-	shiftService := services.NewShiftService(shiftRepo, orderRepo, smManager)
-	// Fund service (must be created before cashier shift service)
-	fundService := services.NewFundService(fundTransactionRepo, fundHandoverRepo, cashHandoverRepo, cashierShiftRepo, client)
+	// Fund service (double-entry journal as single source of truth)
+	journalService := services.NewJournalService(journalRepo, client)
+	shiftService := services.NewShiftService(shiftRepo, orderRepo, smManager, journalService, cashierShiftRepo)
 	// Cashier services
-	cashierShiftService := services.NewCashierShiftService(cashierShiftRepo, fundHandoverRepo, shiftRepo, smManager, fundService, client)
+	cashierShiftService := services.NewCashierShiftService(cashierShiftRepo, shiftRepo, smManager, journalService, client)
 	cashReconciliationService := services.NewCashReconciliationService(cashReconciliationRepo, shiftRepo, orderRepo)
 	paymentOversightService := services.NewPaymentOversightService(orderRepo, paymentDiscrepancyRepo, paymentAuditRepo)
 	cashierReportService := services.NewCashierReportService(orderRepo, cashReconciliationRepo, shiftRepo, paymentAuditRepo)
 	// Handover service
-	cashHandoverService := services.NewCashHandoverService(cashHandoverRepo, cashDiscrepancyRepo, shiftRepo, cashierShiftRepo, orderRepo, client)
+	cashHandoverService := services.NewCashHandoverService(cashHandoverRepo, cashDiscrepancyRepo, shiftRepo, cashierShiftRepo, orderRepo, client, journalService)
 
 	// Create monitoring service for metrics and alerts
 	monitoringService := services.NewMonitoringService()
@@ -246,7 +246,7 @@ func main() {
 	// Handover handler
 	cashHandoverHandler := http.NewCashHandoverHandler(cashHandoverService)
 	// Fund handler
-	fundHandler := http.NewFundHandler(fundService)
+	fundHandler := http.NewFundHandler(journalService)
 	// Batch handlers
 	batchDefinitionHandler := http.NewBatchDefinitionHandler(batchDefinitionService)
 	batchRecordHandler := http.NewBatchRecordHandler(batchRecordService)
@@ -328,7 +328,7 @@ func main() {
 	facilityHandler := http.NewFacilityHandler(facilityService)
 	expenseRepo := mongodb.NewExpenseRepository(db)
 	expenseService := services.NewExpenseService(expenseRepo)
-	fundExpenseIntegrationService := services.NewFundExpenseIntegrationService(expenseRepo, fundTransactionRepo, ingredientRepo, ingredientRestockRepo, facilityRepo, fundService, client)
+	fundExpenseIntegrationService := services.NewFundExpenseIntegrationService(expenseRepo, ingredientRepo, ingredientRestockRepo, facilityRepo, journalService, client)
 	expenseHandler := http.NewExpenseHandler(expenseService, fundExpenseIntegrationService)
 	ingredientHandler.SetFundExpenseIntegrationService(fundExpenseIntegrationService)
 	facilityHandler.SetFundExpenseIntegrationService(fundExpenseIntegrationService)
@@ -707,13 +707,12 @@ func main() {
 				manager.DELETE("/expenses/:id", expenseHandler.DeleteExpense)
 				manager.POST("/expense-categories", expenseHandler.CreateCategory)
 				
-				// Fund management routes
-				manager.GET("/fund/balance", fundHandler.GetBalance)
-				manager.GET("/fund/transactions", fundHandler.GetTransactions)
+				// Fund management routes (journal / double-entry source of truth)
+				manager.GET("/fund/journal-balances", fundHandler.GetJournalFundBalances)
+				manager.GET("/fund/journal", fundHandler.GetJournalEntries)
+				manager.GET("/fund/journal/:id", fundHandler.GetJournalEntry)
 				manager.POST("/fund/deposit", fundHandler.Deposit)
 				manager.POST("/fund/withdraw", fundHandler.Withdraw)
-				manager.GET("/fund/transactions/:id", fundHandler.GetTransactionDetail)
-				manager.GET("/fund/balances", fundHandler.GetAllFundBalances)
 				manager.POST("/fund/transfer", fundHandler.Transfer)
 				manager.GET("/expense-categories", expenseHandler.GetCategories)
 				manager.DELETE("/expense-categories/:id", expenseHandler.DeleteCategory)

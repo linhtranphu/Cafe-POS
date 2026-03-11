@@ -35,7 +35,18 @@
       "Bash(python3 -m json.tool)",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(''OK - user:'', d[''user''][''username''], ''role:'', d[''user''][''role'']\\)\")",
       "Read(//Volumes/Linh-DAT/Misc\\\\ Projects/Cafe\\\\ POS/backend/interfaces/http/**)",
-      "Read(//Volumes/Linh-DAT/Misc\\\\ Projects/Cafe\\\\ POS/backend/**)"
+      "Read(//Volumes/Linh-DAT/Misc\\\\ Projects/Cafe\\\\ POS/backend/**)",
+      "Bash(node --version)",
+      "Bash(npm --version)",
+      "Bash(npm install)",
+      "Bash(timeout 15 npm run dev)",
+      "Bash(go build -o /tmp/cafe-pos-test .)",
+      "Bash(ls -la \"/Volumes/Linh-DAT/Misc Projects/Cafe POS/backend/\"*.go)",
+      "Bash(go build -o backend .)",
+      "Bash(head -20 grep -n \"SOURCE_TYPE_LABELS\\\\|SOURCE_TYPE_ICONS\\\\|waiter_start\\\\|starting_float\" \"/Volumes/Linh-DAT/Misc Projects/Cafe POS/frontend/src/services/fundExpenseService.js\")",
+      "Bash(xargs -I {} basename {})",
+      "Bash(grep -l \"api\\\\|axios\\\\|fetch\" \"/Volumes/Linh-DAT/Misc Projects/Cafe POS/frontend/src/services/\"*.js)",
+      "Bash(\"/Volumes/Linh-DAT/Misc Projects/Cafe:*)"
     ]
   }
 }

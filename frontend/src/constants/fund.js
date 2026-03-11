@@ -1,9 +1,92 @@
+// Journal event types (double-entry source of truth)
+export const EVENT_TYPES = {
+  CASHIER_SHIFT_START: 'cashier_shift_start',
+  CASHIER_SHIFT_END: 'cashier_shift_end',
+  WAITER_SHIFT_START: 'waiter_shift_start',
+  WAITER_HANDOVER: 'waiter_handover',
+  FUND_TRANSFER: 'fund_transfer',
+  MANAGER_DEPOSIT: 'manager_deposit',
+  MANAGER_WITHDRAWAL: 'manager_withdrawal',
+  EXPENSE: 'expense',
+  INGREDIENT_RESTOCK: 'ingredient_restock',
+  FACILITY_PURCHASE: 'facility_purchase',
+  ALL: 'all'
+}
+
+export const EVENT_TYPE_LABELS = {
+  cashier_shift_start: 'Đầu ca thu ngân',
+  cashier_shift_end: 'Cuối ca thu ngân',
+  waiter_shift_start: 'Đầu ca phục vụ',
+  waiter_handover: 'Bàn giao phục vụ',
+  fund_transfer: 'Chuyển quỹ',
+  manager_deposit: 'Nạp tiền',
+  manager_withdrawal: 'Rút tiền',
+  expense: 'Chi tiêu',
+  ingredient_restock: 'Mua nguyên liệu',
+  facility_purchase: 'Mua tài sản',
+  all: 'Tất cả sự kiện'
+}
+
+export const EVENT_TYPE_ICONS = {
+  cashier_shift_start: '🏦',
+  cashier_shift_end: '🏦',
+  waiter_shift_start: '👤',
+  waiter_handover: '🤝',
+  fund_transfer: '↔️',
+  manager_deposit: '📥',
+  manager_withdrawal: '📤',
+  expense: '🧾',
+  ingredient_restock: '🥦',
+  facility_purchase: '🏢'
+}
+
+// Events that represent money flowing IN to a real fund
+export const INFLOW_EVENTS = new Set([
+  'manager_deposit',
+  'cashier_shift_end',
+  'waiter_handover'
+])
+
+// Events that represent money flowing OUT of a real fund
+export const OUTFLOW_EVENTS = new Set([
+  'manager_withdrawal',
+  'cashier_shift_start',
+  'waiter_shift_start',
+  'expense',
+  'ingredient_restock',
+  'facility_purchase'
+])
+
+export const EVENT_TYPE_FILTER_OPTIONS = [
+  { value: 'all', label: 'Tất cả sự kiện' },
+  { value: 'manager_deposit', label: 'Nạp tiền' },
+  { value: 'manager_withdrawal', label: 'Rút tiền' },
+  { value: 'fund_transfer', label: 'Chuyển quỹ' },
+  { value: 'expense', label: 'Chi tiêu' },
+  { value: 'ingredient_restock', label: 'Mua nguyên liệu' },
+  { value: 'facility_purchase', label: 'Mua tài sản' },
+  { value: 'cashier_shift_start', label: 'Đầu ca thu ngân' },
+  { value: 'cashier_shift_end', label: 'Cuối ca thu ngân' },
+  { value: 'waiter_shift_start', label: 'Đầu ca phục vụ' },
+  { value: 'waiter_handover', label: 'Bàn giao phục vụ' }
+]
+
+export const getEventTypeLabel = (type) => EVENT_TYPE_LABELS[type] || type
+export const getEventTypeIcon = (type) => EVENT_TYPE_ICONS[type] || '📋'
+
 // Fund types
 export const FUND_TYPES = {
   OPERATING: 'operating',
   INVENTORY: 'inventory',
   PROFIT: 'profit',
   CASH_DRAWER: 'cash_drawer',
+  WAITER_FLOAT: 'waiter_float',
+  // External counterpart accounts (không phải quỹ thực)
+  OWNER: 'owner',
+  SUPPLIER: 'supplier',
+  CUSTOMER: 'customer',
+  CASH_SHORTAGE: 'cash_shortage',
+  CASH_OVERAGE: 'cash_overage',
   ALL: 'all'
 }
 
@@ -13,6 +96,13 @@ export const FUND_TYPE_LABELS = {
   [FUND_TYPES.INVENTORY]: 'Quỹ hàng hóa',
   [FUND_TYPES.PROFIT]: 'Quỹ lợi nhuận',
   [FUND_TYPES.CASH_DRAWER]: 'Ngăn kéo tiền',
+  [FUND_TYPES.WAITER_FLOAT]: 'Tiền phục vụ',
+  // External counterparts
+  [FUND_TYPES.OWNER]: 'Chủ quán',
+  [FUND_TYPES.SUPPLIER]: 'Nhà cung cấp',
+  [FUND_TYPES.CUSTOMER]: 'Khách hàng',
+  [FUND_TYPES.CASH_SHORTAGE]: 'Thiếu tiền',
+  [FUND_TYPES.CASH_OVERAGE]: 'Thừa tiền',
   [FUND_TYPES.ALL]: 'Tất cả quỹ'
 }
 
@@ -21,7 +111,13 @@ export const FUND_TYPE_ICONS = {
   [FUND_TYPES.OPERATING]: '⚙️',
   [FUND_TYPES.INVENTORY]: '📦',
   [FUND_TYPES.PROFIT]: '💹',
-  [FUND_TYPES.CASH_DRAWER]: '🗄️'
+  [FUND_TYPES.CASH_DRAWER]: '🗄️',
+  [FUND_TYPES.WAITER_FLOAT]: '👤',
+  [FUND_TYPES.OWNER]: '👑',
+  [FUND_TYPES.SUPPLIER]: '🏭',
+  [FUND_TYPES.CUSTOMER]: '🛒',
+  [FUND_TYPES.CASH_SHORTAGE]: '📉',
+  [FUND_TYPES.CASH_OVERAGE]: '📈'
 }
 
 // Fund type colors (Tailwind classes)
@@ -29,7 +125,13 @@ export const FUND_TYPE_COLORS = {
   [FUND_TYPES.OPERATING]: 'blue',
   [FUND_TYPES.INVENTORY]: 'green',
   [FUND_TYPES.PROFIT]: 'yellow',
-  [FUND_TYPES.CASH_DRAWER]: 'purple'
+  [FUND_TYPES.CASH_DRAWER]: 'purple',
+  [FUND_TYPES.WAITER_FLOAT]: 'orange',
+  [FUND_TYPES.OWNER]: 'rose',
+  [FUND_TYPES.SUPPLIER]: 'teal',
+  [FUND_TYPES.CUSTOMER]: 'cyan',
+  [FUND_TYPES.CASH_SHORTAGE]: 'red',
+  [FUND_TYPES.CASH_OVERAGE]: 'emerald'
 }
 
 // Source types
@@ -40,6 +142,7 @@ export const SOURCE_TYPES = {
   HANDOVER: 'handover',
   MANUAL: 'manual',
   FUND_TRANSFER: 'fund_transfer',
+  WAITER_START: 'waiter_start',
   ALL: 'all'
 }
 
@@ -51,6 +154,7 @@ export const SOURCE_TYPE_LABELS = {
   [SOURCE_TYPES.HANDOVER]: 'Bàn giao ca',
   [SOURCE_TYPES.MANUAL]: 'Thủ công',
   [SOURCE_TYPES.FUND_TRANSFER]: 'Chuyển quỹ',
+  [SOURCE_TYPES.WAITER_START]: 'Tiền đầu ca phục vụ',
   [SOURCE_TYPES.ALL]: 'Tất cả nguồn'
 }
 
@@ -61,7 +165,8 @@ export const SOURCE_TYPE_ICONS = {
   [SOURCE_TYPES.FACILITY]: '🏢',
   [SOURCE_TYPES.HANDOVER]: '🤝',
   [SOURCE_TYPES.MANUAL]: '✋',
-  [SOURCE_TYPES.FUND_TRANSFER]: '↔️'
+  [SOURCE_TYPES.FUND_TRANSFER]: '↔️',
+  [SOURCE_TYPES.WAITER_START]: '👤'
 }
 
 // Fund type filter options
@@ -70,7 +175,8 @@ export const FUND_TYPE_FILTER_OPTIONS = [
   { value: FUND_TYPES.OPERATING, label: FUND_TYPE_LABELS[FUND_TYPES.OPERATING] },
   { value: FUND_TYPES.INVENTORY, label: FUND_TYPE_LABELS[FUND_TYPES.INVENTORY] },
   { value: FUND_TYPES.PROFIT, label: FUND_TYPE_LABELS[FUND_TYPES.PROFIT] },
-  { value: FUND_TYPES.CASH_DRAWER, label: FUND_TYPE_LABELS[FUND_TYPES.CASH_DRAWER] }
+  { value: FUND_TYPES.CASH_DRAWER, label: FUND_TYPE_LABELS[FUND_TYPES.CASH_DRAWER] },
+  { value: FUND_TYPES.WAITER_FLOAT, label: FUND_TYPE_LABELS[FUND_TYPES.WAITER_FLOAT] }
 ]
 
 // Source type filter options
@@ -81,7 +187,8 @@ export const SOURCE_TYPE_FILTER_OPTIONS = [
   { value: SOURCE_TYPES.FACILITY, label: SOURCE_TYPE_LABELS[SOURCE_TYPES.FACILITY] },
   { value: SOURCE_TYPES.HANDOVER, label: SOURCE_TYPE_LABELS[SOURCE_TYPES.HANDOVER] },
   { value: SOURCE_TYPES.MANUAL, label: SOURCE_TYPE_LABELS[SOURCE_TYPES.MANUAL] },
-  { value: SOURCE_TYPES.FUND_TRANSFER, label: SOURCE_TYPE_LABELS[SOURCE_TYPES.FUND_TRANSFER] }
+  { value: SOURCE_TYPES.FUND_TRANSFER, label: SOURCE_TYPE_LABELS[SOURCE_TYPES.FUND_TRANSFER] },
+  { value: SOURCE_TYPES.WAITER_START, label: SOURCE_TYPE_LABELS[SOURCE_TYPES.WAITER_START] }
 ]
 
 // Helper functions

@@ -9,17 +9,18 @@ import (
 	"cafe-pos/backend/application/services"
 	"cafe-pos/backend/domain/fund"
 	"cafe-pos/backend/domain/user"
+	"cafe-pos/backend/infrastructure/mongodb"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type FundHandler struct {
-	fundService *services.FundService
+	journalService *services.JournalService
 }
 
-func NewFundHandler(fundService *services.FundService) *FundHandler {
-	return &FundHandler{fundService: fundService}
+func NewFundHandler(journalService *services.JournalService) *FundHandler {
+	return &FundHandler{journalService: journalService}
 }
 
 // getUserObjectID extracts user ObjectID from Gin context
@@ -64,26 +65,6 @@ func getUserInfo(c *gin.Context) (userObjID primitive.ObjectID, userName, userRo
 	return userObjID, userName, userRole, nil
 }
 
-// ─── Response types ───────────────────────────────────────────────────────────
-
-type BalanceResponse struct {
-	CurrentBalance *fund.FundBalance             `json:"current_balance"`
-	TodaySummary   *services.TodayBalanceSummary `json:"today_summary"`
-	LastUpdated    time.Time                     `json:"last_updated"`
-}
-
-type TransactionHistoryResponse struct {
-	Transactions []*services.TransactionHistoryItem `json:"transactions"`
-	Total        int64                              `json:"total"`
-	Limit        int                                `json:"limit"`
-	Offset       int                                `json:"offset"`
-}
-
-type TransactionResponse struct {
-	Transaction *fund.FundTransaction `json:"transaction"`
-	NewBalance  *fund.FundBalance     `json:"new_balance"`
-}
-
 // ─── Request types ────────────────────────────────────────────────────────────
 
 type DepositRequest struct {
@@ -110,116 +91,6 @@ type FundTransferRequest struct {
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
-// GetBalance handles GET /api/manager/fund/balance
-func (h *FundHandler) GetBalance(c *gin.Context) {
-	ctx := c.Request.Context()
-
-	currentBalance, err := h.fundService.CalculateCurrentBalance(ctx)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	todaySummary, err := h.fundService.CalculateTodayBalance(ctx)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, BalanceResponse{
-		CurrentBalance: currentBalance,
-		TodaySummary:   todaySummary,
-		LastUpdated:    time.Now(),
-	})
-}
-
-// GetAllFundBalances handles GET /api/manager/fund/balances
-func (h *FundHandler) GetAllFundBalances(c *gin.Context) {
-	ctx := c.Request.Context()
-
-	balances, err := h.fundService.GetAllFundBalances(ctx)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"balances":     balances,
-		"last_updated": time.Now(),
-	})
-}
-
-// GetTransactions handles GET /api/manager/fund/transactions
-func (h *FundHandler) GetTransactions(c *gin.Context) {
-	ctx := c.Request.Context()
-
-	var transactionType *string
-	if typeStr := c.Query("type"); typeStr != "" && typeStr != "all" {
-		transactionType = &typeStr
-	}
-
-	var moneyType *string
-	if mtStr := c.Query("money_type"); mtStr != "" && mtStr != "all" {
-		moneyType = &mtStr
-	}
-
-	var fundTypeFilter *string
-	if ftStr := c.Query("fund_type"); ftStr != "" && ftStr != "all" {
-		fundTypeFilter = &ftStr
-	}
-
-	var sourceTypeFilter *string
-	if stStr := c.Query("source_type"); stStr != "" && stStr != "all" {
-		sourceTypeFilter = &stStr
-	}
-
-	fromDate := time.Now().Truncate(24 * time.Hour)
-	if fromStr := c.Query("from_date"); fromStr != "" {
-		if parsed, err := time.Parse(time.RFC3339, fromStr); err == nil {
-			fromDate = parsed
-		}
-	}
-
-	toDate := time.Now()
-	if toStr := c.Query("to_date"); toStr != "" {
-		if parsed, err := time.Parse(time.RFC3339, toStr); err == nil {
-			toDate = parsed
-		}
-	}
-
-	limit := 50
-	if limitStr := c.Query("limit"); limitStr != "" {
-		if parsed, err := strconv.Atoi(limitStr); err == nil && parsed > 0 && parsed <= 200 {
-			limit = parsed
-		}
-	}
-
-	offset := 0
-	if offsetStr := c.Query("offset"); offsetStr != "" {
-		if parsed, err := strconv.Atoi(offsetStr); err == nil && parsed >= 0 {
-			offset = parsed
-		}
-	}
-
-	transactions, total, err := h.fundService.GetAggregatedTransactionHistory(
-		ctx, fromDate, toDate,
-		transactionType, moneyType,
-		fundTypeFilter, sourceTypeFilter,
-		limit, offset,
-	)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, TransactionHistoryResponse{
-		Transactions: transactions,
-		Total:        total,
-		Limit:        limit,
-		Offset:       offset,
-	})
-}
-
 // Deposit handles POST /api/manager/fund/deposit
 func (h *FundHandler) Deposit(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -237,23 +108,24 @@ func (h *FundHandler) Deposit(c *gin.Context) {
 	}
 
 	ft := fund.FundType(req.FundType)
-	transaction, newBalance, err := h.fundService.CreateDeposit(
+	if ft == "" {
+		ft = fund.FundTypeOperating
+	}
+
+	entry, err := h.journalService.RecordManagerDeposit(
 		ctx,
+		ft,
 		req.CashAmount, req.TransferAmount,
 		req.Reason,
 		userObjID, userName, userRole,
-		ft,
 	)
 	if err != nil {
 		fmt.Printf("ERROR in Deposit handler: %v\n", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, TransactionResponse{
-		Transaction: transaction,
-		NewBalance:  newBalance,
-	})
+	c.JSON(http.StatusCreated, entry)
 }
 
 // Withdraw handles POST /api/manager/fund/withdraw
@@ -273,22 +145,23 @@ func (h *FundHandler) Withdraw(c *gin.Context) {
 	}
 
 	ft := fund.FundType(req.FundType)
-	transaction, newBalance, err := h.fundService.CreateWithdrawal(
+	if ft == "" {
+		ft = fund.FundTypeOperating
+	}
+
+	entry, err := h.journalService.RecordManagerWithdrawal(
 		ctx,
+		ft,
 		req.CashAmount, req.TransferAmount,
 		req.Reason,
 		userObjID, userName, userRole,
-		ft,
 	)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, TransactionResponse{
-		Transaction: transaction,
-		NewBalance:  newBalance,
-	})
+	c.JSON(http.StatusCreated, entry)
 }
 
 // Transfer handles POST /api/manager/fund/transfer
@@ -312,44 +185,104 @@ func (h *FundHandler) Transfer(c *gin.Context) {
 		return
 	}
 
-	result, err := h.fundService.TransferBetweenFunds(ctx, services.FundTransferRequest{
-		FromFundType:    fund.FundType(req.FromFundType),
-		ToFundType:      fund.FundType(req.ToFundType),
-		CashAmount:      req.CashAmount,
-		TransferAmount:  req.TransferAmount,
-		Reason:          req.Reason,
-		PerformedBy:     userObjID,
-		PerformedByName: userName,
-		PerformedByRole: userRole,
-	})
+	entry, err := h.journalService.RecordFundTransfer(
+		ctx,
+		fund.FundType(req.FromFundType),
+		fund.FundType(req.ToFundType),
+		req.CashAmount,
+		req.TransferAmount,
+		req.Reason,
+		userObjID, userName, userRole,
+	)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, result)
+	c.JSON(http.StatusCreated, entry)
 }
 
-// GetTransactionDetail handles GET /api/manager/fund/transactions/:id
-func (h *FundHandler) GetTransactionDetail(c *gin.Context) {
-	ctx := c.Request.Context()
+// ─── Journal / Double-Entry Endpoints ─────────────────────────────────────────
 
-	id, err := primitive.ObjectIDFromHex(c.Param("id"))
+// GetJournalFundBalances handles GET /api/manager/fund/journal-balances
+func (h *FundHandler) GetJournalFundBalances(c *gin.Context) {
+	ctx := c.Request.Context()
+	balances, err := h.journalService.GetAllFundBalances(ctx)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid transaction ID"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	c.JSON(http.StatusOK, balances)
+}
 
-	transaction, err := h.fundService.GetTransactionDetail(ctx, id)
+// GetJournalEntries handles GET /api/manager/fund/journal
+// Query params: fund_type, event_type, from_date, to_date, limit, offset
+func (h *FundHandler) GetJournalEntries(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	filter := mongodb.JournalFilter{
+		Limit:  20,
+		Offset: 0,
+	}
+
+	if v := c.Query("fund_type"); v != "" {
+		ft := fund.FundType(v)
+		filter.FundType = &ft
+	}
+	if v := c.Query("event_type"); v != "" {
+		et := fund.JournalEventType(v)
+		filter.EventType = &et
+	}
+	if v := c.Query("from_date"); v != "" {
+		if t, err := time.Parse(time.RFC3339, v); err == nil {
+			filter.FromDate = &t
+		}
+	}
+	if v := c.Query("to_date"); v != "" {
+		if t, err := time.Parse(time.RFC3339, v); err == nil {
+			filter.ToDate = &t
+		}
+	}
+	if v := c.Query("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			filter.Limit = n
+		}
+	}
+	if v := c.Query("offset"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			filter.Offset = n
+		}
+	}
+
+	entries, total, err := h.journalService.ListEntries(ctx, filter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	if transaction == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
+	c.JSON(http.StatusOK, gin.H{
+		"entries": entries,
+		"total":   total,
+		"limit":   filter.Limit,
+		"offset":  filter.Offset,
+	})
+}
+
+// GetJournalEntry handles GET /api/manager/fund/journal/:id
+func (h *FundHandler) GetJournalEntry(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	id, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid journal entry ID"})
 		return
 	}
 
-	c.JSON(http.StatusOK, transaction)
+	entry, err := h.journalService.GetEntry(ctx, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "journal entry not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, entry)
 }

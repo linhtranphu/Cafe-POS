@@ -134,53 +134,35 @@
           <h2 class="text-lg font-bold text-gray-800">📋 Danh sách chi phí</h2>
         </div>
 
-        <div v-if="filteredExpenses.length === 0" class="text-center py-16">
+        <div v-if="filteredEntries.length === 0" class="text-center py-16">
           <div class="text-6xl mb-4">📭</div>
           <p class="text-gray-500">Không có chi phí nào</p>
         </div>
 
         <div v-else class="space-y-3">
-          <div v-for="expense in filteredExpenses" :key="expense.id"
+          <div v-for="entry in filteredEntries" :key="entry.id"
             class="bg-white rounded-2xl p-4 shadow-sm border-l-4 border-orange-500">
 
-            <!-- Expense Header -->
+            <!-- Entry Header -->
             <div class="flex justify-between items-start mb-2">
               <div class="flex-1">
-                <h3 class="font-bold text-base">{{ expense.description }}</h3>
-                <p class="text-sm text-gray-600">{{ getCategoryName(expense.category_id) }}</p>
+                <h3 class="font-bold text-base">{{ getEntryDescription(entry) }}</h3>
+                <p class="text-xs text-gray-500">{{ formatDate(entry.timestamp) }}</p>
               </div>
               <div class="text-right">
-                <div class="text-lg font-bold text-red-600">-{{ formatPrice(expense.amount) }}</div>
-                <div class="text-xs text-gray-500">{{ formatDate(expense.date) }}</div>
+                <div class="text-lg font-bold text-red-600">-{{ formatPrice(getEntryAmount(entry)) }}</div>
+                <div class="text-xs text-gray-500">{{ getEntryMoneyType(entry) === 'transfer' ? '💳 CK' : '💵 Tiền mặt' }}</div>
               </div>
             </div>
 
             <!-- Badges -->
-            <div class="flex flex-wrap gap-1 mb-2">
-              <span v-if="expense.paid_from_fund"
-                class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[10px] font-medium">
+            <div class="flex flex-wrap gap-1">
+              <span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[10px] font-medium">
                 ⚡ Chi từ quỹ vận hành
               </span>
               <span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-[10px]">
-                👤 {{ expense.created_by || 'Hệ thống' }}
+                👤 {{ entry.performed_by_name || 'Hệ thống' }}
               </span>
-              <span v-if="expense.vendor" class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px]">
-                🏪 {{ expense.vendor }}
-              </span>
-            </div>
-
-            <!-- Notes -->
-            <div v-if="expense.notes" class="p-2 bg-gray-50 rounded-lg text-sm text-gray-600 border-l-2 border-gray-300 mb-2">
-              <span class="text-xs font-semibold text-gray-500">Ghi chú:</span>
-              <p>{{ expense.notes }}</p>
-            </div>
-
-            <!-- Quick Actions -->
-            <div class="flex gap-2 pt-2 border-t">
-              <button @click="deleteExpense(expense)"
-                class="flex-1 bg-red-50 text-red-600 py-2 rounded-lg text-sm font-medium active:bg-red-100 border border-red-200">
-                🗑️ Xóa
-              </button>
             </div>
           </div>
         </div>
@@ -318,7 +300,6 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useExpenseStore } from '../stores/expense'
 import BottomNav from '../components/BottomNav.vue'
 import PullToRefresh from '../components/PullToRefresh.vue'
 import { usePullToRefresh } from '../composables/usePullToRefresh'
@@ -326,8 +307,7 @@ import { formatDate, formatPrice } from '../utils/formatters'
 import { fundExpenseService } from '../services/fundExpenseService'
 import { expenseService } from '../services/expense'
 import { getAllBalances } from '../services/fund'
-
-const expenseStore = useExpenseStore()
+import { getJournalEntries } from '../services/journal'
 
 const searchQuery = ref('')
 const showCreateForm = ref(false)
@@ -342,6 +322,9 @@ const operatingTransferBalance = ref(null)
 // Operating expense categories — stored in backend with type="operating"
 const categories = ref([])
 
+// Journal entries for event_type=expense (source of truth)
+const journalEntries = ref([])
+
 const formData = ref({
   description: '',
   category_id: '',
@@ -352,45 +335,46 @@ const formData = ref({
   notes: ''
 })
 
-const expenses = computed(() => expenseStore.expenses || [])
+// Get deducted amount from journal entry (CREDIT operating line)
+const getEntryAmount = (entry) => {
+  const creditLine = (entry.lines || []).find(l => l.direction === 'credit' && l.fund_type === 'operating')
+  return creditLine?.total_amount || 0
+}
 
-// Show expenses deducted from operating fund (exclude ingredient restocks which use inventory fund)
-const filteredExpenses = computed(() => {
-  let filtered = expenses.value.filter(e =>
-    e.paid_from_fund === true &&
-    e.source_type !== 'ingredient'
-  )
+const getEntryMoneyType = (entry) => {
+  const creditLine = (entry.lines || []).find(l => l.direction === 'credit' && l.fund_type === 'operating')
+  if (!creditLine) return 'cash'
+  return creditLine.transfer_amount > 0 ? 'transfer' : 'cash'
+}
 
+const getEntryDescription = (entry) => {
+  return entry.description?.replace(/^Chi tiêu: /, '') || entry.description || ''
+}
+
+const filteredEntries = computed(() => {
+  let filtered = journalEntries.value
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     filtered = filtered.filter(e =>
       e.description?.toLowerCase().includes(query) ||
-      e.vendor?.toLowerCase().includes(query) ||
-      getCategoryName(e.category_id).toLowerCase().includes(query)
+      e.performed_by_name?.toLowerCase().includes(query)
     )
   }
-
-  return [...filtered].sort((a, b) => {
-    const dateA = new Date(a.date || a.created_at || 0)
-    const dateB = new Date(b.date || b.created_at || 0)
-    return dateB - dateA
-  })
+  return [...filtered].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
 })
 
 const totalThisMonth = computed(() => {
   const now = new Date()
-  return filteredExpenses.value
+  return journalEntries.value
     .filter(e => {
-      const d = new Date(e.date)
+      const d = new Date(e.timestamp)
       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
     })
-    .reduce((sum, e) => sum + e.amount, 0)
+    .reduce((sum, e) => sum + getEntryAmount(e), 0)
 })
 
 const totalAllTime = computed(() => {
-  return expenses.value
-    .filter(e => e.paid_from_fund === true && e.source_type !== 'ingredient')
-    .reduce((sum, e) => sum + e.amount, 0)
+  return journalEntries.value.reduce((sum, e) => sum + getEntryAmount(e), 0)
 })
 
 const currentTypeBalance = computed(() => {
@@ -409,13 +393,9 @@ const formatCompact = (value) => {
   return thousands % 1 === 0 ? `${thousands}k` : `${thousands.toFixed(1)}k`
 }
 
-const getCategoryName = (categoryId) => {
-  const category = categories.value.find(c => c.id === categoryId)
-  return category ? category.name : categoryId || 'Không xác định'
-}
-
 const getCategoryCount = (categoryId) => {
-  return expenses.value.filter(e => e.category_id === categoryId && e.paid_from_fund).length
+  // count by matching description patterns since category isn't stored in journal
+  return journalEntries.value.filter(e => e.category_id === categoryId).length
 }
 
 const fetchFundBalance = async () => {
@@ -450,6 +430,16 @@ const openCreateModal = async () => {
   await fetchFundBalance()
 }
 
+const fetchJournalEntries = async () => {
+  try {
+    const res = await getJournalEntries({ event_type: 'expense', limit: 200 })
+    journalEntries.value = res.entries || res || []
+  } catch (error) {
+    console.error('Error fetching journal entries:', error)
+    journalEntries.value = []
+  }
+}
+
 const saveExpense = async () => {
   if (!formData.value.description?.trim()) {
     alert('Vui lòng nhập mô tả')
@@ -477,8 +467,7 @@ const saveExpense = async () => {
     })
     alert('Thêm chi phí vận hành thành công')
     showCreateForm.value = false
-    await expenseStore.fetchExpenses()
-    await fetchFundBalance()
+    await Promise.all([fetchJournalEntries(), fetchFundBalance()])
   } catch (error) {
     console.error('Error saving expense:', error)
     alert(error.message || 'Có lỗi xảy ra')
@@ -487,24 +476,9 @@ const saveExpense = async () => {
   }
 }
 
-const deleteExpense = async (expense) => {
-  if (expense.paid_from_fund) {
-    alert('⚠️ Chi phí đã chi từ quỹ không thể xóa vì đã ảnh hưởng đến số dư quỹ.')
-    return
-  }
-  if (confirm(`Bạn có chắc muốn xóa chi phí "${expense.description}"?`)) {
-    try {
-      await expenseStore.deleteExpense(expense.id)
-    } catch (error) {
-      console.error('Error deleting expense:', error)
-      alert('Có lỗi xảy ra khi xóa chi phí')
-    }
-  }
-}
-
 const fetchCategories = async () => {
   try {
-    categories.value = await expenseService.getOperatingCategories()
+    categories.value = await expenseService.getOperatingCategories() || []
   } catch (error) {
     console.error('Error fetching operating categories:', error)
   }
@@ -524,7 +498,7 @@ const addCategory = async () => {
 }
 
 const deleteCategory = async (categoryId) => {
-  const hasExpenses = expenses.value.some(e => e.category_id === categoryId && e.paid_from_fund)
+  const hasExpenses = journalEntries.value.some(e => e.category_id === categoryId)
   if (hasExpenses) {
     alert('Không thể xóa danh mục đã có chi phí!')
     return
@@ -542,7 +516,7 @@ const deleteCategory = async (categoryId) => {
 
 const refreshData = async () => {
   await Promise.all([
-    expenseStore.fetchExpenses(),
+    fetchJournalEntries(),
     fetchCategories(),
     fetchFundBalance()
   ])

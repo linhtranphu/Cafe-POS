@@ -3,9 +3,11 @@ package services
 import (
 	"context"
 	"errors"
+	"log"
 	"time"
 	"cafe-pos/backend/domain"
 	"cafe-pos/backend/domain/order"
+	"cafe-pos/backend/infrastructure/mongodb"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -27,17 +29,23 @@ type ShiftService struct {
 	shiftRepo           ShiftRepository
 	orderRepo           OrderRepository
 	stateMachineManager *domain.StateMachineManager
+	journalService      *JournalService
+	cashierShiftRepo    *mongodb.CashierShiftRepository
 }
 
 func NewShiftService(
 	shiftRepo ShiftRepository,
 	orderRepo OrderRepository,
 	stateMachineManager *domain.StateMachineManager,
+	journalService *JournalService,
+	cashierShiftRepo *mongodb.CashierShiftRepository,
 ) *ShiftService {
 	return &ShiftService{
 		shiftRepo:           shiftRepo,
 		orderRepo:           orderRepo,
 		stateMachineManager: stateMachineManager,
+		journalService:      journalService,
+		cashierShiftRepo:    cashierShiftRepo,
 	}
 }
 
@@ -81,6 +89,34 @@ func (s *ShiftService) StartShift(ctx context.Context, req *order.StartShiftRequ
 	if err := s.shiftRepo.Create(ctx, shift); err != nil {
 		return nil, err
 	}
+
+	// Waiter phải có cashier ca mở trước khi mở ca
+	if roleType == order.RoleWaiter && s.cashierShiftRepo != nil {
+		openCashierShifts, err := s.cashierShiftRepo.FindOpen(ctx)
+		if err != nil {
+			return nil, errors.New("không thể kiểm tra ca thu ngân")
+		}
+		if len(openCashierShifts) == 0 {
+			return nil, errors.New("thu ngân phải mở ca trước khi phục vụ mở ca")
+		}
+
+		cashierShift := openCashierShifts[0]
+
+		// Ghi nhận tiền đầu ca: double-entry journal cash_drawer → waiter_float
+		if req.StartCash > 0 && s.journalService != nil {
+			if _, err := s.journalService.RecordWaiterShiftStart(ctx, req.StartCash, shift.ID, userOID, userName); err != nil {
+				log.Printf("⚠️ [WAITER START FLOAT] Failed to record journal entry: %v (non-fatal)", err)
+			} else {
+				cashierShift.AddDistributedCash(req.StartCash)
+				if saveErr := s.cashierShiftRepo.Save(ctx, cashierShift); saveErr != nil {
+					log.Printf("⚠️ [WAITER START FLOAT] Failed to update cashier distributed cash: %v (non-fatal)", saveErr)
+				} else {
+					log.Printf("✅ [WAITER START FLOAT] Journal entry recorded: cash_drawer → waiter_float %.0f for %s", req.StartCash, userName)
+				}
+			}
+		}
+	}
+
 	return shift, nil
 }
 

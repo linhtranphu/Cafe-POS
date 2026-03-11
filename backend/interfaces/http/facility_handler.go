@@ -103,9 +103,9 @@ func (h *FacilityHandler) CreateFacility(c *gin.Context) {
 		_ = h.service.CreateFacilityHistory(c.Request.Context(), f.ID, "created", "Tạo mới tài sản (trả từ quỹ): "+f.Name, nil, result.Facility, userID, username)
 
 		c.JSON(http.StatusCreated, gin.H{
-			"facility":         result.Facility,
-			"expense":          result.Expense,
-			"fund_transaction": result.FundTransaction,
+			"facility":      result.Facility,
+			"expense":       result.Expense,
+			"journal_entry": result.JournalEntry,
 		})
 		return
 	}

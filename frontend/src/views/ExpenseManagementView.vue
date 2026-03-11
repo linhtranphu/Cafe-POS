@@ -703,7 +703,7 @@ const loadFundBalance = async () => {
     loadingBalance.value = true
     fundBalanceError.value = false
     const balance = await getBalance()
-    fundBalance.value = balance.current_balance
+    fundBalance.value = balance
   } catch (error) {
     console.error('Error loading fund balance:', error)
     fundBalance.value = null
