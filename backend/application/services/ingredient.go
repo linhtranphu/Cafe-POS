@@ -494,6 +494,88 @@ func (s *IngredientService) AdjustStock(ctx context.Context, id primitive.Object
 	return item, nil
 }
 
+// DeductStock deducts ingredient quantity when an order is PAID, and records StockHistory
+func (s *IngredientService) DeductStock(
+	ctx context.Context,
+	ingredientID primitive.ObjectID,
+	quantity float64,
+	unit ingredient.UnitType,
+	orderID primitive.ObjectID,
+	orderNumber string,
+) error {
+	ing, err := s.ingredientRepo.FindByID(ctx, ingredientID)
+	if err != nil {
+		return err
+	}
+
+	convRate := ingredient.GetConversionRate(ingredient.UnitType(ing.Unit), unit)
+	qtyInStock := quantity * convRate
+
+	beforeQty := ing.Quantity
+	ing.Quantity -= qtyInStock
+	if ing.Quantity < 0 {
+		ing.Quantity = 0
+	}
+	afterQty := ing.Quantity
+
+	if err := s.ingredientRepo.Update(ctx, ingredientID, ing); err != nil {
+		return err
+	}
+
+	history := &ingredient.StockHistory{
+		IngredientID: ingredientID,
+		Type:         ingredient.TransactionOrder,
+		Quantity:     -qtyInStock,
+		BeforeQty:    beforeQty,
+		AfterQty:     afterQty,
+		Reason:       "Order #" + orderNumber,
+		CostPerUnit:  ing.CostPerUnit,
+		TotalCost:    -qtyInStock * ing.CostPerUnit,
+	}
+	s.stockHistoryRepo.Create(ctx, history)
+
+	return nil
+}
+
+// RestoreStock restores ingredient quantity (rollback of a deduction)
+func (s *IngredientService) RestoreStock(
+	ctx context.Context,
+	ingredientID primitive.ObjectID,
+	quantity float64,
+	unit ingredient.UnitType,
+	orderID primitive.ObjectID,
+) error {
+	ing, err := s.ingredientRepo.FindByID(ctx, ingredientID)
+	if err != nil {
+		return err
+	}
+
+	convRate := ingredient.GetConversionRate(ingredient.UnitType(ing.Unit), unit)
+	qtyInStock := quantity * convRate
+
+	beforeQty := ing.Quantity
+	ing.Quantity += qtyInStock
+	afterQty := ing.Quantity
+
+	if err := s.ingredientRepo.Update(ctx, ingredientID, ing); err != nil {
+		return err
+	}
+
+	history := &ingredient.StockHistory{
+		IngredientID: ingredientID,
+		Type:         ingredient.TransactionAdjustment,
+		Quantity:     qtyInStock,
+		BeforeQty:    beforeQty,
+		AfterQty:     afterQty,
+		Reason:       "Hoàn trả tồn kho (rollback order)",
+		CostPerUnit:  ing.CostPerUnit,
+		TotalCost:    qtyInStock * ing.CostPerUnit,
+	}
+	s.stockHistoryRepo.Create(ctx, history)
+
+	return nil
+}
+
 func (s *IngredientService) GetLowStockIngredients(ctx context.Context) ([]*ingredient.Ingredient, error) {
 	return s.ingredientRepo.FindLowStock(ctx)
 }

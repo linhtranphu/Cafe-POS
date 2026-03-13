@@ -312,10 +312,11 @@ func (s *CashHandoverService) ConfirmHandover(
 			if err := s.updateBalances(sessCtx, h); err != nil {
 				return nil, err
 			}
-			// Record double-entry: DEBIT cash_drawer / CREDIT waiter_float
+			// Record double-entry with shortage/overage handling
 			if _, err := s.journalService.RecordWaiterHandover(
 				sessCtx,
 				h.CashActualAmount, h.TransferActualAmount,
+				h.CashDeclaredAmount, h.TransferDeclaredAmount,
 				handoverID,
 				h.WaiterID, h.WaiterName,
 			); err != nil {
@@ -392,11 +393,28 @@ func (s *CashHandoverService) updateBalances(ctx context.Context, h *handover.Ca
 		waiterShift.TotalOrders = len(orders)
 		waiterShift.EndedAt = &now
 
-		// Lock completed orders
+		// Xử lý đơn hàng khi kết thúc ca:
+		// - CREATED (chưa thanh toán): huỷ rồi khoá
+		// - PAID và các trạng thái sau (đã thanh toán): khoá trực tiếp
 		for _, o := range orders {
-			if o.Status == order.StatusServed || o.Status == order.StatusCancelled {
+			switch o.Status {
+			case order.StatusCreated:
+				o.Status = order.StatusCancelled
+				o.CancelReason = "Ca làm việc đã kết thúc"
+				o.UpdatedAt = now
+				if err := s.orderRepo.Update(ctx, o.ID, o); err != nil {
+					return err
+				}
 				o.Status = order.StatusLocked
 				o.LockedAt = &now
+				o.UpdatedAt = now
+				if err := s.orderRepo.Update(ctx, o.ID, o); err != nil {
+					return err
+				}
+			case order.StatusPaid, order.StatusQueued, order.StatusInProgress, order.StatusReady, order.StatusServed, order.StatusCancelled:
+				o.Status = order.StatusLocked
+				o.LockedAt = &now
+				o.UpdatedAt = now
 				if err := s.orderRepo.Update(ctx, o.ID, o); err != nil {
 					return err
 				}

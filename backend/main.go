@@ -175,7 +175,7 @@ func main() {
 	cashierShiftService := services.NewCashierShiftService(cashierShiftRepo, shiftRepo, smManager, journalService, client)
 	cashReconciliationService := services.NewCashReconciliationService(cashReconciliationRepo, shiftRepo, orderRepo)
 	paymentOversightService := services.NewPaymentOversightService(orderRepo, paymentDiscrepancyRepo, paymentAuditRepo)
-	cashierReportService := services.NewCashierReportService(orderRepo, cashReconciliationRepo, shiftRepo, paymentAuditRepo)
+	cashierReportService := services.NewCashierReportService(orderRepo, cashReconciliationRepo, shiftRepo, paymentAuditRepo, cashHandoverRepo)
 	// Handover service
 	cashHandoverService := services.NewCashHandoverService(cashHandoverRepo, cashDiscrepancyRepo, shiftRepo, cashierShiftRepo, orderRepo, client, journalService)
 
@@ -186,6 +186,8 @@ func main() {
 	// Wire up batch repository for batch ingredient cost calculation
 	batchRecordCostAdapter := services.NewBatchRecordCostAdapter(batchRecordRepo)
 	costCalculatorService.SetBatchRecordRepository(batchRecordCostAdapter)
+	// Wire up batch definition repository for cost interpolation when no batch records exist
+	costCalculatorService.SetBatchDefinitionRepository(batchDefinitionRepo)
 	profitAnalyzerService := services.NewProfitAnalyzerService(menuRepo, orderItemRepo, shopSettingsRepo, operatingExpenseRepo)
 	costRecalculationService := services.NewCostRecalculationService(costCalculatorService, menuRepo, 4, 1000) // 4 workers, queue size 1000
 	operatingExpenseService := services.NewOperatingExpenseService(operatingExpenseRepo)
@@ -526,6 +528,7 @@ func main() {
 				waiter.POST("/orders/:id/send", orderHandler.SendToBar)
 				waiter.POST("/orders/:id/serve", orderHandler.ServeOrder)
 				waiter.POST("/orders/:id/cancel", orderHandler.CancelOrder)
+				waiter.POST("/orders/:id/print-temp-bill", orderHandler.PrintTemporaryBill)
 				waiter.GET("/orders", orderHandler.GetMyOrders)
 				waiter.GET("/orders/:id", orderHandler.GetOrder)
 				
@@ -787,6 +790,8 @@ func main() {
 				if htmlTemplateHandlerBridge != nil {
 					manager.GET("/html-templates/bill", htmlTemplateHandlerBridge.GetHTMLTemplate)
 					manager.PUT("/html-templates/bill", htmlTemplateHandlerBridge.UpdateHTMLTemplate)
+					manager.GET("/html-templates/temp-bill", htmlTemplateHandlerBridge.GetTempBillTemplate)
+					manager.PUT("/html-templates/temp-bill", htmlTemplateHandlerBridge.UpdateTempBillTemplate)
 					manager.POST("/html-templates/test-print", htmlTemplateHandlerBridge.TestPrintHTMLTemplate)
 					manager.POST("/html-templates/preview", htmlTemplateHandlerBridge.PreviewHTMLTemplate)
 					log.Println("✅ HTML template routes registered (using print bridge from settings)")

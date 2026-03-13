@@ -30,6 +30,7 @@ type OrderService struct {
 	menuRepo            MenuRepository
 	stateMachineManager *domain.StateMachineManager
 	batchUsageService   *BatchUsageService
+	ingredientService   *IngredientService
 	printService        PrintService              // Optional: for auto-printing
 	settingsRepo        ShopSettingsRepository    // Optional: for auto-print setting
 }
@@ -49,6 +50,11 @@ func NewOrderService(
 		batchUsageService:   batchUsageService,
 		printService:        nil, // Will be set via SetPrintService
 	}
+}
+
+// SetIngredientService sets the ingredient service for raw stock deduction
+func (s *OrderService) SetIngredientService(ingredientService *IngredientService) {
+	s.ingredientService = ingredientService
 }
 
 // SetPrintService sets the print service for auto-printing (optional)
@@ -144,34 +150,9 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *order.CreateOrderRe
 	}
 
 	o.CalculateTotal()
-	
-	// Create order first
+
 	if err := s.orderRepo.Create(ctx, o); err != nil {
 		return nil, err
-	}
-
-	// Deduct batch ingredients after order is created
-	// This happens after order creation so we have an order ID for logging
-	if s.batchUsageService != nil {
-		batchCost, err := s.deductBatchIngredients(ctx, o)
-		if err != nil {
-			// Rollback: restore batch quantities and delete the order
-			_ = s.batchUsageService.RollbackBatchUsage(ctx, o.ID)
-			_ = s.orderRepo.Delete(ctx, o.ID)
-			return nil, fmt.Errorf("failed to deduct batch ingredients: %w", err)
-		}
-		
-		// Store batch cost information in order note for tracking
-		// In a production system, you might want to add a dedicated field for this
-		if batchCost > 0 {
-			if o.Note != "" {
-				o.Note += fmt.Sprintf(" [Batch Cost: %.2f VND]", batchCost)
-			} else {
-				o.Note = fmt.Sprintf("[Batch Cost: %.2f VND]", batchCost)
-			}
-			// Update order with batch cost info
-			_ = s.orderRepo.Update(ctx, o.ID, o)
-		}
 	}
 
 	return o, nil
@@ -204,6 +185,12 @@ func (s *OrderService) CollectPayment(ctx context.Context, id primitive.ObjectID
 	if o.IsFullyPaid() {
 		o.Status = order.StatusPaid
 		o.PaidAt = &now
+
+		// Deduct inventory when order is PAID
+		if err := s.deductIngredients(ctx, o); err != nil {
+			log.Printf("WARNING: inventory deduction failed for paid order %s: %v", o.OrderNumber, err)
+			// Do not rollback payment — log only
+		}
 	}
 
 	// Update shift revenue based on payment method
@@ -649,61 +636,51 @@ func (s *OrderService) GetOrder(ctx context.Context, id primitive.ObjectID) (*or
 	return s.orderRepo.FindByID(ctx, id)
 }
 
-// deductBatchIngredients deducts batch ingredients for all items in an order
-// Returns the total batch cost used
-func (s *OrderService) deductBatchIngredients(ctx context.Context, o *order.Order) (float64, error) {
-	totalBatchCost := 0.0
-	
+// deductIngredients deducts inventory for all ingredients with DeductInventory=true when order is PAID.
+// Batch ingredients are deducted via BatchUsageService; raw ingredients via IngredientService.DeductStock.
+func (s *OrderService) deductIngredients(ctx context.Context, o *order.Order) error {
 	for _, item := range o.Items {
-		// Get menu item to check ingredients
 		menuItem, err := s.menuRepo.FindByID(ctx, item.MenuItemID)
 		if err != nil {
-			return 0, fmt.Errorf("failed to fetch menu item %s: %w", item.MenuItemID.Hex(), err)
+			log.Printf("WARNING: failed to fetch menu item %s for deduction: %v", item.MenuItemID.Hex(), err)
+			continue
 		}
 
-		// Get ingredients for this item (considering variants)
 		ingredients := menuItem.GetIngredients(item.VariantID)
 
-		// Process each ingredient
 		for _, ing := range ingredients {
-			// Only process batch ingredients
-			if !ing.IsBatchIngredient() {
+			if !ing.DeductInventory {
 				continue
 			}
 
-			// Skip if no batch ID
-			if ing.BatchID == nil {
-				continue
-			}
+			qty := ing.Quantity * float64(item.Quantity)
 
-			// Calculate total quantity needed (ingredient quantity * order item quantity)
-			quantityNeeded := ing.Quantity * float64(item.Quantity)
+			switch {
+			case ing.IsBatchIngredient() && ing.BatchID != nil && s.batchUsageService != nil:
+				req := UseBatchRequest{
+					BatchDefinitionID: *ing.BatchID,
+					QuantityNeeded:    qty,
+					Unit:              string(ing.Unit),
+					OrderID:           o.ID,
+					MenuItemID:        item.MenuItemID,
+					MenuItemName:      item.Name,
+				}
+				result, err := s.batchUsageService.UseBatch(ctx, req)
+				if err != nil {
+					log.Printf("WARNING: failed to deduct batch ingredient %s for order %s: %v", ing.Name, o.OrderNumber, err)
+				} else if !result.Success {
+					log.Printf("WARNING: insufficient batch %s for order %s: %s", ing.Name, o.OrderNumber, result.Message)
+				}
 
-			// Deduct batch using BatchUsageService
-			req := UseBatchRequest{
-				BatchDefinitionID: *ing.BatchID,
-				QuantityNeeded:    quantityNeeded,
-				Unit:              string(ing.Unit), // Convert UnitType to string
-				OrderID:           o.ID,
-				MenuItemID:        item.MenuItemID,
-				MenuItemName:      item.Name,
+			case ing.IsRawIngredient() && ing.IngredientID != nil && s.ingredientService != nil:
+				if err := s.ingredientService.DeductStock(ctx, *ing.IngredientID, qty, ing.Unit, o.ID, o.OrderNumber); err != nil {
+					log.Printf("WARNING: failed to deduct raw ingredient %s for order %s: %v", ing.Name, o.OrderNumber, err)
+				}
 			}
-
-			result, err := s.batchUsageService.UseBatch(ctx, req)
-			if err != nil {
-				return 0, fmt.Errorf("failed to use batch for ingredient %s: %w", ing.Name, err)
-			}
-
-			if !result.Success {
-				return 0, fmt.Errorf("insufficient batch %s: %s", ing.Name, result.Message)
-			}
-			
-			// Accumulate batch cost
-			totalBatchCost += result.TotalCost
 		}
 	}
 
-	return totalBatchCost, nil
+	return nil
 }
 
 // PrintTemporaryBill - Mark order as bill printed (for temporary bill printing)

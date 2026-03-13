@@ -28,10 +28,16 @@ type Ingredient struct {
 	Name           string               `bson:"name" json:"name"`
 	Quantity       float64              `bson:"quantity" json:"quantity"`
 	Unit           ingredient.UnitType  `bson:"unit" json:"unit"`
-	
-	// Batch support - NEW
+
+	// Batch support
 	IngredientType string               `bson:"ingredient_type" json:"ingredient_type"` // "raw" or "batch"
 	BatchID        *primitive.ObjectID  `bson:"batch_id,omitempty" json:"batch_id,omitempty"` // Reference to batch_definition_id when type is "batch"
+	IngredientID   *primitive.ObjectID  `bson:"ingredient_id,omitempty" json:"ingredient_id,omitempty"` // Reference to ingredient master when type is "raw"
+
+	// Inventory deduction control:
+	// true  → deduct inventory when order is PAID (default for existing batch ingredients)
+	// false → used for cost calculation only, no inventory deduction
+	DeductInventory bool `bson:"deduct_inventory" json:"deduct_inventory"`
 }
 
 // IsRawIngredient returns true if this is a raw ingredient

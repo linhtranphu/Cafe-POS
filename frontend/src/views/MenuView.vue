@@ -358,8 +358,24 @@
                         (+ {{ ing.wastage }}% hao hụt)
                       </div>
                     </div>
+
+                    <!-- Deduct Inventory Toggle -->
+                    <div class="mt-2 flex items-center gap-1">
+                      <button type="button"
+                        @click="ing.deductInventory = !ing.deductInventory"
+                        :class="[
+                          'px-2 py-1 rounded text-xs font-medium transition-colors',
+                          ing.deductInventory
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-gray-100 text-gray-500'
+                        ]"
+                        :title="ing.deductInventory ? 'Đang trừ tồn kho khi order PAID' : 'Chỉ tính cost, không trừ kho'"
+                      >
+                        {{ ing.deductInventory ? '📦 Trừ kho' : '💰 Chỉ cost' }}
+                      </button>
+                    </div>
                   </div>
-                  
+
                   <!-- Total Cost Summary -->
                   <div v-if="totalIngredientCost > 0" class="bg-gradient-to-r from-yellow-500 to-orange-500 rounded-xl p-4 text-white shadow-lg">
                     <div class="flex justify-between items-center">
@@ -536,6 +552,22 @@
                             <div v-if="ing.wastage > 0" class="text-xs text-green-600 mt-1">
                               (+ {{ ing.wastage }}% hao hụt)
                             </div>
+                          </div>
+
+                          <!-- Deduct Inventory Toggle -->
+                          <div class="mt-2 flex items-center gap-1">
+                            <button type="button"
+                              @click="ing.deductInventory = !ing.deductInventory"
+                              :class="[
+                                'px-2 py-1 rounded text-xs font-medium transition-colors',
+                                ing.deductInventory
+                                  ? 'bg-red-100 text-red-700'
+                                  : 'bg-gray-100 text-gray-500'
+                              ]"
+                              :title="ing.deductInventory ? 'Đang trừ tồn kho khi order PAID' : 'Chỉ tính cost, không trừ kho'"
+                            >
+                              {{ ing.deductInventory ? '📦 Trừ kho' : '💰 Chỉ cost' }}
+                            </button>
                           </div>
                         </div>
                         
@@ -952,16 +984,17 @@ const editItem = (item) => {
           costPerUnit: batchCostPerUnit,
           wastage: 0,
           conversionRate: conversionRate,
-          estimatedCost: breakdown.totalCost
+          estimatedCost: breakdown.totalCost,
+          deductInventory: ing.deduct_inventory ?? true
         }
       }
     } else {
       // Handle raw ingredient
-      const ingredientData = availableIngredients.value.find(i => i.name === ing.name)
+      const ingredientData = availableIngredients.value.find(i => i.name === ing.name || i.id === ing.ingredient_id)
       if (ingredientData) {
         const compatibleUnits = getCompatibleUnits(ingredientData.unit)
         const conversionRate = getConversionRate(ingredientData.unit, ing.unit)
-        
+
         // Calculate estimated cost
         const breakdown = calculateCostBreakdown(
           ing.quantity,
@@ -970,7 +1003,7 @@ const editItem = (item) => {
           ingredientData.unit,
           ingredientData.wastage_percentage || 0
         )
-        
+
         return {
           id: ingredientData.id,
           type: 'raw',
@@ -982,19 +1015,20 @@ const editItem = (item) => {
           costPerUnit: ingredientData.cost_per_unit || 0,
           wastage: ingredientData.wastage_percentage || 0,
           conversionRate: conversionRate,
-          estimatedCost: breakdown.totalCost
+          estimatedCost: breakdown.totalCost,
+          deductInventory: ing.deduct_inventory ?? true
         }
       }
     }
     return ing
   }) : []
-  
+
   // Prepare variants with enriched ingredient data
   const preparedVariants = item.variants ? item.variants.map(variant => {
     const enrichedIngredients = variant.ingredients ? variant.ingredients.map(ing => {
       // Check if this is a batch ingredient
       const isBatch = ing.ingredient_type === 'batch' || ing.type === 'batch'
-      
+
       if (isBatch) {
         // Handle batch ingredient
         const batchData = availableBatchDefinitions.value.find(b => b.id === ing.batch_id || b.name === ing.name)
@@ -1002,7 +1036,7 @@ const editItem = (item) => {
           const batchCostPerUnit = calculateBatchCostPerUnit(batchData)
           const compatibleUnits = getCompatibleUnits(batchData.unit)
           const conversionRate = getConversionRate(batchData.unit, ing.unit)
-          
+
           // Calculate estimated cost
           const breakdown = calculateCostBreakdown(
             ing.quantity,
@@ -1011,7 +1045,7 @@ const editItem = (item) => {
             batchData.unit,
             0 // Batches don't have wastage
           )
-          
+
           return {
             id: batchData.id,
             batch_definition_id: batchData.id,
@@ -1024,16 +1058,17 @@ const editItem = (item) => {
             costPerUnit: batchCostPerUnit,
             wastage: 0,
             conversionRate: conversionRate,
-            estimatedCost: breakdown.totalCost
+            estimatedCost: breakdown.totalCost,
+            deductInventory: ing.deduct_inventory ?? true
           }
         }
       } else {
         // Handle raw ingredient
-        const ingredientData = availableIngredients.value.find(i => i.name === ing.name)
+        const ingredientData = availableIngredients.value.find(i => i.name === ing.name || i.id === ing.ingredient_id)
         if (ingredientData) {
           const compatibleUnits = getCompatibleUnits(ingredientData.unit)
           const conversionRate = getConversionRate(ingredientData.unit, ing.unit)
-          
+
           // Calculate estimated cost
           const breakdown = calculateCostBreakdown(
             ing.quantity,
@@ -1042,7 +1077,7 @@ const editItem = (item) => {
             ingredientData.unit,
             ingredientData.wastage_percentage || 0
           )
-          
+
           return {
             id: ingredientData.id,
             type: 'raw',
@@ -1054,7 +1089,8 @@ const editItem = (item) => {
             costPerUnit: ingredientData.cost_per_unit || 0,
             wastage: ingredientData.wastage_percentage || 0,
             conversionRate: conversionRate,
-            estimatedCost: breakdown.totalCost
+            estimatedCost: breakdown.totalCost,
+            deductInventory: ing.deduct_inventory ?? true
           }
         }
       }
@@ -1243,7 +1279,8 @@ const selectIngredient = (ingredient) => {
       costPerUnit: ingredient.cost_per_unit || 0,
       wastage: ingredient.wastage_percentage || 0,
       conversionRate: conversionRate,
-      estimatedCost: 0
+      estimatedCost: 0,
+      deductInventory: true
     })
     
     // Calculate initial cost
@@ -1276,7 +1313,8 @@ const selectIngredient = (ingredient) => {
       costPerUnit: ingredient.cost_per_unit || 0,
       wastage: ingredient.wastage_percentage || 0,
       conversionRate: conversionRate,
-      estimatedCost: 0
+      estimatedCost: 0,
+      deductInventory: true
     })
     
     updateIngredientCost(form.value.ingredients.length - 1)
@@ -1362,7 +1400,8 @@ const selectBatch = (batch) => {
       costPerUnit: batchCostPerUnit, // Calculated cost per unit
       wastage: 0, // Batches don't have wastage
       conversionRate: 1,
-      estimatedCost: batchCostPerUnit // Initial cost for quantity 1
+      estimatedCost: batchCostPerUnit, // Initial cost for quantity 1
+      deductInventory: true
     })
     
     // Calculate initial cost
@@ -1392,7 +1431,8 @@ const selectBatch = (batch) => {
       costPerUnit: batchCostPerUnit, // Calculated cost per unit
       wastage: 0,
       conversionRate: 1,
-      estimatedCost: batchCostPerUnit // Initial cost for quantity 1
+      estimatedCost: batchCostPerUnit, // Initial cost for quantity 1
+      deductInventory: true
     })
     
     updateIngredientCost(form.value.ingredients.length - 1)
@@ -1588,10 +1628,14 @@ const saveItem = async () => {
         name: ing.name,
         quantity: ing.quantity,
         unit: ing.unit,
-        // Include batch fields if this is a batch ingredient
+        deduct_inventory: ing.deductInventory ?? true,
         ...(ing.type === 'batch' && {
           ingredient_type: 'batch',
           batch_id: ing.batch_definition_id || ing.id
+        }),
+        ...(ing.type === 'raw' && {
+          ingredient_type: 'raw',
+          ingredient_id: ing.id
         })
       })),
       available: v.available !== false,
@@ -1607,10 +1651,14 @@ const saveItem = async () => {
       name: ing.name,
       quantity: ing.quantity,
       unit: ing.unit,
-      // Include batch fields if this is a batch ingredient
+      deduct_inventory: ing.deductInventory ?? true,
       ...(ing.type === 'batch' && {
         ingredient_type: 'batch',
         batch_id: ing.batch_definition_id || ing.id
+      }),
+      ...(ing.type === 'raw' && {
+        ingredient_type: 'raw',
+        ingredient_id: ing.id
       })
     }))
     

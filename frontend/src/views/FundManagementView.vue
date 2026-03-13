@@ -27,7 +27,7 @@
     <!-- Total Balance Summary Card -->
     <div class="p-4">
       <div class="bg-gradient-to-br from-orange-400 to-yellow-400 rounded-2xl p-5 text-white shadow-lg">
-        <div class="text-sm opacity-90 mb-1">Tổng tất cả quỹ</div>
+        <div class="text-sm opacity-90 mb-1">Tổng 5 quỹ thực</div>
         <div v-if="loadingAllBalances" class="animate-pulse">
           <div class="h-8 bg-white/30 rounded w-48 mb-2"></div>
           <div class="flex gap-4">
@@ -36,17 +36,18 @@
           </div>
         </div>
         <div v-else>
-          <div class="text-3xl font-bold mb-2">{{ formatCurrency(allBalances?.total?.total || 0) }}</div>
+          <div class="text-3xl font-bold mb-2">{{ formatCurrency(realFundsTotal.total) }}</div>
           <div class="flex gap-4 text-sm opacity-90">
-            <span>💵 TM: {{ formatCurrency(allBalances?.total?.cash || 0) }}</span>
-            <span>💳 CK: {{ formatCurrency(allBalances?.total?.transfer || 0) }}</span>
+            <span>💵 TM: {{ formatCurrency(realFundsTotal.cash) }}</span>
+            <span>💳 CK: {{ formatCurrency(realFundsTotal.transfer) }}</span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 5 Fund Balance Cards -->
-    <div class="px-4 pb-4">
+    <!-- 5 Real Fund Balance Cards -->
+    <div class="px-4 pb-2">
+      <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Quỹ thực</div>
       <div class="grid grid-cols-2 gap-3">
         <template v-if="loadingAllBalances">
           <div v-for="i in 5" :key="i" class="bg-white rounded-xl p-4 shadow animate-pulse">
@@ -76,6 +77,48 @@
             </div>
           </div>
         </template>
+      </div>
+    </div>
+
+    <!-- Cash Shortage / Overage Audit Section -->
+    <div class="px-4 pb-4 mt-3">
+      <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Chênh lệch bàn giao (tích lũy)</div>
+      <div v-if="loadingAllBalances" class="grid grid-cols-2 gap-3">
+        <div v-for="i in 2" :key="i" class="bg-white rounded-xl p-4 shadow animate-pulse">
+          <div class="h-4 bg-gray-200 rounded w-3/4 mb-3"></div>
+          <div class="h-6 bg-gray-200 rounded w-1/2"></div>
+        </div>
+      </div>
+      <div v-else class="grid grid-cols-2 gap-3">
+        <!-- Cash Shortage -->
+        <div
+          class="bg-red-50 rounded-xl p-4 border border-red-200 cursor-pointer hover:shadow-md transition-shadow"
+          @click="filterByFund('cash_shortage')"
+        >
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-lg">📉</span>
+            <span class="text-xs font-semibold text-red-700">Thiếu tiền</span>
+          </div>
+          <div class="text-lg font-bold text-red-600">
+            {{ formatCurrency(allBalances?.cash_shortage?.total || 0) }}
+          </div>
+          <div class="text-xs text-red-400 mt-1">Tổng waiter thiếu</div>
+        </div>
+
+        <!-- Cash Overage -->
+        <div
+          class="bg-emerald-50 rounded-xl p-4 border border-emerald-200 cursor-pointer hover:shadow-md transition-shadow"
+          @click="filterByFund('cash_overage')"
+        >
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-lg">📈</span>
+            <span class="text-xs font-semibold text-emerald-700">Thừa tiền</span>
+          </div>
+          <div class="text-lg font-bold text-emerald-600">
+            {{ formatCurrency(Math.abs(allBalances?.cash_overage?.total || 0)) }}
+          </div>
+          <div class="text-xs text-emerald-400 mt-1">Tổng waiter thừa</div>
+        </div>
       </div>
     </div>
 
@@ -490,6 +533,25 @@ const fundTypeKeys = computed(() => [
   FUND_TYPES.WAITER_FLOAT
 ])
 
+const REAL_FUND_KEYS = [
+  FUND_TYPES.OPERATING,
+  FUND_TYPES.INVENTORY,
+  FUND_TYPES.PROFIT,
+  FUND_TYPES.CASH_DRAWER,
+  FUND_TYPES.WAITER_FLOAT
+]
+
+const realFundsTotal = computed(() => {
+  if (!allBalances.value) return { cash: 0, transfer: 0, total: 0 }
+  return REAL_FUND_KEYS.reduce((acc, key) => {
+    const b = allBalances.value[key] || {}
+    acc.cash += b.cash || 0
+    acc.transfer += b.transfer || 0
+    acc.total += b.total || 0
+    return acc
+  }, { cash: 0, transfer: 0, total: 0 })
+})
+
 const sourceBalance = computed(() => {
   if (!allBalances.value || !transferForm.value.from_fund_type) return 0
   const b = allBalances.value[transferForm.value.from_fund_type]
@@ -508,7 +570,7 @@ const isTransferValid = computed(() => {
 })
 
 // Journal entry helpers
-const EXTERNAL_ACCOUNTS = new Set(['external', 'owner', 'supplier', 'customer'])
+const EXTERNAL_ACCOUNTS = new Set(['external', 'owner', 'supplier', 'customer', 'cash_shortage', 'cash_overage'])
 const realLines = (entry) => {
   return (entry.lines || []).filter(l => !EXTERNAL_ACCOUNTS.has(l.fund_type))
 }
@@ -561,13 +623,7 @@ const loadAllBalances = async () => {
   loadingAllBalances.value = true
   try {
     const data = await getJournalBalances()
-    const total = { cash: 0, transfer: 0, total: 0 }
-    for (const b of Object.values(data)) {
-      total.cash += b.cash || 0
-      total.transfer += b.transfer || 0
-      total.total += b.total || 0
-    }
-    allBalances.value = { ...data, total }
+    allBalances.value = data
   } catch (error) {
     console.error('Failed to load all balances:', error)
   } finally {

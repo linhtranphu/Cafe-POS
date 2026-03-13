@@ -339,23 +339,43 @@
             <span class="text-3xl">⚠️</span>
             <div>
               <h3 class="text-xl font-bold text-red-600">Còn order chưa hoàn thành</h3>
-              <p class="text-sm text-gray-500">Đóng ca sẽ hủy tất cả các order này</p>
+              <p class="text-sm text-gray-500">Đóng ca sẽ xử lý {{ pendingOrdersList.length }} order còn lại</p>
             </div>
           </div>
 
-          <div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-5">
+          <!-- Orders sẽ bị HUỶ (CREATED - chưa thanh toán) -->
+          <div v-if="pendingCancelledOrders.length > 0" class="bg-red-50 border border-red-200 rounded-xl p-4 mb-3">
             <p class="text-sm font-semibold text-red-700 mb-3">
-              {{ pendingOrdersList.length }} order đang pending sẽ bị hủy:
+              🚫 {{ pendingCancelledOrders.length }} order chưa thanh toán sẽ bị <strong>huỷ</strong>:
             </p>
-            <div class="space-y-2 max-h-48 overflow-y-auto">
-              <div v-for="o in pendingOrdersList" :key="o.id"
+            <div class="space-y-2 max-h-36 overflow-y-auto">
+              <div v-for="o in pendingCancelledOrders" :key="o.id"
                 class="flex justify-between items-center bg-white rounded-lg p-3 border border-red-100">
+                <div>
+                  <p class="font-semibold text-gray-800">#{{ o.order_number }}</p>
+                  <p v-if="o.customer_name" class="text-xs text-gray-500">{{ o.customer_name }}</p>
+                  <span class="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-700">
+                    Chưa thanh toán
+                  </span>
+                </div>
+                <p class="font-bold text-gray-800">{{ formatPrice(o.total) }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Orders sẽ bị KHOÁ (PAID trở đi - đã thanh toán) -->
+          <div v-if="pendingLockedOrders.length > 0" class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5">
+            <p class="text-sm font-semibold text-blue-700 mb-3">
+              🔒 {{ pendingLockedOrders.length }} order đã thanh toán sẽ được <strong>khoá</strong>:
+            </p>
+            <div class="space-y-2 max-h-36 overflow-y-auto">
+              <div v-for="o in pendingLockedOrders" :key="o.id"
+                class="flex justify-between items-center bg-white rounded-lg p-3 border border-blue-100">
                 <div>
                   <p class="font-semibold text-gray-800">#{{ o.order_number }}</p>
                   <p v-if="o.customer_name" class="text-xs text-gray-500">{{ o.customer_name }}</p>
                   <span class="text-xs px-2 py-0.5 rounded-full font-medium"
                     :class="{
-                      'bg-gray-100 text-gray-700': o.status === 'CREATED',
                       'bg-blue-100 text-blue-700': o.status === 'PAID',
                       'bg-yellow-100 text-yellow-700': o.status === 'QUEUED',
                       'bg-orange-100 text-orange-700': o.status === 'IN_PROGRESS',
@@ -368,9 +388,19 @@
               </div>
             </div>
           </div>
+          <div v-else class="mb-5"></div>
 
           <p class="text-sm text-gray-600 mb-5">
-            Bạn có chắc chắn muốn <strong class="text-red-600">hủy {{ pendingOrdersList.length }} order</strong> và tiếp tục đóng ca?
+            <span v-if="pendingCancelledOrders.length > 0 && pendingLockedOrders.length > 0">
+              Huỷ <strong class="text-red-600">{{ pendingCancelledOrders.length }} order chưa thanh toán</strong>
+              và khoá <strong class="text-blue-600">{{ pendingLockedOrders.length }} order đã thanh toán</strong>.
+            </span>
+            <span v-else-if="pendingCancelledOrders.length > 0">
+              Bạn có chắc muốn <strong class="text-red-600">huỷ {{ pendingCancelledOrders.length }} order chưa thanh toán</strong> và đóng ca?
+            </span>
+            <span v-else>
+              <strong class="text-blue-600">{{ pendingLockedOrders.length }} order đã thanh toán</strong> sẽ được khoá lại.
+            </span>
           </p>
 
           <div class="flex gap-3">
@@ -380,7 +410,7 @@
             </button>
             <button @click="confirmPendingOrdersAndProceed"
               class="flex-1 bg-red-500 active:bg-red-600 text-white px-4 py-3.5 rounded-xl font-bold">
-              Xác nhận hủy & đóng ca
+              Xác nhận & đóng ca
             </button>
           </div>
         </div>
@@ -685,6 +715,15 @@ const handoverHistory = ref([])
 const showPendingOrdersWarning = ref(false)
 const pendingOrdersList = ref([])
 const pendingOrdersAction = ref(null) // 'endShift' | 'handoverEnd'
+
+// Orders chưa thanh toán → sẽ bị huỷ khi đóng ca
+const pendingCancelledOrders = computed(() =>
+  pendingOrdersList.value.filter(o => o.status === 'CREATED')
+)
+// Orders đã thanh toán → sẽ được khoá khi đóng ca
+const pendingLockedOrders = computed(() =>
+  pendingOrdersList.value.filter(o => o.status !== 'CREATED')
+)
 
 const startForm = ref({
   type: '',

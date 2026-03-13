@@ -96,6 +96,7 @@ type IngredientCostDetail struct {
 	ConversionRate    float64 `json:"conversion_rate"`
 	WastagePercentage float64 `json:"wastage_percentage"`
 	TotalCost         float64 `json:"total_cost"`
+	DeductInventory   bool    `json:"deduct_inventory"`
 }
 
 // GetMenuCostDetailResponse represents the response for GET /api/menu/costs/:id
@@ -142,6 +143,7 @@ func (h *MenuCostHandler) GetMenuCostDetail(c *gin.Context) {
 			ConversionRate:    ing.ConversionRate,
 			WastagePercentage: ing.WastagePercentage,
 			TotalCost:         ing.TotalCost,
+			DeductInventory:   ing.DeductInventory,
 		})
 	}
 
@@ -272,6 +274,7 @@ func (h *MenuCostHandler) GetCostBreakdown(c *gin.Context) {
 				ConversionRate:    ing.ConversionRate,
 				WastagePercentage: ing.WastagePercentage,
 				TotalCost:         ing.TotalCost,
+				DeductInventory:   ing.DeductInventory,
 			})
 		}
 
@@ -291,37 +294,43 @@ type variantCostDetail struct {
 }
 
 // calculateVariantCostDetail calculates cost detail for a variant's ingredients
-// This method fetches ingredients from the database and calculates costs
 func (h *MenuCostHandler) calculateVariantCostDetail(ctx context.Context, variantIngredients []menu.Ingredient) *variantCostDetail {
 	result := &variantCostDetail{
 		ingredients: []IngredientCostDetail{},
 		totalCost:   0,
 	}
 
-	// If no ingredients, return empty
 	if len(variantIngredients) == 0 {
 		return result
 	}
 
-	// We need to call the cost calculator service to get ingredient details
-	// For now, create a temporary menu item to use the existing CalculateMenuItemCostDetail method
-	// This is not ideal but works for the MVP
-	// TODO: Refactor to have a dedicated method for calculating variant costs
-	
-	// For now, return basic structure without detailed calculation
-	// The actual cost is already calculated and stored in variant.CurrentCost
-	for _, ing := range variantIngredients {
-		detail := IngredientCostDetail{
+	costDetail, err := h.costCalculator.CalculateIngredientListCostDetail(ctx, variantIngredients)
+	if err != nil {
+		// Fallback: return names only with zero costs
+		for _, ing := range variantIngredients {
+			result.ingredients = append(result.ingredients, IngredientCostDetail{
+				Name:           ing.Name,
+				Quantity:       ing.Quantity,
+				Unit:           string(ing.Unit),
+				ConversionRate: 1.0,
+			})
+		}
+		return result
+	}
+
+	for _, ing := range costDetail.Ingredients {
+		result.ingredients = append(result.ingredients, IngredientCostDetail{
 			Name:              ing.Name,
 			Quantity:          ing.Quantity,
-			Unit:              string(ing.Unit),
-			CostPerUnit:       0, // Would need to fetch from ingredient repo
-			ConversionRate:    1.0,
-			WastagePercentage: 0,
-			TotalCost:         0,
-		}
-		result.ingredients = append(result.ingredients, detail)
+			Unit:              ing.Unit,
+			CostPerUnit:       ing.CostPerUnit,
+			ConversionRate:    ing.ConversionRate,
+			WastagePercentage: ing.WastagePercentage,
+			TotalCost:         ing.TotalCost,
+			DeductInventory:   ing.DeductInventory,
+		})
 	}
+	result.totalCost = costDetail.TotalCost
 
 	return result
 }

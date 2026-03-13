@@ -38,12 +38,12 @@ export const menuCostService = {
   },
 
   /**
-   * Get detailed cost breakdown for a specific menu item
+   * Get detailed cost breakdown for a specific menu item (supports variants)
    * @param {string} id - Menu item ID
-   * @returns {Promise<MenuItemCostBreakdown>} Menu item cost breakdown
+   * @returns {Promise<Object>} Cost breakdown response (has_variants, variants[] or ingredients[])
    */
   async getMenuCostDetail(id) {
-    const response = await api.get(`/manager/menu/costs/${id}`)
+    const response = await api.get(`/manager/menu/${id}/cost-breakdown`)
     return response.data
   },
 

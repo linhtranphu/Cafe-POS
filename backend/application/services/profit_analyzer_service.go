@@ -22,6 +22,19 @@ const (
 	WarningLoss      WarningStatus = "loss"
 )
 
+// VariantProfit represents profit metrics for a single variant
+type VariantProfit struct {
+	VariantID      string          `json:"variant_id"`
+	VariantName    string          `json:"variant_name"`
+	Price          float64         `json:"price"`
+	CurrentCost    float64         `json:"current_cost"`
+	ProfitMargin   float64         `json:"profit_margin"`
+	AbsoluteProfit float64         `json:"absolute_profit"`
+	CostStatus     menu.CostStatus `json:"cost_status"`
+	IsDefault      bool            `json:"is_default"`
+	WarningStatus  WarningStatus   `json:"warning_status"`
+}
+
 // MenuItemProfit represents profit metrics for a menu item
 type MenuItemProfit struct {
 	MenuItemID           primitive.ObjectID `json:"menu_item_id"`
@@ -34,6 +47,8 @@ type MenuItemProfit struct {
 	CostStatus           menu.CostStatus    `json:"cost_status"`
 	CostLastCalculatedAt time.Time          `json:"cost_last_calculated_at"`
 	WarningStatus        WarningStatus      `json:"warning_status"`
+	HasVariants          bool               `json:"has_variants"`
+	Variants             []VariantProfit    `json:"variants,omitempty"`
 }
 
 // CategoryProfit represents profit analysis for a menu category
@@ -153,29 +168,68 @@ func (s *ProfitAnalyzerService) calculateProfitMetrics(menuItem *menu.MenuItem, 
 		MenuItemID:           menuItem.ID,
 		Name:                 menuItem.Name,
 		Category:             menuItem.Category,
-		Price:                menuItem.Price,
-		CurrentCost:          menuItem.CurrentCost,
-		CostStatus:           menuItem.CostStatus,
 		CostLastCalculatedAt: menuItem.CostLastCalculatedAt,
+		HasVariants:          menuItem.HasVariants,
 	}
 
-	// Handle edge case: price = 0 or negative (promotional/gifted items)
-	if menuItem.Price <= 0 {
-		profit.ProfitMargin = 0
-		profit.AbsoluteProfit = -menuItem.CurrentCost
-		profit.WarningStatus = WarningNone // N/A for promotional items
+	if menuItem.HasVariants && len(menuItem.Variants) > 0 {
+		// Multi-variant: calculate per-variant profit metrics
+		variants := make([]VariantProfit, 0, len(menuItem.Variants))
+		for _, v := range menuItem.Variants {
+			vp := VariantProfit{
+				VariantID:   v.ID,
+				VariantName: v.Name,
+				Price:       v.Price,
+				CurrentCost: v.CurrentCost,
+				CostStatus:  v.CostStatus,
+				IsDefault:   v.IsDefault,
+			}
+			if v.Price > 0 {
+				margin := ((v.Price - v.CurrentCost) / v.Price) * 100
+				vp.ProfitMargin = math.Round(margin*100) / 100
+				vp.AbsoluteProfit = v.Price - v.CurrentCost
+			} else {
+				vp.AbsoluteProfit = -v.CurrentCost
+			}
+			vp.WarningStatus = s.determineWarningStatus(v.Price, v.CurrentCost, vp.ProfitMargin, lowMarginThreshold)
+			variants = append(variants, vp)
+		}
+		profit.Variants = variants
+
+		// Use default variant for top-level sort/display fields
+		defaultVariant := menuItem.GetDefaultVariant()
+		if defaultVariant == nil {
+			defaultVariant = &menuItem.Variants[0]
+		}
+		profit.Price = defaultVariant.Price
+		profit.CurrentCost = defaultVariant.CurrentCost
+		profit.CostStatus = defaultVariant.CostStatus
+		if defaultVariant.Price > 0 {
+			margin := ((defaultVariant.Price - defaultVariant.CurrentCost) / defaultVariant.Price) * 100
+			profit.ProfitMargin = math.Round(margin*100) / 100
+			profit.AbsoluteProfit = defaultVariant.Price - defaultVariant.CurrentCost
+		} else {
+			profit.AbsoluteProfit = -defaultVariant.CurrentCost
+		}
+		profit.WarningStatus = s.determineWarningStatus(profit.Price, profit.CurrentCost, profit.ProfitMargin, lowMarginThreshold)
 		return profit
 	}
 
-	// Calculate profit_margin = ((price - cost) / price) * 100
+	// Single-size item
+	profit.Price = menuItem.Price
+	profit.CurrentCost = menuItem.CurrentCost
+	profit.CostStatus = menuItem.CostStatus
+
+	if menuItem.Price <= 0 {
+		profit.ProfitMargin = 0
+		profit.AbsoluteProfit = -menuItem.CurrentCost
+		profit.WarningStatus = WarningNone
+		return profit
+	}
+
 	profitMargin := ((menuItem.Price - menuItem.CurrentCost) / menuItem.Price) * 100
-	// Round to 2 decimal places
 	profit.ProfitMargin = math.Round(profitMargin*100) / 100
-
-	// Calculate absolute_profit = price - cost
 	profit.AbsoluteProfit = menuItem.Price - menuItem.CurrentCost
-
-	// Determine warning status
 	profit.WarningStatus = s.determineWarningStatus(menuItem.Price, menuItem.CurrentCost, profit.ProfitMargin, lowMarginThreshold)
 
 	return profit
@@ -304,7 +358,7 @@ func (s *ProfitAnalyzerService) GetAllMenuItemProfits(ctx context.Context, filte
 		}
 
 		// Calculate average profit margin (excluding items with price <= 0)
-		if menuItem.Price > 0 && profit.CostStatus != menu.CostStatusIncomplete {
+		if profit.Price > 0 && profit.CostStatus != menu.CostStatusIncomplete {
 			totalProfitMargin += profit.ProfitMargin
 			profitMarginCount++
 		}

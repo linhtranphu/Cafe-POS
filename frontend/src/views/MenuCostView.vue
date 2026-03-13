@@ -184,7 +184,7 @@
             @click="openCostBreakdown(item)"
             class="bg-white rounded-2xl p-4 shadow-sm cursor-pointer active:scale-98 hover:shadow-md transition-all"
             :class="getItemBorderClass(item.warning_status)">
-            
+
             <!-- Item Header -->
             <div class="flex justify-between items-start mb-3">
               <div class="flex-1">
@@ -193,24 +193,32 @@
                   <span class="px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">
                     {{ item.category }}
                   </span>
+                  <span v-if="item.has_variants" class="px-2 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700">
+                    📏 Nhiều size
+                  </span>
                 </div>
-                <div class="flex items-center gap-2 flex-wrap">
+                <!-- Single-size: show price + status -->
+                <div v-if="!item.has_variants" class="flex items-center gap-2 flex-wrap">
                   <span class="text-sm text-gray-600">Giá bán: {{ formatPrice(item.price) }}</span>
-                  <span v-if="item.cost_status" 
+                  <span v-if="item.cost_status"
                     :class="getCostStatusClass(item.cost_status)"
                     class="px-2 py-0.5 rounded text-[10px] font-medium">
                     {{ getCostStatusLabel(item.cost_status) }}
                   </span>
                 </div>
+                <!-- Multi-size: show default variant label -->
+                <div v-else class="text-xs text-gray-500">
+                  Hiển thị theo size mặc định
+                </div>
               </div>
-              <div class="text-right ml-2">
+              <div v-if="!item.has_variants" class="text-right ml-2">
                 <div class="text-sm text-gray-500 mb-1">Chi phí</div>
                 <div class="text-lg font-bold text-blue-600">{{ formatPrice(item.current_cost) }}</div>
               </div>
             </div>
 
-            <!-- Profit Metrics -->
-            <div class="grid grid-cols-2 gap-3 pt-3 border-t">
+            <!-- Single-size: Profit Metrics -->
+            <div v-if="!item.has_variants" class="grid grid-cols-2 gap-3 pt-3 border-t">
               <div>
                 <div class="text-xs text-gray-500 mb-1">Lợi nhuận %</div>
                 <div class="font-bold" :class="getProfitMarginColor(item.profit_margin, item.warning_status)">
@@ -221,6 +229,29 @@
                 <div class="text-xs text-gray-500 mb-1">Lợi nhuận tiền</div>
                 <div class="font-bold" :class="getAbsoluteProfitColor(item.absolute_profit)">
                   {{ formatPrice(item.absolute_profit) }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Multi-size: Variant Breakdown Table -->
+            <div v-else class="pt-3 border-t">
+              <div class="grid grid-cols-4 gap-1 text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1 px-1">
+                <span>Size</span>
+                <span class="text-right">Giá</span>
+                <span class="text-right">Chi phí</span>
+                <span class="text-right">LN %</span>
+              </div>
+              <div v-for="v in item.variants" :key="v.variant_id"
+                class="grid grid-cols-4 gap-1 text-xs py-1.5 px-1 rounded-lg"
+                :class="v.is_default ? 'bg-purple-50' : 'hover:bg-gray-50'">
+                <div class="flex items-center gap-1">
+                  <span class="font-medium text-gray-800 truncate">{{ v.variant_name }}</span>
+                  <span v-if="v.is_default" class="text-[9px] bg-purple-200 text-purple-700 px-1 rounded leading-tight flex-shrink-0">✦</span>
+                </div>
+                <div class="text-right text-gray-700">{{ formatPrice(v.price) }}</div>
+                <div class="text-right text-blue-600 font-medium">{{ formatPrice(v.current_cost) }}</div>
+                <div class="text-right font-bold" :class="getProfitMarginColor(v.profit_margin, v.warning_status)">
+                  {{ formatPercentage(v.profit_margin) }}
                 </div>
               </div>
             </div>
@@ -251,30 +282,69 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-200">
-                <tr v-for="item in filteredMenuItems" :key="item.menu_item_id"
-                  @click="openCostBreakdown(item)"
-                  class="hover:bg-gray-50 cursor-pointer transition-colors"
-                  :class="getTableRowClass(item.warning_status)">
-                  <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ item.name }}</td>
-                  <td class="px-4 py-3 text-sm text-gray-600">
-                    <span class="px-2 py-1 rounded-full text-xs bg-gray-100">{{ item.category }}</span>
-                  </td>
-                  <td class="px-4 py-3 text-sm text-right text-gray-900">{{ formatPrice(item.price) }}</td>
-                  <td class="px-4 py-3 text-sm text-right font-medium text-blue-600">{{ formatPrice(item.current_cost) }}</td>
-                  <td class="px-4 py-3 text-sm text-right font-bold" :class="getProfitMarginColor(item.profit_margin, item.warning_status)">
-                    {{ formatPercentage(item.profit_margin) }}
-                  </td>
-                  <td class="px-4 py-3 text-sm text-right font-bold" :class="getAbsoluteProfitColor(item.absolute_profit)">
-                    {{ formatPrice(item.absolute_profit) }}
-                  </td>
-                  <td class="px-4 py-3 text-center">
-                    <span v-if="item.cost_status" 
-                      :class="getCostStatusClass(item.cost_status)"
-                      class="px-2 py-1 rounded text-xs font-medium inline-block">
-                      {{ getCostStatusLabel(item.cost_status) }}
-                    </span>
-                  </td>
-                </tr>
+                <template v-for="item in filteredMenuItems" :key="item.menu_item_id">
+                  <!-- Main row -->
+                  <tr @click="openCostBreakdown(item)"
+                    class="hover:bg-gray-50 cursor-pointer transition-colors"
+                    :class="getTableRowClass(item.warning_status)">
+                    <td class="px-4 py-3 text-sm font-medium text-gray-900">
+                      <div class="flex items-center gap-2">
+                        {{ item.name }}
+                        <span v-if="item.has_variants" class="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">📏 Nhiều size</span>
+                      </div>
+                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-600">
+                      <span class="px-2 py-1 rounded-full text-xs bg-gray-100">{{ item.category }}</span>
+                    </td>
+                    <td class="px-4 py-3 text-sm text-right text-gray-900">
+                      {{ item.has_variants ? '—' : formatPrice(item.price) }}
+                    </td>
+                    <td class="px-4 py-3 text-sm text-right font-medium text-blue-600">
+                      {{ item.has_variants ? '—' : formatPrice(item.current_cost) }}
+                    </td>
+                    <td class="px-4 py-3 text-sm text-right font-bold" :class="getProfitMarginColor(item.profit_margin, item.warning_status)">
+                      {{ item.has_variants ? '—' : formatPercentage(item.profit_margin) }}
+                    </td>
+                    <td class="px-4 py-3 text-sm text-right font-bold" :class="getAbsoluteProfitColor(item.absolute_profit)">
+                      {{ item.has_variants ? '—' : formatPrice(item.absolute_profit) }}
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                      <span v-if="item.cost_status && !item.has_variants"
+                        :class="getCostStatusClass(item.cost_status)"
+                        class="px-2 py-1 rounded text-xs font-medium inline-block">
+                        {{ getCostStatusLabel(item.cost_status) }}
+                      </span>
+                    </td>
+                  </tr>
+                  <!-- Variant sub-rows -->
+                  <tr v-for="v in item.variants" :key="v.variant_id"
+                    @click="openCostBreakdown(item)"
+                    class="cursor-pointer transition-colors bg-purple-50 hover:bg-purple-100">
+                    <td class="pl-10 pr-4 py-2 text-xs text-gray-700">
+                      <span class="flex items-center gap-1">
+                        <span class="text-purple-400">└</span>
+                        {{ v.variant_name }}
+                        <span v-if="v.is_default" class="text-[9px] bg-purple-200 text-purple-700 px-1 rounded">✦ mặc định</span>
+                      </span>
+                    </td>
+                    <td class="px-4 py-2 text-xs text-gray-400"></td>
+                    <td class="px-4 py-2 text-xs text-right text-gray-700">{{ formatPrice(v.price) }}</td>
+                    <td class="px-4 py-2 text-xs text-right font-medium text-blue-500">{{ formatPrice(v.current_cost) }}</td>
+                    <td class="px-4 py-2 text-xs text-right font-bold" :class="getProfitMarginColor(v.profit_margin, v.warning_status)">
+                      {{ formatPercentage(v.profit_margin) }}
+                    </td>
+                    <td class="px-4 py-2 text-xs text-right font-bold" :class="getAbsoluteProfitColor(v.absolute_profit)">
+                      {{ formatPrice(v.absolute_profit) }}
+                    </td>
+                    <td class="px-4 py-2 text-center">
+                      <span v-if="v.cost_status"
+                        :class="getCostStatusClass(v.cost_status)"
+                        class="px-1.5 py-0.5 rounded text-[10px] font-medium inline-block">
+                        {{ getCostStatusLabel(v.cost_status) }}
+                      </span>
+                    </td>
+                  </tr>
+                </template>
               </tbody>
             </table>
           </div>

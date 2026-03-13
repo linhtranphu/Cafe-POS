@@ -46,7 +46,21 @@
       "Bash(head -20 grep -n \"SOURCE_TYPE_LABELS\\\\|SOURCE_TYPE_ICONS\\\\|waiter_start\\\\|starting_float\" \"/Volumes/Linh-DAT/Misc Projects/Cafe POS/frontend/src/services/fundExpenseService.js\")",
       "Bash(xargs -I {} basename {})",
       "Bash(grep -l \"api\\\\|axios\\\\|fetch\" \"/Volumes/Linh-DAT/Misc Projects/Cafe POS/frontend/src/services/\"*.js)",
-      "Bash(\"/Volumes/Linh-DAT/Misc Projects/Cafe:*)"
+      "Bash(\"/Volumes/Linh-DAT/Misc Projects/Cafe:*)",
+      "Bash(grep -r \"StartShift\\\\|start.shift\\\\|/shifts\" interfaces/http/router*.go interfaces/http/routes*.go)",
+      "Bash(grep -r \"shifts\" interfaces/http/*.go)",
+      "Bash(MONGODB_URI=\"mongodb://admin:108trannhatduat@localhost:27017/cafe_pos?replicaSet=rs0&authSource=admin\" go run cmd/close-all-waiter-shifts/main.go)",
+      "Bash(go build ./application/... ./domain/... ./interfaces/... ./infrastructure/...)",
+      "Bash(chmod +x \"/Volumes/Linh-DAT/Misc Projects/Cafe POS/scripts/cancel-created-orders.sh\")",
+      "Bash(grep -n '${CONFIRM,,}' \"/Volumes/Linh-DAT/Misc Projects/Cafe POS/build_docker_hub.sh\" \"/Volumes/Linh-DAT/Misc Projects/Cafe POS/scripts/cancel-created-orders.sh\")",
+      "Bash(go build ./application/...)",
+      "Bash(go build ./domain/...)",
+      "Bash(go build ./application/... ./domain/...)",
+      "Bash(go build ./application/... ./domain/... ./interfaces/...)",
+      "Bash(go build ./application/... ./domain/... ./interfaces/... .)",
+      "WebFetch(domain:print.tacafe.store)",
+      "Bash(curl -s -X POST https://print.tacafe.store/render-and-print -H \"Content-Type: application/json\" -d '{\"\"html\"\":\"\"<h1>Test</h1>\"\",\"\"printerIP\"\":\"\"192.168.1.116\"\",\"\"printerPort\"\":9100,\"\"width\"\":576}' -w \"\\\\nHTTP_STATUS:%{http_code}\")",
+      "WebSearch"
     ]
   }
 }

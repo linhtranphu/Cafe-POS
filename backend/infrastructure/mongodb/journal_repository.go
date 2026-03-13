@@ -154,7 +154,7 @@ func (r *JournalRepository) GetFundBalance(ctx context.Context, fundType fund.Fu
 	return balance, nil
 }
 
-// GetAllFundBalances returns balances for all real fund types (external pseudo-fund excluded)
+// GetAllFundBalances returns balances for all real fund types plus audit accounts (shortage/overage)
 func (r *JournalRepository) GetAllFundBalances(ctx context.Context) (map[fund.FundType]*fund.FundBalance, error) {
 	allFunds := []fund.FundType{
 		fund.FundTypeOperating,
@@ -162,7 +162,9 @@ func (r *JournalRepository) GetAllFundBalances(ctx context.Context) (map[fund.Fu
 		fund.FundTypeProfit,
 		fund.FundTypeCashDrawer,
 		fund.FundTypeWaiterFloat,
-		// owner/supplier/customer omitted — external counterpart accounts only
+		fund.FundTypeCashShortage, // audit: accumulated shortages from waiter handovers
+		fund.FundTypeCashOverage,  // audit: accumulated overages from waiter handovers
+		// owner/supplier/customer omitted — pure double-entry counterpart accounts
 	}
 
 	result := make(map[fund.FundType]*fund.FundBalance)

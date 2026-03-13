@@ -22,6 +22,45 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
+# ── Ask which images to build/push ────────────────────────────────────────────
+echo "Select images to build & push:"
+echo "  [1] Backend only"
+echo "  [2] Frontend only"
+echo "  [3] Print Bridge only"
+echo "  [4] Backend + Frontend"
+echo "  [5] All (Backend + Frontend + Print Bridge)"
+echo ""
+read -r -p "Choice [1-5]: " CHOICE
+
+BUILD_BACKEND=false
+BUILD_FRONTEND=false
+BUILD_PRINT_BRIDGE=false
+
+case "$CHOICE" in
+  1) BUILD_BACKEND=true ;;
+  2) BUILD_FRONTEND=true ;;
+  3) BUILD_PRINT_BRIDGE=true ;;
+  4) BUILD_BACKEND=true; BUILD_FRONTEND=true ;;
+  5) BUILD_BACKEND=true; BUILD_FRONTEND=true; BUILD_PRINT_BRIDGE=true ;;
+  *)
+    echo "❌ Invalid choice. Exiting."
+    exit 1
+    ;;
+esac
+
+echo ""
+echo "Will build/push:"
+[[ $BUILD_BACKEND == true ]]      && echo "  ✔ Backend"
+[[ $BUILD_FRONTEND == true ]]     && echo "  ✔ Frontend"
+[[ $BUILD_PRINT_BRIDGE == true ]] && echo "  ✔ Print Bridge"
+echo ""
+read -r -p "Proceed? [y/N] " CONFIRM
+if [[ "$(echo "$CONFIRM" | tr '[:upper:]' '[:lower:]')" != "y" ]]; then
+    echo "Aborted."
+    exit 0
+fi
+echo ""
+
 # Docker Hub Login
 echo "🔐 Logging in to Docker Hub..."
 docker login
@@ -34,127 +73,129 @@ fi
 echo "✅ Docker Hub login successful"
 echo ""
 
-# Build Backend Image
-echo "=========================================="
-echo "🔨 Building Backend Image..."
-echo "=========================================="
-echo "Image: $BACKEND_IMAGE:latest"
-echo ""
+# ── Build Backend ──────────────────────────────────────────────────────────────
+if [[ $BUILD_BACKEND == true ]]; then
+    echo "=========================================="
+    echo "🔨 Building Backend Image..."
+    echo "=========================================="
+    echo "Image: $BACKEND_IMAGE:latest"
+    echo ""
 
-cd backend
-docker build --no-cache -t "$BACKEND_IMAGE:latest" .
-cd ..
+    cd backend
+    docker build --no-cache -t "$BACKEND_IMAGE:latest" .
+    cd ..
 
-if [ $? -eq 0 ]; then
-    echo "✅ Backend image built successfully"
-else
-    echo "❌ Backend build failed"
-    exit 1
-fi
-
-echo ""
-
-# Build Frontend Image
-echo "=========================================="
-echo "🔨 Building Frontend Image..."
-echo "=========================================="
-echo "Image: $FRONTEND_IMAGE:latest"
-echo ""
-
-cd frontend
-docker build --no-cache -t "$FRONTEND_IMAGE:latest" .
-cd ..
-
-if [ $? -eq 0 ]; then
-    echo "✅ Frontend image built successfully"
-else
-    echo "❌ Frontend build failed"
-    exit 1
-fi
-
-echo ""
-
-# Build Print Bridge Image
-echo "=========================================="
-echo "🔨 Building Print Bridge Image..."
-echo "=========================================="
-echo "Image: $PRINT_BRIDGE_IMAGE:latest"
-echo ""
-
-cd local-print-bridge
-docker build --no-cache -t "$PRINT_BRIDGE_IMAGE:latest" .
-cd ..
-
-if [ $? -eq 0 ]; then
-    echo "✅ Print Bridge image built successfully"
-    
-    # Verify Chromium in image
-    echo "🔍 Verifying Chromium in image..."
-    TEMP_CONTAINER=$(docker run -d "$PRINT_BRIDGE_IMAGE:latest" sleep 10)
-    if docker exec $TEMP_CONTAINER which chromium-browser > /dev/null 2>&1; then
-        CHROME_VERSION=$(docker exec $TEMP_CONTAINER chromium-browser --version 2>&1 || echo "Unknown")
-        echo "✅ Chromium verified: $CHROME_VERSION"
+    if [ $? -eq 0 ]; then
+        echo "✅ Backend image built successfully"
     else
-        echo "⚠️  Warning: Chromium not found in image"
+        echo "❌ Backend build failed"
+        exit 1
     fi
-    docker rm -f $TEMP_CONTAINER > /dev/null 2>&1
-else
-    echo "❌ Print Bridge build failed"
-    exit 1
+    echo ""
 fi
 
-echo ""
+# ── Build Frontend ─────────────────────────────────────────────────────────────
+if [[ $BUILD_FRONTEND == true ]]; then
+    echo "=========================================="
+    echo "🔨 Building Frontend Image..."
+    echo "=========================================="
+    echo "Image: $FRONTEND_IMAGE:latest"
+    echo ""
 
-# Push Backend Image
-echo "=========================================="
-echo "📤 Pushing Backend Image to Docker Hub..."
-echo "=========================================="
-echo ""
+    cd frontend
+    docker build --no-cache -t "$FRONTEND_IMAGE:latest" .
+    cd ..
 
-echo "Pushing $BACKEND_IMAGE:latest..."
-docker push "$BACKEND_IMAGE:latest"
-
-if [ $? -eq 0 ]; then
-    echo "✅ Backend latest pushed successfully"
-else
-    echo "❌ Backend latest push failed"
-    exit 1
+    if [ $? -eq 0 ]; then
+        echo "✅ Frontend image built successfully"
+    else
+        echo "❌ Frontend build failed"
+        exit 1
+    fi
+    echo ""
 fi
 
-echo ""
+# ── Build Print Bridge ─────────────────────────────────────────────────────────
+if [[ $BUILD_PRINT_BRIDGE == true ]]; then
+    echo "=========================================="
+    echo "🔨 Building Print Bridge Image..."
+    echo "=========================================="
+    echo "Image: $PRINT_BRIDGE_IMAGE:latest"
+    echo ""
 
-# Push Frontend Image
-echo "=========================================="
-echo "📤 Pushing Frontend Image to Docker Hub..."
-echo "=========================================="
-echo ""
+    cd local-print-bridge
+    docker build --no-cache -t "$PRINT_BRIDGE_IMAGE:latest" .
+    cd ..
 
-echo "Pushing $FRONTEND_IMAGE:latest..."
-docker push "$FRONTEND_IMAGE:latest"
+    if [ $? -eq 0 ]; then
+        echo "✅ Print Bridge image built successfully"
 
-if [ $? -eq 0 ]; then
-    echo "✅ Frontend latest pushed successfully"
-else
-    echo "❌ Frontend latest push failed"
-    exit 1
+        # Verify Chromium in image
+        echo "🔍 Verifying Chromium in image..."
+        TEMP_CONTAINER=$(docker run -d "$PRINT_BRIDGE_IMAGE:latest" sleep 10)
+        if docker exec $TEMP_CONTAINER which chromium-browser > /dev/null 2>&1; then
+            CHROME_VERSION=$(docker exec $TEMP_CONTAINER chromium-browser --version 2>&1 || echo "Unknown")
+            echo "✅ Chromium verified: $CHROME_VERSION"
+        else
+            echo "⚠️  Warning: Chromium not found in image"
+        fi
+        docker rm -f $TEMP_CONTAINER > /dev/null 2>&1
+    else
+        echo "❌ Print Bridge build failed"
+        exit 1
+    fi
+    echo ""
 fi
 
-echo ""
+# ── Push Backend ───────────────────────────────────────────────────────────────
+if [[ $BUILD_BACKEND == true ]]; then
+    echo "=========================================="
+    echo "📤 Pushing Backend Image to Docker Hub..."
+    echo "=========================================="
 
-# Push Print Bridge Image
-echo "=========================================="
-echo "📤 Pushing Print Bridge Image to Docker Hub..."
-echo "=========================================="
-echo ""
+    docker push "$BACKEND_IMAGE:latest"
 
-echo "Pushing $PRINT_BRIDGE_IMAGE:latest..."
-docker push "$PRINT_BRIDGE_IMAGE:latest"
+    if [ $? -eq 0 ]; then
+        echo "✅ Backend pushed successfully"
+    else
+        echo "❌ Backend push failed"
+        exit 1
+    fi
+    echo ""
+fi
 
-if [ $? -eq 0 ]; then
-    echo "✅ Print Bridge latest pushed successfully"
-else
-    echo "❌ Print Bridge latest push failed"
-    exit 1
+# ── Push Frontend ──────────────────────────────────────────────────────────────
+if [[ $BUILD_FRONTEND == true ]]; then
+    echo "=========================================="
+    echo "📤 Pushing Frontend Image to Docker Hub..."
+    echo "=========================================="
+
+    docker push "$FRONTEND_IMAGE:latest"
+
+    if [ $? -eq 0 ]; then
+        echo "✅ Frontend pushed successfully"
+    else
+        echo "❌ Frontend push failed"
+        exit 1
+    fi
+    echo ""
+fi
+
+# ── Push Print Bridge ──────────────────────────────────────────────────────────
+if [[ $BUILD_PRINT_BRIDGE == true ]]; then
+    echo "=========================================="
+    echo "📤 Pushing Print Bridge Image to Docker Hub..."
+    echo "=========================================="
+
+    docker push "$PRINT_BRIDGE_IMAGE:latest"
+
+    if [ $? -eq 0 ]; then
+        echo "✅ Print Bridge pushed successfully"
+    else
+        echo "❌ Print Bridge push failed"
+        exit 1
+    fi
+    echo ""
 fi
 
 echo ""

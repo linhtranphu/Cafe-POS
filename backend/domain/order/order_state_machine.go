@@ -69,14 +69,31 @@ func (sm *OrderStateMachine) defineTransitions() {
 		EventServeOrder: StatusServed,
 	}
 	
+	// From PAID state (paid but not sent to bar) - can also be locked at shift close
+	// Note: PAID → LOCKED is only done administratively during shift close/handover
+	sm.transitions[StatusPaid][EventLockOrder] = StatusLocked
+
+	// From QUEUED state - can also be locked at shift close
+	sm.transitions[StatusQueued][EventLockOrder] = StatusLocked
+
+	// From IN_PROGRESS state - can also be locked at shift close
+	sm.transitions[StatusInProgress][EventLockOrder] = StatusLocked
+
+	// From READY state - can also be locked at shift close
+	sm.transitions[StatusReady][EventLockOrder] = StatusLocked
+
 	// From SERVED state (completed)
 	sm.transitions[StatusServed] = map[OrderEvent]OrderStatus{
 		EventLockOrder:   StatusLocked,
 		EventRefundOrder: StatusRefunded,
 	}
-	
+
+	// CANCELLED can be locked at shift close (to finalize the record)
+	sm.transitions[StatusCancelled] = map[OrderEvent]OrderStatus{
+		EventLockOrder: StatusLocked,
+	}
+
 	// Terminal states (no transitions)
-	sm.transitions[StatusCancelled] = map[OrderEvent]OrderStatus{}
 	sm.transitions[StatusRefunded] = map[OrderEvent]OrderStatus{}
 	sm.transitions[StatusLocked] = map[OrderEvent]OrderStatus{}
 }
@@ -204,8 +221,9 @@ func (sm *OrderStateMachine) CanModifyOrder(currentState OrderStatus) bool {
 }
 
 // CanLockOrder checks if an order can be locked
+// Used during shift close/handover to finalize orders
 func (sm *OrderStateMachine) CanLockOrder(currentState OrderStatus) bool {
-	return currentState == StatusServed
+	return sm.CanTransition(currentState, EventLockOrder)
 }
 
 // GetOrderProgress returns the progress percentage of an order

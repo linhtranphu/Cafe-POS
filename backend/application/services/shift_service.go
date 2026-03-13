@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 	"cafe-pos/backend/domain"
+	"cafe-pos/backend/domain/cashier"
 	"cafe-pos/backend/domain/order"
 	"cafe-pos/backend/infrastructure/mongodb"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -61,36 +62,17 @@ func (s *ShiftService) StartShift(ctx context.Context, req *order.StartShiftRequ
 	}
 	
 	userOID, _ := primitive.ObjectIDFromHex(userID)
-	
+
 	// Check if user already has an open shift for this role
 	existingShift, _ := s.shiftRepo.FindOpenShiftByUser(ctx, userOID, roleType)
-	
+
 	// Validate using state machine
 	if err := s.stateMachineManager.ValidateWaiterShiftStart(existingShift); err != nil {
 		return nil, err
 	}
 
-	shift := &order.Shift{
-		Type:              req.Type,
-		Status:            order.ShiftOpen,
-		RoleType:          roleType,
-		UserID:            userOID,
-		UserName:          userName,
-		StartCash:         req.StartCash,
-		CurrentCash:       req.StartCash,       // Initialize with start cash
-		RemainingCash:     req.StartCash,       // Initialize with start cash
-		TransferRevenue:   0,                   // Initialize transfer revenue
-		RemainingTransfer: 0,                   // Initialize remaining transfer
-		HandedOverCash:    0,                   // Initialize handed over cash
-		HandedOverTransfer: 0,                  // Initialize handed over transfer
-		StartedAt:         time.Now(),
-	}
-
-	if err := s.shiftRepo.Create(ctx, shift); err != nil {
-		return nil, err
-	}
-
-	// Waiter phải có cashier ca mở trước khi mở ca
+	// Waiter phải có cashier ca mở trước khi mở ca — validate BEFORE creating the shift
+	var activeCashierShifts []*cashier.CashierShift
 	if roleType == order.RoleWaiter && s.cashierShiftRepo != nil {
 		openCashierShifts, err := s.cashierShiftRepo.FindOpen(ctx)
 		if err != nil {
@@ -99,20 +81,40 @@ func (s *ShiftService) StartShift(ctx context.Context, req *order.StartShiftRequ
 		if len(openCashierShifts) == 0 {
 			return nil, errors.New("thu ngân phải mở ca trước khi phục vụ mở ca")
 		}
+		activeCashierShifts = openCashierShifts
+	}
 
-		cashierShift := openCashierShifts[0]
+	shift := &order.Shift{
+		Type:               req.Type,
+		Status:             order.ShiftOpen,
+		RoleType:           roleType,
+		UserID:             userOID,
+		UserName:           userName,
+		StartCash:          req.StartCash,
+		CurrentCash:        req.StartCash,
+		RemainingCash:      req.StartCash,
+		TransferRevenue:    0,
+		RemainingTransfer:  0,
+		HandedOverCash:     0,
+		HandedOverTransfer: 0,
+		StartedAt:          time.Now(),
+	}
 
-		// Ghi nhận tiền đầu ca: double-entry journal cash_drawer → waiter_float
-		if req.StartCash > 0 && s.journalService != nil {
-			if _, err := s.journalService.RecordWaiterShiftStart(ctx, req.StartCash, shift.ID, userOID, userName); err != nil {
-				log.Printf("⚠️ [WAITER START FLOAT] Failed to record journal entry: %v (non-fatal)", err)
+	if err := s.shiftRepo.Create(ctx, shift); err != nil {
+		return nil, err
+	}
+
+	// Record starting float journal entry after shift is persisted
+	if len(activeCashierShifts) > 0 && req.StartCash > 0 && s.journalService != nil {
+		activeCashierShift := activeCashierShifts[0]
+		if _, err := s.journalService.RecordWaiterShiftStart(ctx, req.StartCash, shift.ID, userOID, userName); err != nil {
+			log.Printf("⚠️ [WAITER START FLOAT] Failed to record journal entry: %v (non-fatal)", err)
+		} else {
+			activeCashierShift.AddDistributedCash(req.StartCash)
+			if saveErr := s.cashierShiftRepo.Save(ctx, activeCashierShift); saveErr != nil {
+				log.Printf("⚠️ [WAITER START FLOAT] Failed to update cashier distributed cash: %v (non-fatal)", saveErr)
 			} else {
-				cashierShift.AddDistributedCash(req.StartCash)
-				if saveErr := s.cashierShiftRepo.Save(ctx, cashierShift); saveErr != nil {
-					log.Printf("⚠️ [WAITER START FLOAT] Failed to update cashier distributed cash: %v (non-fatal)", saveErr)
-				} else {
-					log.Printf("✅ [WAITER START FLOAT] Journal entry recorded: cash_drawer → waiter_float %.0f for %s", req.StartCash, userName)
-				}
+				log.Printf("✅ [WAITER START FLOAT] Journal entry recorded: cash_drawer → waiter_float %.0f for %s", req.StartCash, userName)
 			}
 		}
 	}
@@ -228,16 +230,19 @@ func (s *ShiftService) CloseShiftAndLockOrders(ctx context.Context, shiftID prim
 	now := time.Now()
 	orders, _ := s.orderRepo.FindByShiftID(ctx, shiftID)
 	for _, o := range orders {
-		// First pass: cancel any pending orders
 		switch o.Status {
-		case order.StatusCreated, order.StatusPaid, order.StatusQueued, order.StatusInProgress, order.StatusReady:
+		case order.StatusCreated:
+			// Huỷ đơn chưa thanh toán, sau đó khoá lại
 			o.Status = order.StatusCancelled
 			o.CancelReason = "Ca làm việc đã kết thúc"
 			o.UpdatedAt = now
 			s.orderRepo.Update(ctx, o.ID, o)
-		}
-		// Second pass: lock all completed/cancelled orders
-		if o.Status == order.StatusServed || o.Status == order.StatusCancelled {
+			o.Status = order.StatusLocked
+			o.LockedAt = &now
+			o.UpdatedAt = now
+			s.orderRepo.Update(ctx, o.ID, o)
+		case order.StatusPaid, order.StatusQueued, order.StatusInProgress, order.StatusReady, order.StatusServed, order.StatusCancelled:
+			// Khoá đơn đã thanh toán và đơn hoàn thành
 			o.Status = order.StatusLocked
 			o.LockedAt = &now
 			o.UpdatedAt = now

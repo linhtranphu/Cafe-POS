@@ -316,18 +316,35 @@ func (s *JournalService) recordWaiterShiftStart(
 	return entry, nil
 }
 
-// RecordWaiterHandover creates:
-//   DEBIT  cash_drawer  X  (ngăn kéo nhận tiền về)
-//   CREDIT waiter_float X  (waiter hoàn trả tiền)
+// RecordWaiterHandover records a waiter cash handover to the cashier drawer.
+// Handles 3 cases based on discrepancy between actual and declared amounts:
+//
+// Exact (|actual - declared| < 0.01):
+//
+//	DEBIT  cash_drawer  +actual
+//	CREDIT waiter_float +actual
+//
+// Shortage (actual < declared):
+//
+//	DEBIT  cash_drawer   +actual
+//	DEBIT  cash_shortage +shortage   ← ghi nhận khoản thiếu (audit)
+//	CREDIT waiter_float  +declared
+//
+// Overage (actual > declared):
+//
+//	DEBIT  cash_drawer  +actual
+//	CREDIT cash_overage +overage    ← ghi nhận khoản thừa (audit)
+//	CREDIT waiter_float +declared
 func (s *JournalService) RecordWaiterHandover(
 	ctx context.Context,
-	cashAmount, transferAmount float64,
+	cashActual, transferActual float64,
+	cashDeclared, transferDeclared float64,
 	handoverID primitive.ObjectID,
 	waiterID primitive.ObjectID,
 	waiterName string,
 ) (*fund.JournalEntry, error) {
-	total := cashAmount + transferAmount
-	if total <= 0 {
+	totalActual := cashActual + transferActual
+	if totalActual <= 0 {
 		return nil, fmt.Errorf("handover amount must be greater than 0")
 	}
 
@@ -342,7 +359,7 @@ func (s *JournalService) RecordWaiterHandover(
 		if err := session.StartTransaction(); err != nil {
 			return err
 		}
-		e, err := s.recordWaiterHandover(sc, cashAmount, transferAmount, handoverID, waiterID, waiterName)
+		e, err := s.recordWaiterHandover(sc, cashActual, transferActual, cashDeclared, transferDeclared, handoverID, waiterID, waiterName)
 		if err != nil {
 			session.AbortTransaction(sc)
 			return err
@@ -355,12 +372,20 @@ func (s *JournalService) RecordWaiterHandover(
 
 func (s *JournalService) recordWaiterHandover(
 	ctx context.Context,
-	cashAmount, transferAmount float64,
+	cashActual, transferActual float64,
+	cashDeclared, transferDeclared float64,
 	handoverID primitive.ObjectID,
 	waiterID primitive.ObjectID,
 	waiterName string,
 ) (*fund.JournalEntry, error) {
-	total := cashAmount + transferAmount
+	const tolerance = 0.01
+	totalActual := cashActual + transferActual
+	totalDeclared := cashDeclared + transferDeclared
+
+	cashShortage := cashDeclared - cashActual       // positive = shortage
+	cashOverage := cashActual - cashDeclared         // positive = overage
+	transferShortage := transferDeclared - transferActual
+	transferOverage := transferActual - transferDeclared
 
 	drawerBefore, err := s.repo.GetFundBalance(ctx, fund.FundTypeCashDrawer)
 	if err != nil {
@@ -371,36 +396,83 @@ func (s *JournalService) recordWaiterHandover(
 		return nil, fmt.Errorf("failed to get waiter_float balance: %w", err)
 	}
 
-	desc := fmt.Sprintf("Bàn giao ca phục vụ %s - tiền mặt: %.0fđ, chuyển khoản: %.0fđ", waiterName, cashAmount, transferAmount)
-	entry := fund.NewJournalEntry(
-		fund.EventWaiterHandover,
-		handoverID,
-		desc,
-		waiterID,
-		waiterName,
-		"waiter",
-	)
+	desc := fmt.Sprintf("Bàn giao ca phục vụ %s - thực nhận: %.0fđ (khai báo: %.0fđ)", waiterName, totalActual, totalDeclared)
+	entry := fund.NewJournalEntry(fund.EventWaiterHandover, handoverID, desc, waiterID, waiterName, "waiter")
 
-	// DEBIT cash_drawer (drawer receives money back)
+	// DEBIT cash_drawer — always debited with actual amount received
 	drawerAfter := fund.FundBalance{
-		Cash:     drawerBefore.Cash + cashAmount,
-		Transfer: drawerBefore.Transfer + transferAmount,
-		Total:    drawerBefore.Total + total,
+		Cash:     drawerBefore.Cash + cashActual,
+		Transfer: drawerBefore.Transfer + transferActual,
+		Total:    drawerBefore.Total + totalActual,
 	}
-	entry.AddLine(fund.FundTypeCashDrawer, fund.DirectionDebit, cashAmount, transferAmount, *drawerBefore, drawerAfter)
+	entry.AddLine(fund.FundTypeCashDrawer, fund.DirectionDebit, cashActual, transferActual, *drawerBefore, drawerAfter)
 
-	// CREDIT waiter_float (waiter returns money)
-	waiterAfter := fund.FundBalance{
-		Cash:     waiterBefore.Cash - cashAmount,
-		Transfer: waiterBefore.Transfer - transferAmount,
-		Total:    waiterBefore.Total - total,
+	// Shortage lines: DEBIT cash_shortage for the gap
+	if cashShortage > tolerance {
+		shortageBefore, err := s.repo.GetFundBalance(ctx, fund.FundTypeCashShortage)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get cash_shortage balance: %w", err)
+		}
+		shortageAfter := fund.FundBalance{
+			Cash:  shortageBefore.Cash + cashShortage,
+			Total: shortageBefore.Total + cashShortage,
+		}
+		entry.AddLine(fund.FundTypeCashShortage, fund.DirectionDebit, cashShortage, 0, *shortageBefore, shortageAfter)
 	}
-	entry.AddLine(fund.FundTypeWaiterFloat, fund.DirectionCredit, cashAmount, transferAmount, *waiterBefore, waiterAfter)
+	if transferShortage > tolerance {
+		shortageBefore, err := s.repo.GetFundBalance(ctx, fund.FundTypeCashShortage)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get cash_shortage balance: %w", err)
+		}
+		shortageAfter := fund.FundBalance{
+			Transfer: shortageBefore.Transfer + transferShortage,
+			Total:    shortageBefore.Total + transferShortage,
+		}
+		entry.AddLine(fund.FundTypeCashShortage, fund.DirectionDebit, 0, transferShortage, *shortageBefore, shortageAfter)
+	}
+
+	// Overage lines: CREDIT cash_overage for the surplus
+	if cashOverage > tolerance {
+		overageBefore, err := s.repo.GetFundBalance(ctx, fund.FundTypeCashOverage)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get cash_overage balance: %w", err)
+		}
+		overageAfter := fund.FundBalance{
+			Cash:  overageBefore.Cash + cashOverage,
+			Total: overageBefore.Total + cashOverage,
+		}
+		entry.AddLine(fund.FundTypeCashOverage, fund.DirectionCredit, cashOverage, 0, *overageBefore, overageAfter)
+	}
+	if transferOverage > tolerance {
+		overageBefore, err := s.repo.GetFundBalance(ctx, fund.FundTypeCashOverage)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get cash_overage balance: %w", err)
+		}
+		overageAfter := fund.FundBalance{
+			Transfer: overageBefore.Transfer + transferOverage,
+			Total:    overageBefore.Total + transferOverage,
+		}
+		entry.AddLine(fund.FundTypeCashOverage, fund.DirectionCredit, 0, transferOverage, *overageBefore, overageAfter)
+	}
+
+	// CREDIT waiter_float — credited with declared amount (zeros out their balance)
+	creditCash := cashDeclared
+	creditTransfer := transferDeclared
+	if cashDeclared <= tolerance && transferDeclared <= tolerance {
+		// Fallback: if declared is 0, use actual
+		creditCash = cashActual
+		creditTransfer = transferActual
+	}
+	waiterAfter := fund.FundBalance{
+		Cash:     waiterBefore.Cash - creditCash,
+		Transfer: waiterBefore.Transfer - creditTransfer,
+		Total:    waiterBefore.Total - creditCash - creditTransfer,
+	}
+	entry.AddLine(fund.FundTypeWaiterFloat, fund.DirectionCredit, creditCash, creditTransfer, *waiterBefore, waiterAfter)
 
 	if err := entry.Validate(); err != nil {
 		return nil, err
 	}
-
 	if err := s.repo.Create(ctx, entry); err != nil {
 		return nil, fmt.Errorf("failed to persist journal entry: %w", err)
 	}

@@ -6,6 +6,7 @@ import (
 	"math"
 	"time"
 
+	"cafe-pos/backend/domain/batch"
 	"cafe-pos/backend/domain/ingredient"
 	"cafe-pos/backend/domain/menu"
 	"cafe-pos/backend/domain/order"
@@ -37,10 +38,11 @@ type CostCalculatorService struct {
 	orderRepo      OrderRepository
 	orderItemRepo  OrderItemRepository
 	batchRecRepo   CostCalculatorBatchRecordRepository
-	
+	batchDefRepo   batch.BatchDefinitionRepository
+
 	// Reference to cost recalculation service for queuing background jobs
 	recalcService *CostRecalculationService
-	
+
 	// Monitoring service for metrics and alerts
 	monitoringService *MonitoringService
 }
@@ -59,6 +61,11 @@ func NewCostCalculatorService(menuRepo MenuRepository, ingredientRepo Ingredient
 // SetBatchRecordRepository sets the batch record repository for batch cost calculation
 func (s *CostCalculatorService) SetBatchRecordRepository(batchRecRepo CostCalculatorBatchRecordRepository) {
 	s.batchRecRepo = batchRecRepo
+}
+
+// SetBatchDefinitionRepository sets the batch definition repository for batch cost interpolation
+func (s *CostCalculatorService) SetBatchDefinitionRepository(batchDefRepo batch.BatchDefinitionRepository) {
+	s.batchDefRepo = batchDefRepo
 }
 
 // SetCostRecalculationService sets the cost recalculation service for queuing background jobs
@@ -284,6 +291,7 @@ type ingredientCostResult struct {
 	cost               float64
 	status             menu.CostStatus
 	missingIngredients []string
+	hasEstimated       bool // true if any ingredient used ESTIMATED cost
 }
 
 // calculateIngredientsCost calculates cost for a list of ingredients
@@ -292,6 +300,7 @@ func (s *CostCalculatorService) calculateIngredientsCost(ingredients []menu.Ingr
 	var totalCost float64
 	var missingIngredients []string
 	hasIncompleteCost := false
+	hasEstimated := false
 
 	for _, menuIngredient := range ingredients {
 		// Check if this is a batch ingredient
@@ -302,16 +311,19 @@ func (s *CostCalculatorService) calculateIngredientsCost(ingredients []menu.Ingr
 				hasIncompleteCost = true
 				continue
 			}
-			
-			// Get batch cost
-			batchCost, err := s.getBatchCostPerUnit(context.Background(), *menuIngredient.BatchID)
+
+			// Get batch cost (FINAL from record, or ESTIMATED from definition)
+			batchCost, batchStatus, err := s.getBatchCostPerUnit(context.Background(), *menuIngredient.BatchID)
 			if err != nil {
-				// Batch not found or no available batches
 				missingIngredients = append(missingIngredients, menuIngredient.Name)
 				hasIncompleteCost = true
 				continue
 			}
-			
+
+			if batchStatus == menu.CostStatusEstimated {
+				hasEstimated = true
+			}
+
 			// Calculate cost for batch ingredient
 			// Formula: quantity * batch_cost_per_unit
 			ingredientCost := menuIngredient.Quantity * batchCost
@@ -354,40 +366,85 @@ func (s *CostCalculatorService) calculateIngredientsCost(ingredients []menu.Ingr
 	// Round to 2 decimal places
 	totalCost = math.Round(totalCost*100) / 100
 
-	// Determine cost status
+	// Determine cost status: INCOMPLETE > ESTIMATED > FINAL
 	costStatus := menu.CostStatusFinal
 	if hasIncompleteCost {
 		costStatus = menu.CostStatusIncomplete
+	} else if hasEstimated {
+		costStatus = menu.CostStatusEstimated
 	}
-	
+
 	return &ingredientCostResult{
 		cost:               totalCost,
 		status:             costStatus,
 		missingIngredients: missingIngredients,
+		hasEstimated:       hasEstimated,
 	}
 }
 
-// getBatchCostPerUnit retrieves the average cost per unit for available batches
-// Uses FIFO logic - gets cost from the oldest available batch
-func (s *CostCalculatorService) getBatchCostPerUnit(ctx context.Context, batchDefID primitive.ObjectID) (float64, error) {
-	// If batch repository is not set, return error
-	if s.batchRecRepo == nil {
-		return 0, fmt.Errorf("batch repository not configured")
+// getBatchCostPerUnit retrieves cost per unit for a batch definition.
+// 1. FINAL: uses CostPerUnit from the oldest available BatchRecord (FIFO).
+// 2. ESTIMATED: interpolates from BatchDefinition.ConversionRates when no BatchRecord exists.
+func (s *CostCalculatorService) getBatchCostPerUnit(ctx context.Context, batchDefID primitive.ObjectID) (float64, menu.CostStatus, error) {
+	// 1. Try BatchRecord (FINAL cost)
+	if s.batchRecRepo != nil {
+		batches, err := s.batchRecRepo.FindAvailableByDefinition(ctx, batchDefID)
+		if err == nil && len(batches) > 0 {
+			return batches[0].CostPerUnit, menu.CostStatusFinal, nil
+		}
 	}
-	
-	// Get available batches (sorted by expiry date - FIFO)
-	batches, err := s.batchRecRepo.FindAvailableByDefinition(ctx, batchDefID)
+
+	// 2. Interpolate from BatchDefinition (ESTIMATED cost)
+	cost, status, err := s.interpolateBatchCostFromDefinition(ctx, batchDefID)
 	if err != nil {
-		return 0, fmt.Errorf("failed to find available batches: %w", err)
+		return 0, menu.CostStatusIncomplete, err
 	}
-	
-	// If no batches available, return error
-	if len(batches) == 0 {
-		return 0, fmt.Errorf("no available batches")
+	return cost, status, nil
+}
+
+// interpolateBatchCostFromDefinition estimates cost per batch unit from the
+// BatchDefinition's ConversionRates and current ingredient CostPerUnit values.
+func (s *CostCalculatorService) interpolateBatchCostFromDefinition(
+	ctx context.Context,
+	batchDefID primitive.ObjectID,
+) (float64, menu.CostStatus, error) {
+	if s.batchDefRepo == nil {
+		return 0, menu.CostStatusIncomplete, fmt.Errorf("batch definition repository not configured")
 	}
-	
-	// Return cost per unit from the first (oldest) batch (FIFO)
-	return batches[0].CostPerUnit, nil
+
+	def, err := s.batchDefRepo.FindByID(ctx, batchDefID)
+	if err != nil {
+		return 0, menu.CostStatusIncomplete, fmt.Errorf("batch definition not found: %w", err)
+	}
+
+	if len(def.ConversionRates) == 0 {
+		return 0, menu.CostStatusIncomplete, fmt.Errorf("batch definition has no conversion rates")
+	}
+
+	totalCostPerBatchUnit := 0.0
+	batchQuantity := def.ConversionRates[0].BatchQuantity
+	if batchQuantity <= 0 {
+		batchQuantity = 1
+	}
+
+	for _, rate := range def.ConversionRates {
+		ing, err := s.ingredientRepo.FindByID(ctx, rate.SourceIngredientID)
+		if err != nil || ing.CostPerUnit <= 0 {
+			return 0, menu.CostStatusIncomplete, fmt.Errorf("missing cost for ingredient %s", rate.SourceIngredientName)
+		}
+
+		// Convert source_quantity from recipe unit to ingredient stock unit
+		convRate := ingredient.GetConversionRate(ingredient.UnitType(ing.Unit), ingredient.UnitType(rate.SourceUnit))
+		qtyInStockUnit := rate.SourceQuantity * convRate
+
+		// Apply wastage
+		actualQty := qtyInStockUnit * (1 + rate.WastageRate)
+
+		totalCostPerBatchUnit += actualQty * ing.CostPerUnit
+	}
+
+	costPerUnit := totalCostPerBatchUnit / batchQuantity
+	return math.Round(costPerUnit*100) / 100, menu.CostStatusEstimated, nil
 }
 
 // CalculateAllMenuItemCosts calculates current cost for all menu items
@@ -806,6 +863,7 @@ type IngredientCostDetail struct {
 	ConversionRate    float64
 	WastagePercentage float64
 	TotalCost         float64
+	DeductInventory   bool
 }
 
 // MenuItemCostDetail represents detailed cost breakdown for a menu item
@@ -827,18 +885,26 @@ func (s *CostCalculatorService) CalculateMenuItemCostDetail(ctx context.Context,
 		return nil, fmt.Errorf("failed to fetch menu item: %w", err)
 	}
 
-	// Initialize result
+	result, err := s.CalculateIngredientListCostDetail(ctx, menuItem.Ingredients)
+	if err != nil {
+		return nil, err
+	}
+	result.MenuItemID = menuItemID
+	result.MenuItemName = menuItem.Name
+	return result, nil
+}
+
+// CalculateIngredientListCostDetail calculates cost detail for a given list of ingredients.
+// Useful for variant-level cost breakdown.
+func (s *CostCalculatorService) CalculateIngredientListCostDetail(ctx context.Context, ingredients []menu.Ingredient) (*MenuItemCostDetail, error) {
 	result := &MenuItemCostDetail{
-		MenuItemID:   menuItemID,
-		MenuItemName: menuItem.Name,
 		Ingredients:  []IngredientCostDetail{},
 		TotalCost:    0.0,
 		CostStatus:   menu.CostStatusFinal,
 		MissingCosts: []string{},
 	}
 
-	// If menu item has no ingredients, return empty breakdown
-	if len(menuItem.Ingredients) == 0 {
+	if len(ingredients) == 0 {
 		return result, nil
 	}
 
@@ -848,65 +914,65 @@ func (s *CostCalculatorService) CalculateMenuItemCostDetail(ctx context.Context,
 		return nil, fmt.Errorf("failed to fetch ingredients: %w", err)
 	}
 
-	// Build ingredient lookup map by name
 	ingredientMap := make(map[string]*ingredient.Ingredient)
 	for _, ing := range allIngredients {
 		ingredientMap[ing.Name] = ing
 	}
 
-	// Calculate cost for each ingredient
 	var totalCost float64
 	hasIncompleteCost := false
+	hasEstimated := false
 
-	for _, menuIngredient := range menuItem.Ingredients {
-		// Find the ingredient in our map
-		ing, exists := ingredientMap[menuIngredient.Name]
-		
+	for _, menuIngredient := range ingredients {
 		detail := IngredientCostDetail{
-			Name:     menuIngredient.Name,
-			Quantity: menuIngredient.Quantity,
-			Unit:     string(menuIngredient.Unit),
+			Name:            menuIngredient.Name,
+			Quantity:        menuIngredient.Quantity,
+			Unit:            string(menuIngredient.Unit),
+			DeductInventory: menuIngredient.DeductInventory,
+			ConversionRate:  1.0,
 		}
 
-		if !exists {
-			// Ingredient not found in database
-			result.MissingCosts = append(result.MissingCosts, menuIngredient.Name)
-			hasIncompleteCost = true
-			detail.CostPerUnit = 0
-			detail.ConversionRate = 1.0
-			detail.WastagePercentage = 0.0
-			detail.TotalCost = 0
+		// Batch ingredient: resolve cost from batch records/definition
+		if menuIngredient.IsBatchIngredient() && menuIngredient.BatchID != nil {
+			costPerUnit, status, err := s.getBatchCostPerUnit(ctx, *menuIngredient.BatchID)
+			if err != nil || costPerUnit <= 0 {
+				result.MissingCosts = append(result.MissingCosts, menuIngredient.Name)
+				hasIncompleteCost = true
+				result.Ingredients = append(result.Ingredients, detail)
+				continue
+			}
+			ingredientCost := math.Round(menuIngredient.Quantity*costPerUnit*100) / 100
+			detail.CostPerUnit = costPerUnit
+			detail.TotalCost = ingredientCost
+			totalCost += ingredientCost
+			if status == menu.CostStatusEstimated {
+				hasEstimated = true
+			}
 			result.Ingredients = append(result.Ingredients, detail)
 			continue
 		}
 
-		// Check if cost_per_unit is missing (0 or not set)
+		// Raw ingredient: resolve from ingredientMap
+		ing, exists := ingredientMap[menuIngredient.Name]
+		if !exists {
+			result.MissingCosts = append(result.MissingCosts, menuIngredient.Name)
+			hasIncompleteCost = true
+			result.Ingredients = append(result.Ingredients, detail)
+			continue
+		}
+
 		if ing.CostPerUnit <= 0 {
 			result.MissingCosts = append(result.MissingCosts, menuIngredient.Name)
 			hasIncompleteCost = true
-			detail.CostPerUnit = 0
-			// Calculate conversion rate even if cost is missing (for display purposes)
 			detail.ConversionRate = ingredient.GetConversionRate(ing.Unit, menuIngredient.Unit)
-			detail.WastagePercentage = ing.WastagePercentage
-			if detail.WastagePercentage < 0 {
-				detail.WastagePercentage = 0.0
-			}
-			detail.TotalCost = 0
+			detail.WastagePercentage = max0(ing.WastagePercentage)
 			result.Ingredients = append(result.Ingredients, detail)
 			continue
 		}
 
-		// Calculate conversion rate dynamically based on stock unit and recipe unit
 		conversionRate := ingredient.GetConversionRate(ing.Unit, menuIngredient.Unit)
+		wastagePercentage := max0(ing.WastagePercentage)
 
-		// Get wastage percentage (default 0.0 if not set)
-		wastagePercentage := ing.WastagePercentage
-		if wastagePercentage < 0 {
-			wastagePercentage = 0.0
-		}
-
-		// Calculate cost for this ingredient
-		// Formula: quantity * cost_per_unit * conversion_rate * (1 + wastage_percentage/100)
 		ingredientCost := menuIngredient.Quantity * ing.CostPerUnit * conversionRate * (1 + wastagePercentage/100)
 		ingredientCost = math.Round(ingredientCost*100) / 100
 
@@ -919,10 +985,9 @@ func (s *CostCalculatorService) CalculateMenuItemCostDetail(ctx context.Context,
 		result.Ingredients = append(result.Ingredients, detail)
 	}
 
-	// Round total cost to 2 decimal places
-	result.TotalCost = math.Round(totalCost*100) / 100
+	_ = hasEstimated // used for future CostStatus refinement
 
-	// Determine cost status
+	result.TotalCost = math.Round(totalCost*100) / 100
 	if hasIncompleteCost {
 		result.CostStatus = menu.CostStatusIncomplete
 	}
@@ -933,4 +998,11 @@ func (s *CostCalculatorService) CalculateMenuItemCostDetail(ctx context.Context,
 // GetMenuItemByID fetches a menu item by ID (helper for handlers)
 func (s *CostCalculatorService) GetMenuItemByID(ctx context.Context, menuItemID primitive.ObjectID) (*menu.MenuItem, error) {
 	return s.menuRepo.FindByID(ctx, menuItemID)
+}
+
+func max0(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	return v
 }

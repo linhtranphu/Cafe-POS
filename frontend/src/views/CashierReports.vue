@@ -188,6 +188,88 @@
             </div>
           </div>
 
+          <!-- Handover Summary -->
+          <div v-if="currentReport.handover" class="space-y-2">
+            <h3 class="font-bold text-gray-800 text-sm">🤝 Bàn giao ca</h3>
+            <!-- Summary totals -->
+            <div class="grid grid-cols-2 gap-2">
+              <div class="bg-blue-50 rounded-xl p-3">
+                <div class="text-xs text-gray-500 mb-1">Tổng khai báo</div>
+                <div class="font-bold text-blue-700 text-sm">{{ formatCompactPrice(currentReport.handover.total_declared) }}</div>
+              </div>
+              <div class="bg-green-50 rounded-xl p-3">
+                <div class="text-xs text-gray-500 mb-1">Tổng thực nhận</div>
+                <div class="font-bold text-green-700 text-sm">{{ formatCompactPrice(currentReport.handover.total_actual) }}</div>
+              </div>
+              <div v-if="currentReport.handover.total_shortage > 0" class="bg-red-50 rounded-xl p-3">
+                <div class="text-xs text-gray-500 mb-1">Tổng thiếu</div>
+                <div class="font-bold text-red-600 text-sm">-{{ formatCompactPrice(currentReport.handover.total_shortage) }}</div>
+              </div>
+              <div v-if="currentReport.handover.total_overage > 0" class="bg-emerald-50 rounded-xl p-3">
+                <div class="text-xs text-gray-500 mb-1">Tổng thừa</div>
+                <div class="font-bold text-emerald-600 text-sm">+{{ formatCompactPrice(currentReport.handover.total_overage) }}</div>
+              </div>
+            </div>
+            <!-- Per-waiter breakdown -->
+            <div v-if="currentReport.handover.entries?.length" class="space-y-2">
+              <div
+                v-for="(entry, idx) in currentReport.handover.entries"
+                :key="idx"
+                class="bg-gray-50 rounded-xl p-3"
+              >
+                <div class="flex justify-between items-center mb-2">
+                  <span class="font-medium text-gray-800 text-sm">{{ entry.waiter_name }}</span>
+                  <span :class="getHandoverStatusClass(entry.status)" class="text-[10px] px-2 py-0.5 rounded-full font-medium">
+                    {{ getHandoverStatusText(entry.status) }}
+                  </span>
+                </div>
+                <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
+                  <div class="flex justify-between"><span>💵 Cash khai báo:</span><span class="font-medium">{{ formatCompactPrice(entry.cash_declared) }}</span></div>
+                  <div class="flex justify-between"><span>💵 Cash thực nhận:</span><span class="font-medium">{{ formatCompactPrice(entry.cash_actual) }}</span></div>
+                  <div class="flex justify-between"><span>💳 CK khai báo:</span><span class="font-medium">{{ formatCompactPrice(entry.transfer_declared) }}</span></div>
+                  <div class="flex justify-between"><span>💳 CK thực nhận:</span><span class="font-medium">{{ formatCompactPrice(entry.transfer_actual) }}</span></div>
+                </div>
+                <div v-if="entry.cash_discrepancy !== 0 || entry.transfer_discrepancy !== 0" class="mt-2 pt-2 border-t border-gray-200 flex gap-3 text-xs">
+                  <span v-if="entry.cash_discrepancy !== 0" :class="entry.cash_discrepancy < 0 ? 'text-red-600' : 'text-emerald-600'" class="font-medium">
+                    💵 {{ entry.cash_discrepancy > 0 ? '+' : '' }}{{ formatCompactPrice(entry.cash_discrepancy) }}
+                  </span>
+                  <span v-if="entry.transfer_discrepancy !== 0" :class="entry.transfer_discrepancy < 0 ? 'text-red-600' : 'text-emerald-600'" class="font-medium">
+                    💳 {{ entry.transfer_discrepancy > 0 ? '+' : '' }}{{ formatCompactPrice(entry.transfer_discrepancy) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Item Breakdown -->
+          <div v-if="currentReport.items_sold && currentReport.items_sold.length > 0" class="space-y-2">
+            <div class="flex justify-between items-center">
+              <h3 class="font-bold text-gray-800 text-sm">🧾 Danh sách món đã bán</h3>
+              <span class="text-xs text-gray-500">{{ currentReport.total_items_sold }} món</span>
+            </div>
+            <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <!-- Header -->
+              <div class="grid grid-cols-12 gap-1 px-3 py-2 bg-gray-100 text-xs text-gray-500 font-medium">
+                <div class="col-span-6">Tên món</div>
+                <div class="col-span-2 text-center">SL</div>
+                <div class="col-span-4 text-right">Doanh thu</div>
+              </div>
+              <!-- Rows -->
+              <div
+                v-for="(item, idx) in currentReport.items_sold"
+                :key="idx"
+                class="grid grid-cols-12 gap-1 px-3 py-2 text-sm border-t border-gray-100"
+              >
+                <div class="col-span-6">
+                  <div class="font-medium text-gray-800 text-xs leading-tight">{{ item.name }}</div>
+                  <div v-if="item.variant_name" class="text-[10px] text-gray-500">{{ item.variant_name }}</div>
+                </div>
+                <div class="col-span-2 text-center font-bold text-gray-700 text-xs self-center">{{ item.quantity }}</div>
+                <div class="col-span-4 text-right text-xs text-gray-700 self-center">{{ formatCompactPrice(item.revenue) }}</div>
+              </div>
+            </div>
+          </div>
+
           <!-- Audit Trail -->
           <div v-if="currentReport.audits && currentReport.audits.length > 0" class="space-y-2">
             <h3 class="font-bold text-gray-800 text-sm">📝 Nhật ký kiểm toán</h3>
@@ -472,6 +554,26 @@ const getAuditActionText = (action) => {
     LOCK: '🔒 Khóa'
   }
   return texts[action] || action
+}
+
+const getHandoverStatusClass = (status) => {
+  const classes = {
+    CONFIRMED: 'bg-green-100 text-green-700',
+    PENDING: 'bg-yellow-100 text-yellow-700',
+    REJECTED: 'bg-red-100 text-red-700',
+    DISCREPANCY: 'bg-orange-100 text-orange-700',
+  }
+  return classes[status] || 'bg-gray-100 text-gray-600'
+}
+
+const getHandoverStatusText = (status) => {
+  const texts = {
+    CONFIRMED: '✅ Đã xác nhận',
+    PENDING: '⏳ Chờ xác nhận',
+    REJECTED: '❌ Từ chối',
+    DISCREPANCY: '⚠️ Chênh lệch',
+  }
+  return texts[status] || status
 }
 
 const getReportTitle = (report) => {
