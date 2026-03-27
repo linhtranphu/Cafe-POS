@@ -21,6 +21,15 @@ type ShopSettings struct {
 	ShowCustomMessage  bool               `bson:"show_custom_message" json:"show_custom_message"`               // Show custom message on bill
 	LowMarginThreshold float64            `bson:"low_margin_threshold" json:"low_margin_threshold"`             // Default: 20.0
 	AutoPrintEnabled   bool               `bson:"auto_print_enabled" json:"auto_print_enabled"`                 // Default: true
+	PaperWidth         int                `bson:"paper_width" json:"paper_width"`                               // Bill paper width in mm (40, 58, 80)
+	
+	// Label Printer Settings (replaces temp bill printer)
+	LabelPrinterEnabled bool   `bson:"label_printer_enabled" json:"label_printer_enabled"`
+	LabelPrinterIP      string `bson:"label_printer_ip" json:"label_printer_ip"`
+	LabelPrinterPort    int    `bson:"label_printer_port" json:"label_printer_port"`
+	LabelWidth          int    `bson:"label_width" json:"label_width"`   // mm
+	LabelHeight         int    `bson:"label_height" json:"label_height"` // mm
+	
 	CreatedAt          time.Time          `bson:"created_at" json:"created_at"`
 	UpdatedAt          time.Time          `bson:"updated_at" json:"updated_at"`
 }
@@ -36,6 +45,7 @@ func NewShopSettings(shopName string) *ShopSettings {
 		ShowCustomMessage:  true,
 		LowMarginThreshold: 20.0, // Default threshold
 		AutoPrintEnabled:   true, // Default: auto-print enabled
+		PaperWidth:         58,   // Default: 58mm thermal paper
 		CreatedAt:          now,
 		UpdatedAt:          now,
 	}

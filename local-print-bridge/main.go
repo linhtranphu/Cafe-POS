@@ -81,6 +81,9 @@ func main() {
 	// Direct print (ESC/POS data)
 	r.POST("/print", handleDirectPrint)
 
+	// Print TSPL commands (for label printers)
+	r.POST("/print-tspl", handlePrintTSPL)
+
 	log.Println(strings.Repeat("=", 50))
 	log.Println("🖨️  Local Print Bridge Started (Go + chromedp)")
 	log.Println(strings.Repeat("=", 50))
@@ -91,6 +94,7 @@ func main() {
 	log.Println("Endpoints:")
 	log.Println("  POST /render-and-print - Render HTML and print")
 	log.Println("  POST /print - Direct print ESC/POS data")
+	log.Println("  POST /print-tspl - Print TSPL commands (label printer)")
 	log.Println("  POST /test-connection - Test printer connection")
 	log.Println("  GET /health - Health check")
 	log.Println("  GET /status - Service status")
@@ -492,4 +496,39 @@ func sendToPrinter(ip string, port int, data []byte) error {
 	}
 
 	return nil
+}
+
+// handlePrintTSPL prints TSPL commands to label printer
+func handlePrintTSPL(c *gin.Context) {
+	var req struct {
+		Commands    string `json:"commands" binding:"required"`
+		PrinterIP   string `json:"printer_ip" binding:"required"`
+		PrinterPort int    `json:"printer_port"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	if req.PrinterPort == 0 {
+		req.PrinterPort = 9100
+	}
+
+	log.Printf("[Print TSPL] Request - Printer: %s:%d, Commands: %d bytes", req.PrinterIP, req.PrinterPort, len(req.Commands))
+	log.Printf("[Print TSPL] Commands:\n%s", req.Commands)
+
+	// Send TSPL commands directly to printer
+	if err := sendToPrinter(req.PrinterIP, req.PrinterPort, []byte(req.Commands)); err != nil {
+		log.Printf("[Print TSPL] Failed: %v", err)
+		c.JSON(500, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	log.Printf("[Print TSPL] Success")
+	c.JSON(200, gin.H{
+		"success":   true,
+		"message":   "TSPL print completed successfully",
+		"timestamp": time.Now().Format(time.RFC3339),
+	})
 }

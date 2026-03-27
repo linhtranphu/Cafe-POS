@@ -407,52 +407,44 @@ func (s *JournalService) recordWaiterHandover(
 	}
 	entry.AddLine(fund.FundTypeCashDrawer, fund.DirectionDebit, cashActual, transferActual, *drawerBefore, drawerAfter)
 
-	// Shortage lines: DEBIT cash_shortage for the gap
-	if cashShortage > tolerance {
+	// Shortage line: DEBIT cash_shortage — single line with both cash and transfer
+	if cashShortage > tolerance || transferShortage > tolerance {
+		if cashShortage < 0 {
+			cashShortage = 0
+		}
+		if transferShortage < 0 {
+			transferShortage = 0
+		}
 		shortageBefore, err := s.repo.GetFundBalance(ctx, fund.FundTypeCashShortage)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get cash_shortage balance: %w", err)
 		}
 		shortageAfter := fund.FundBalance{
-			Cash:  shortageBefore.Cash + cashShortage,
-			Total: shortageBefore.Total + cashShortage,
-		}
-		entry.AddLine(fund.FundTypeCashShortage, fund.DirectionDebit, cashShortage, 0, *shortageBefore, shortageAfter)
-	}
-	if transferShortage > tolerance {
-		shortageBefore, err := s.repo.GetFundBalance(ctx, fund.FundTypeCashShortage)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get cash_shortage balance: %w", err)
-		}
-		shortageAfter := fund.FundBalance{
+			Cash:     shortageBefore.Cash + cashShortage,
 			Transfer: shortageBefore.Transfer + transferShortage,
-			Total:    shortageBefore.Total + transferShortage,
+			Total:    shortageBefore.Total + cashShortage + transferShortage,
 		}
-		entry.AddLine(fund.FundTypeCashShortage, fund.DirectionDebit, 0, transferShortage, *shortageBefore, shortageAfter)
+		entry.AddLine(fund.FundTypeCashShortage, fund.DirectionDebit, cashShortage, transferShortage, *shortageBefore, shortageAfter)
 	}
 
-	// Overage lines: CREDIT cash_overage for the surplus
-	if cashOverage > tolerance {
+	// Overage line: CREDIT cash_overage — single line with both cash and transfer
+	if cashOverage > tolerance || transferOverage > tolerance {
+		if cashOverage < 0 {
+			cashOverage = 0
+		}
+		if transferOverage < 0 {
+			transferOverage = 0
+		}
 		overageBefore, err := s.repo.GetFundBalance(ctx, fund.FundTypeCashOverage)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get cash_overage balance: %w", err)
 		}
 		overageAfter := fund.FundBalance{
-			Cash:  overageBefore.Cash + cashOverage,
-			Total: overageBefore.Total + cashOverage,
-		}
-		entry.AddLine(fund.FundTypeCashOverage, fund.DirectionCredit, cashOverage, 0, *overageBefore, overageAfter)
-	}
-	if transferOverage > tolerance {
-		overageBefore, err := s.repo.GetFundBalance(ctx, fund.FundTypeCashOverage)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get cash_overage balance: %w", err)
-		}
-		overageAfter := fund.FundBalance{
+			Cash:     overageBefore.Cash + cashOverage,
 			Transfer: overageBefore.Transfer + transferOverage,
-			Total:    overageBefore.Total + transferOverage,
+			Total:    overageBefore.Total + cashOverage + transferOverage,
 		}
-		entry.AddLine(fund.FundTypeCashOverage, fund.DirectionCredit, 0, transferOverage, *overageBefore, overageAfter)
+		entry.AddLine(fund.FundTypeCashOverage, fund.DirectionCredit, cashOverage, transferOverage, *overageBefore, overageAfter)
 	}
 
 	// CREDIT waiter_float — credited with declared amount (zeros out their balance)
@@ -802,6 +794,89 @@ func (s *JournalService) RecordFundTransfer(
 			return err
 		}
 
+		if err := s.repo.Create(sc, e); err != nil {
+			session.AbortTransaction(sc)
+			return fmt.Errorf("failed to persist journal entry: %w", err)
+		}
+		entry = e
+		return session.CommitTransaction(sc)
+	})
+	return entry, err
+}
+
+// RecordOrderPayment creates:
+//
+//	DEBIT  waiter_float  X  (waiter nhận tiền từ khách)
+//	CREDIT customer      X  (khách hàng thanh toán)
+//
+// cashAmount > 0 khi thanh toán tiền mặt, transferAmount > 0 khi chuyển khoản/QR.
+func (s *JournalService) RecordOrderPayment(
+	ctx context.Context,
+	cashAmount, transferAmount float64,
+	orderID primitive.ObjectID,
+	orderNumber string,
+	waiterID primitive.ObjectID,
+	waiterName string,
+) (*fund.JournalEntry, error) {
+	total := cashAmount + transferAmount
+	if total <= 0 {
+		return nil, fmt.Errorf("payment amount must be greater than 0")
+	}
+
+	session, err := s.mongoClient.StartSession()
+	if err != nil {
+		return nil, fmt.Errorf("failed to start session: %w", err)
+	}
+	defer session.EndSession(ctx)
+
+	var entry *fund.JournalEntry
+	err = mongoDriver.WithSession(ctx, session, func(sc mongoDriver.SessionContext) error {
+		if err := session.StartTransaction(); err != nil {
+			return err
+		}
+
+		waiterBefore, err := s.repo.GetFundBalance(sc, fund.FundTypeWaiterFloat)
+		if err != nil {
+			session.AbortTransaction(sc)
+			return fmt.Errorf("failed to get waiter_float balance: %w", err)
+		}
+		customerBefore, err := s.repo.GetFundBalance(sc, fund.FundTypeCustomer)
+		if err != nil {
+			session.AbortTransaction(sc)
+			return fmt.Errorf("failed to get customer balance: %w", err)
+		}
+
+		var paymentType string
+		if cashAmount > 0 && transferAmount > 0 {
+			paymentType = "tiền mặt + chuyển khoản"
+		} else if cashAmount > 0 {
+			paymentType = "tiền mặt"
+		} else {
+			paymentType = "chuyển khoản"
+		}
+		desc := fmt.Sprintf("Thanh toán đơn %s - %.0fđ (%s) - %s", orderNumber, total, paymentType, waiterName)
+		e := fund.NewJournalEntry(fund.EventOrderPayment, orderID, desc, waiterID, waiterName, "waiter")
+
+		// DEBIT waiter_float (waiter nhận tiền từ khách)
+		waiterAfter := fund.FundBalance{
+			Cash:     waiterBefore.Cash + cashAmount,
+			Transfer: waiterBefore.Transfer + transferAmount,
+			Total:    waiterBefore.Total + total,
+		}
+		e.AddLine(fund.FundTypeWaiterFloat, fund.DirectionDebit, cashAmount, transferAmount, *waiterBefore, waiterAfter)
+
+		// CREDIT customer (khách hàng thanh toán)
+		customerAfter := fund.FundBalance{
+			Cash:     customerBefore.Cash - cashAmount,
+			Transfer: customerBefore.Transfer - transferAmount,
+			Total:    customerBefore.Total - total,
+		}
+		e.AddLine(fund.FundTypeCustomer, fund.DirectionCredit, cashAmount, transferAmount, *customerBefore, customerAfter)
+
+		if err := e.Validate(); err != nil {
+			session.AbortTransaction(sc)
+			return err
+		}
 		if err := s.repo.Create(sc, e); err != nil {
 			session.AbortTransaction(sc)
 			return fmt.Errorf("failed to persist journal entry: %w", err)

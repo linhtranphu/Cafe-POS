@@ -46,7 +46,7 @@ type CreatePrinterConfigRequest struct {
 	IPAddress      string         `json:"ip_address"`
 	Port           int            `json:"port"`
 	USBPath        string         `json:"usb_path"`
-	PaperWidth     int            `json:"paper_width" binding:"required,oneof=58 80"`
+	PaperWidth     int            `json:"paper_width" binding:"required,oneof=40 58 80"`
 	IsDefault      bool           `json:"is_default"`
 	IsEnabled      bool           `json:"is_enabled"`
 }
@@ -59,7 +59,7 @@ type UpdatePrinterConfigRequest struct {
 	IPAddress      string          `json:"ip_address"`
 	Port           *int            `json:"port"`
 	USBPath        string          `json:"usb_path"`
-	PaperWidth     *int            `json:"paper_width" binding:"omitempty,oneof=58 80"`
+	PaperWidth     *int            `json:"paper_width" binding:"omitempty,oneof=40 58 80"`
 	IsDefault      *bool           `json:"is_default"`
 	IsEnabled      *bool           `json:"is_enabled"`
 }

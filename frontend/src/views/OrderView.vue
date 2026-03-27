@@ -787,7 +787,7 @@ const viewOrderDetail = (order) => {
 const printTempBill = async (orderId) => {
   try {
     await orderStore.printTemporaryBill(orderId)
-    alert('✅ Đã in bill tạm thành công')
+    alert('✅ Đã in tem thành công')
   } catch (error) {
     alert('❌ Lỗi: ' + error.message)
   }

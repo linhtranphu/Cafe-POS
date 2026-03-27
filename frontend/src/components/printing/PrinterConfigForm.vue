@@ -54,12 +54,13 @@
               <select 
                 v-model.number="formData.paper_width" 
                 class="w-full px-4 py-3 border-2 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
-                <option :value="58">58mm (Nhỏ - Label)</option>
+                <option :value="40">40mm (Tem nhỏ)</option>
+                <option :value="58">58mm (Tem trung)</option>
                 <option :value="72">72mm (Trung bình)</option>
                 <option :value="80">80mm (Lớn - Bill)</option>
               </select>
               <p class="text-xs text-gray-500 mt-1">
-                {{ formData.type === 'LABEL' ? 'Khuyến nghị: 58mm cho tem nhãn' : 'Khuyến nghị: 80mm cho hóa đơn' }}
+                {{ formData.type === 'LABEL' ? 'Khuyến nghị: 40mm hoặc 58mm cho tem nhãn' : 'Khuyến nghị: 80mm cho hóa đơn' }}
               </p>
             </div>
           </div>
@@ -299,9 +300,9 @@ watch(() => [formData.value.connection_type, formData.value.ip_address, formData
 
 // Auto-set paper_width based on printer type
 watch(() => formData.value.type, (newType) => {
-  if (newType === 'LABEL' && formData.value.paper_width === 80) {
-    formData.value.paper_width = 58
-  } else if (newType === 'BILL' && formData.value.paper_width === 58) {
+  if (newType === 'LABEL' && (formData.value.paper_width === 80 || formData.value.paper_width === 72)) {
+    formData.value.paper_width = 40
+  } else if (newType === 'BILL' && (formData.value.paper_width === 40 || formData.value.paper_width === 58)) {
     formData.value.paper_width = 80
   }
 })
@@ -351,7 +352,7 @@ const handleSave = async () => {
 
     // Set default paper_width if not set
     if (!printerData.paper_width) {
-      printerData.paper_width = printerData.type === 'LABEL' ? 58 : 80
+      printerData.paper_width = printerData.type === 'LABEL' ? 40 : 80
     }
 
     await printerStore.savePrinter(printerData)

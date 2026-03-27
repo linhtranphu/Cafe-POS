@@ -280,6 +280,24 @@
                 </p>
               </div>
 
+              <!-- Bill Paper Width -->
+              <div class="border-t pt-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  Khổ Giấy Bill
+                </label>
+                <select
+                  v-model.number="formData.paper_width"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option :value="40">40mm (Tem nhỏ)</option>
+                  <option :value="58">58mm (Phổ biến)</option>
+                  <option :value="80">80mm (Lớn)</option>
+                </select>
+                <p class="mt-1 text-xs text-gray-500">
+                  Chọn khổ giấy phù hợp với máy in bill của bạn
+                </p>
+              </div>
+
               <!-- Test Print Button -->
               <div class="border-t pt-4">
                 <button
@@ -359,7 +377,8 @@ const formData = reactive({
   show_address: true,
   show_phone: true,
   show_custom_message: true,
-  auto_print_enabled: true
+  auto_print_enabled: true,
+  paper_width: 58
 })
 
 onMounted(async () => {
@@ -381,7 +400,8 @@ async function loadSettings() {
         show_address: settings.value.show_address !== false,
         show_phone: settings.value.show_phone !== false,
         show_custom_message: settings.value.show_custom_message !== false,
-        auto_print_enabled: settings.value.auto_print_enabled !== false
+        auto_print_enabled: settings.value.auto_print_enabled !== false,
+        paper_width: settings.value.paper_width || 58
       })
     }
   } catch (err) {
@@ -402,7 +422,8 @@ function resetForm() {
       show_address: settings.value.show_address !== false,
       show_phone: settings.value.show_phone !== false,
       show_custom_message: settings.value.show_custom_message !== false,
-      auto_print_enabled: settings.value.auto_print_enabled !== false
+      auto_print_enabled: settings.value.auto_print_enabled !== false,
+      paper_width: settings.value.paper_width || 58
     })
   }
   bridgeStatus.value = null

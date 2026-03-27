@@ -5,6 +5,14 @@
 
 set -e
 
+# Parse flags
+SKIP_BRIDGE=false
+for arg in "$@"; do
+    case $arg in
+        --no-bridge) SKIP_BRIDGE=true ;;
+    esac
+done
+
 echo "=========================================="
 echo "🔄 Local Development Restart Script"
 echo "=========================================="
@@ -123,34 +131,50 @@ echo "=========================================="
 echo ""
 
 PRINT_BRIDGE_CONTAINER="local-print-bridge"
+PRINT_BRIDGE_STATUS="⏭️  Skipped"
 
-if docker ps | grep -q "$PRINT_BRIDGE_CONTAINER"; then
-    echo "✅ Print Bridge is already running"
+if [ "$SKIP_BRIDGE" = true ]; then
+    echo "⏭️  Skipping Print Bridge (--no-bridge flag)"
 else
-    echo "⚠️  Print Bridge is not running. Starting..."
-    
-    # Check if container exists but stopped
-    if docker ps -a | grep -q "$PRINT_BRIDGE_CONTAINER"; then
-        echo "Starting existing container..."
-        docker start "$PRINT_BRIDGE_CONTAINER"
-    else
-        echo "Creating new container..."
-        # Use port mapping instead of host network for macOS compatibility
-        docker run -d \
-            --name "$PRINT_BRIDGE_CONTAINER" \
-            --restart unless-stopped \
-            -p 3001:3001 \
-            --env-file local-print-bridge/.env \
-            linhtranphu/local-print-bridge:latest
-    fi
-    
-    sleep 2
-    
     if docker ps | grep -q "$PRINT_BRIDGE_CONTAINER"; then
-        echo "✅ Print Bridge started successfully"
+        echo "✅ Print Bridge is already running"
+        PRINT_BRIDGE_STATUS="✅ Running on localhost:3001 (Docker)"
     else
-        echo "❌ Failed to start Print Bridge"
-        echo "Check logs: docker logs $PRINT_BRIDGE_CONTAINER"
+        echo "⚠️  Print Bridge is not running. Starting..."
+        
+        # Check if container exists but stopped
+        if docker ps -a | grep -q "$PRINT_BRIDGE_CONTAINER"; then
+            echo "Starting existing container..."
+            
+            # Close port 3001 if occupied by another process
+            if lsof -Pi :3001 -sTCP:LISTEN -t >/dev/null 2>&1; then
+                echo "Port 3001 is in use. Closing..."
+                kill -9 $(lsof -t -i:3001) 2>/dev/null || true
+                sleep 1
+            fi
+            
+            docker start "$PRINT_BRIDGE_CONTAINER"
+        else
+            echo "Creating new container..."
+            # Use port mapping instead of host network for macOS compatibility
+            docker run -d \
+                --name "$PRINT_BRIDGE_CONTAINER" \
+                --restart unless-stopped \
+                -p 3001:3001 \
+                --env-file local-print-bridge/.env \
+                linhtranphu/local-print-bridge:latest
+        fi
+        
+        sleep 2
+        
+        if docker ps | grep -q "$PRINT_BRIDGE_CONTAINER"; then
+            echo "✅ Print Bridge started successfully"
+            PRINT_BRIDGE_STATUS="✅ Running on localhost:3001 (Docker)"
+        else
+            echo "❌ Failed to start Print Bridge"
+            echo "Check logs: docker logs $PRINT_BRIDGE_CONTAINER"
+            PRINT_BRIDGE_STATUS="❌ Failed to start"
+        fi
     fi
 fi
 
@@ -205,7 +229,7 @@ export JWT_SECRET="your-jwt-secret-key-min-32-chars-long"
 
 # Build backend
 echo "Building backend..."
-if go build -v . > ../backend-build.log 2>&1; then
+if go build -v -o ../cafe-pos-backend . > ../backend-build.log 2>&1; then
     echo "✅ Backend built successfully"
 else
     echo "❌ Backend build failed"
@@ -213,8 +237,8 @@ else
     exit 1
 fi
 
-# Run backend in background
-go run main.go > ../backend.log 2>&1 &
+# Run backend binary in background
+../cafe-pos-backend > ../backend.log 2>&1 &
 BACKEND_PID=$!
 
 echo "Backend PID: $BACKEND_PID"
@@ -283,7 +307,7 @@ echo "📊 Service Status:"
 echo "  MongoDB:      ✅ Running on localhost:27017 (Replica Set: rs0)"
 echo "  Backend:      ✅ Running on localhost:3000 (PID: $BACKEND_PID)"
 echo "  Frontend:     ✅ Running on localhost:5173 (PID: $FRONTEND_PID)"
-echo "  Print Bridge: ✅ Running on localhost:3001 (Docker)"
+echo "  Print Bridge: $PRINT_BRIDGE_STATUS"
 echo ""
 echo "🌐 Access Information:"
 echo "  Frontend (Local):  http://localhost:5173"

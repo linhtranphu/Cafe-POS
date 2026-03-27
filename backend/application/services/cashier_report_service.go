@@ -170,7 +170,12 @@ func (s *CashierReportService) GenerateShiftReport(shiftID string) (*ShiftReport
 
 	// Calculate revenue by payment method
 	for _, ord := range orders {
-		if ord.Status == order.StatusPaid || ord.Status == order.StatusInProgress || ord.Status == order.StatusServed {
+		if ord.PaymentMethod == "" {
+			continue // chưa thanh toán (cancelled trước khi pay)
+		}
+		if ord.Status == order.StatusPaid || ord.Status == order.StatusQueued ||
+			ord.Status == order.StatusInProgress || ord.Status == order.StatusReady ||
+			ord.Status == order.StatusServed || ord.Status == order.StatusLocked {
 			report.TotalRevenue += ord.Total
 			switch ord.PaymentMethod {
 			case order.PaymentCash:
@@ -236,7 +241,12 @@ func (s *CashierReportService) GetDailyReport(date time.Time) (*ShiftReport, err
 
 		report.TotalOrders += len(orders)
 		for _, ord := range orders {
-			if ord.Status == order.StatusPaid || ord.Status == order.StatusInProgress || ord.Status == order.StatusServed {
+			if ord.PaymentMethod == "" {
+				continue // chưa thanh toán (cancelled trước khi pay)
+			}
+			if ord.Status == order.StatusPaid || ord.Status == order.StatusQueued ||
+				ord.Status == order.StatusInProgress || ord.Status == order.StatusReady ||
+				ord.Status == order.StatusServed || ord.Status == order.StatusLocked {
 				report.TotalRevenue += ord.Total
 				switch ord.PaymentMethod {
 				case order.PaymentCash:

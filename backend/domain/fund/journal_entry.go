@@ -24,6 +24,7 @@ const (
 	EventCashierShiftEnd   JournalEventType = "cashier_shift_end"
 	EventWaiterShiftStart  JournalEventType = "waiter_shift_start"
 	EventWaiterHandover    JournalEventType = "waiter_handover"
+	EventOrderPayment      JournalEventType = "order_payment"      // Khách thanh toán đơn hàng
 	EventFundTransfer      JournalEventType = "fund_transfer"
 	EventManagerDeposit    JournalEventType = "manager_deposit"    // Nạp tiền từ ngoài vào quỹ
 	EventManagerWithdrawal JournalEventType = "manager_withdrawal" // Rút tiền từ quỹ ra ngoài

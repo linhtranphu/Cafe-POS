@@ -33,6 +33,7 @@ type OrderService struct {
 	ingredientService   *IngredientService
 	printService        PrintService              // Optional: for auto-printing
 	settingsRepo        ShopSettingsRepository    // Optional: for auto-print setting
+	journalService      *JournalService           // Optional: for double-entry journal
 }
 
 func NewOrderService(
@@ -65,6 +66,11 @@ func (s *OrderService) SetPrintService(printService PrintService) {
 // SetSettingsRepository sets the settings repository for auto-print setting (optional)
 func (s *OrderService) SetSettingsRepository(settingsRepo ShopSettingsRepository) {
 	s.settingsRepo = settingsRepo
+}
+
+// SetJournalService sets the journal service for double-entry bookkeeping (optional)
+func (s *OrderService) SetJournalService(journalService *JournalService) {
+	s.journalService = journalService
 }
 
 func (s *OrderService) CreateOrder(ctx context.Context, req *order.CreateOrderRequest, waiterID, waiterName string) (*order.Order, error) {
@@ -261,6 +267,29 @@ func (s *OrderService) CollectPayment(ctx context.Context, id primitive.ObjectID
 
 	if err := s.orderRepo.Update(ctx, id, o); err != nil {
 		return nil, err
+	}
+
+	// Record double-entry journal for order payment
+	if s.journalService != nil && o.IsFullyPaid() {
+		var cashAmount, transferAmount float64
+		if req.PaymentMethod == order.PaymentCash {
+			cashAmount = req.Amount
+		} else {
+			transferAmount = req.Amount
+		}
+		if _, err := s.journalService.RecordOrderPayment(
+			ctx,
+			cashAmount, transferAmount,
+			o.ID,
+			o.OrderNumber,
+			o.WaiterID,
+			o.WaiterName,
+		); err != nil {
+			// Non-fatal: order already saved. Log and continue.
+			log.Printf("⚠️ [JOURNAL] Failed to record order payment journal for %s: %v", o.OrderNumber, err)
+		} else {
+			log.Printf("✅ [JOURNAL] Order payment recorded: %s %.0fđ (%s)", o.OrderNumber, req.Amount, req.PaymentMethod)
+		}
 	}
 
 	// Emit OrderCreated event for printing if order is now PAID

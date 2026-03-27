@@ -14,6 +14,8 @@ import (
 	"cafe-pos/backend/domain/order"
 	"cafe-pos/backend/domain/printing"
 	"cafe-pos/backend/domain/settings"
+	"cafe-pos/backend/infrastructure/printbridge"
+	infraprinting "cafe-pos/backend/infrastructure/printing"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -155,15 +157,23 @@ func (s *printService) CreatePrintJobsForOrder(ctx context.Context, ord *order.O
 		return fmt.Errorf("failed to create bill job: %w", err)
 	}
 
-	// Create label print jobs for each item
-	for i := range ord.Items {
-		if err := s.createLabelJob(ctx, ord, i, labelPrinter, labelTemplate); err != nil {
-			log.Printf("[PRINT ERROR] Failed to create label job for item %d in order %s: %v", i, ord.OrderNumber, err)
-			return fmt.Errorf("failed to create label job for item %d: %w", i, err)
+	// Create label print jobs for each item, respecting quantity
+	totalLabels := 0
+	for i, item := range ord.Items {
+		qty := item.Quantity
+		if qty <= 0 {
+			qty = 1
+		}
+		for q := 0; q < qty; q++ {
+			if err := s.createLabelJob(ctx, ord, i, labelPrinter, labelTemplate); err != nil {
+				log.Printf("[PRINT ERROR] Failed to create label job for item %d (copy %d) in order %s: %v", i, q+1, ord.OrderNumber, err)
+				return fmt.Errorf("failed to create label job for item %d: %w", i, err)
+			}
+			totalLabels++
 		}
 	}
 
-	log.Printf("[PRINT] Successfully created %d print jobs for order %s (1 bill + %d labels)", 1+len(ord.Items), ord.OrderNumber, len(ord.Items))
+	log.Printf("[PRINT] Successfully created %d print jobs for order %s (1 bill + %d labels)", 1+totalLabels, ord.OrderNumber, totalLabels)
 	return nil
 }
 
@@ -516,72 +526,109 @@ func (s *printService) prepareBillData(ord *order.Order, shopSettings *settings.
 	return data
 }
 
-// CreateTempBillJob creates a temporary bill print job for an order
+// CreateTempBillJob - UPDATED: Print labels instead of temp bill HTML
 func (s *printService) CreateTempBillJob(ctx context.Context, ord *order.Order) error {
 	if ord == nil {
 		return fmt.Errorf("order cannot be nil")
 	}
 
-	log.Printf("[PRINT] Creating temporary bill job for order %s (ID: %s)", ord.OrderNumber, ord.ID.Hex())
+	log.Printf("[PRINT] Creating label print jobs for order %s (ID: %s)", ord.OrderNumber, ord.ID.Hex())
 
-	// Get default bill printer
-	billPrinter, err := s.printerConfigRepo.FindDefault(ctx, printing.PrinterTypeBill)
+	// Get default LABEL printer from PrinterConfig (not ShopSettings)
+	labelPrinter, err := s.printerConfigRepo.FindDefault(ctx, printing.PrinterTypeLabel)
 	if err != nil {
-		log.Printf("[PRINT ERROR] Failed to get default bill printer for order %s: %v", ord.OrderNumber, err)
-		return fmt.Errorf("failed to get default bill printer: %w", err)
+		log.Printf("[PRINT ERROR] Failed to get default label printer - order_id=%s, error=%v", ord.ID.Hex(), err)
+		return fmt.Errorf("failed to get default label printer: %w", err)
 	}
-	if billPrinter == nil {
-		log.Printf("[PRINT ERROR] No default bill printer configured for order %s", ord.OrderNumber)
-		return fmt.Errorf("no default bill printer configured")
+	if labelPrinter == nil {
+		log.Printf("[PRINT ERROR] No default label printer configured for order %s", ord.OrderNumber)
+		return fmt.Errorf("no default label printer configured. Please add a LABEL printer in Printers List")
+	}
+	if !labelPrinter.IsEnabled {
+		return fmt.Errorf("default label printer is disabled")
 	}
 
-	// Fetch shop settings
+	// Get print bridge URL from shop settings
 	shopSettings, err := s.shopSettingsRepo.GetSettings(ctx)
 	if err != nil {
-		log.Printf("[PRINT ERROR] Failed to fetch shop settings for temp bill - order_id=%s, error=%v", ord.ID.Hex(), err)
 		return fmt.Errorf("failed to fetch shop settings: %w", err)
 	}
+	if shopSettings.PrintBridgeURL == "" {
+		return fmt.Errorf("print bridge URL not configured in settings")
+	}
 
-	var content string
-	var contentType string
+	// Get print bridge client
+	printBridgeClient := printbridge.NewClient(shopSettings.PrintBridgeURL, 30*time.Second)
+	if !printBridgeClient.IsAvailable() {
+		log.Printf("[PRINT ERROR] Print bridge not available for order %s", ord.OrderNumber)
+		return fmt.Errorf("print bridge not available at %s", shopSettings.PrintBridgeURL)
+	}
 
-	// Render temp bill HTML
-	htmlContent, err := s.renderTempBillHTML(ord, shopSettings)
+	// Label dimensions from printer config
+	labelWidth := labelPrinter.PaperWidth
+	if labelWidth == 0 {
+		labelWidth = 40 // default 40mm
+	}
+	labelHeight := 30 // fixed height
+
+	// Initialize TSPL generator
+	tsplGenerator := infraprinting.NewTSPLGenerator(labelWidth, labelHeight, 203)
+
+	// Load template
+	templateContent, err := os.ReadFile("./application/services/templates/label_template.tspl")
 	if err != nil {
-		log.Printf("[PRINT ERROR] Failed to render temp bill HTML - order_id=%s, error=%v", ord.ID.Hex(), err)
-		return fmt.Errorf("failed to render temp bill HTML: %w", err)
-	}
-	content = htmlContent
-	contentType = "html"
-	log.Printf("[PRINT] Using temp bill HTML template - order_id=%s", ord.OrderNumber)
-
-	// Create print job
-	job := &printing.PrintJob{
-		Type:        printing.PrintJobTypeBill,
-		OrderID:     ord.ID,
-		OrderNumber: ord.OrderNumber,
-		PrinterID:   billPrinter.ID,
-		Content:     content,
-		ContentType: contentType,
-		Status:      printing.PrintJobStatusPending,
-		RetryCount:  0,
-		MaxRetries:  3,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		log.Printf("[PRINT ERROR] Failed to read label template - order_id=%s, error=%v", ord.ID.Hex(), err)
+		return fmt.Errorf("failed to read label template: %w", err)
 	}
 
-	if err := s.printJobRepo.Create(ctx, job); err != nil {
-		log.Printf("[PRINT ERROR] Failed to save temp bill print job - order_id=%s, error=%v", ord.ID.Hex(), err)
-		return fmt.Errorf("failed to create print job: %w", err)
+	// Print label for each item, respecting quantity
+	successCount := 0
+	totalLabels := 0
+	printerPort := labelPrinter.Port
+	if printerPort == 0 {
+		printerPort = 9100
+	}
+	for _, item := range ord.Items {
+		itemName := item.Name
+		if item.VariantName != "" {
+			itemName = fmt.Sprintf("%s (%s)", item.Name, item.VariantName)
+		}
+
+		qty := item.Quantity
+		if qty <= 0 {
+			qty = 1
+		}
+
+		data := infraprinting.LabelData{
+			OrderNumber:  ord.OrderNumber,
+			ItemName:     itemName,
+			Note:         item.Note,
+			Time:         ord.CreatedAt.Format("15:04"),
+			CustomerName: ord.CustomerName,
+			Quantity:     qty,
+		}
+
+		// Generate TSPL
+		tsplCommands, err := tsplGenerator.GenerateLabelCommands(data, string(templateContent))
+		if err != nil {
+			log.Printf("[PRINT ERROR] Failed to generate TSPL for item %s: %v", item.Name, err)
+			continue
+		}
+
+		// Send one label per quantity
+		for q := 0; q < qty; q++ {
+			totalLabels++
+			err = printBridgeClient.SendTSPLCommands(ctx, tsplCommands, labelPrinter.IPAddress, printerPort)
+			if err != nil {
+				log.Printf("[PRINT ERROR] Failed to print label for item %s (copy %d/%d): %v", item.Name, q+1, qty, err)
+			} else {
+				successCount++
+				log.Printf("[PRINT] Label printed successfully for item %s (copy %d/%d)", item.Name, q+1, qty)
+			}
+		}
 	}
 
-	log.Printf("[PRINT] Temporary bill job created - job_id=%s, order_id=%s", job.ID.Hex(), ord.ID.Hex())
-	
-	// Broadcast WebSocket event
-	if s.wsBroadcaster != nil {
-		s.wsBroadcaster.BroadcastPrintJobCreated(job)
-	}
-
+	log.Printf("[PRINT] Label printing completed - order=%s, success=%d/%d", ord.OrderNumber, successCount, totalLabels)
 	return nil
 }
 

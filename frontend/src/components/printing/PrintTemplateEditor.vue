@@ -17,15 +17,15 @@
             🌐 Bill Template
           </button>
           <button
-            @click="activeTemplateTab = 'temp-bill'"
+            @click="activeTemplateTab = 'label'"
             :class="[
               'px-4 py-2 rounded-lg text-sm font-bold transition-colors',
-              activeTemplateTab === 'temp-bill'
-                ? 'bg-amber-500 text-white'
+              activeTemplateTab === 'label'
+                ? 'bg-blue-500 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             ]"
           >
-            📄 Bill Tạm
+            🏷️ Label Template
           </button>
           <button
             @click="activeTemplateTab = 'text'"
@@ -49,9 +49,9 @@
         <HTMLTemplateEditor />
       </div>
 
-      <!-- Temp Bill Template Tab -->
-      <div v-show="activeTemplateTab === 'temp-bill'" class="h-full">
-        <TempBillTemplateEditor />
+      <!-- Label Template Tab -->
+      <div v-show="activeTemplateTab === 'label'" class="h-full">
+        <LabelTemplateEditor />
       </div>
 
       <!-- Text Templates Tab -->
@@ -65,7 +65,7 @@
 <script setup>
 import { ref } from 'vue'
 import HTMLTemplateEditor from './HTMLTemplateEditor.vue'
-import TempBillTemplateEditor from './TempBillTemplateEditor.vue'
+import LabelTemplateEditor from './LabelTemplateEditor.vue'
 import TextTemplateList from './TextTemplateList.vue'
 
 const activeTemplateTab = ref('html')

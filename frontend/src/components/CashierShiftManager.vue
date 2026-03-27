@@ -247,7 +247,8 @@
         
         <div class="mb-4">
           <label class="block text-sm font-medium text-gray-700 mb-2">
-            Tiền đầu ca (VNĐ) <span class="text-red-500">*</span>
+            Tiền đầu ca (VNĐ)
+            <span class="text-gray-400 text-xs font-normal ml-1">(để trống nếu không có)</span>
           </label>
           <input
             v-model.number="startingFloat"
@@ -256,7 +257,7 @@
             min="0"
             class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-yellow-500"
             :class="{ 'border-red-500': startingFloatError }"
-            placeholder="Nhập số tiền đầu ca"
+            placeholder="0 (không bắt buộc)"
             @input="validateStartingFloat"
           />
           <p v-if="startingFloatError" class="text-sm text-red-600 mt-1">{{ startingFloatError }}</p>
@@ -296,7 +297,7 @@ const shiftStore = useShiftStore()
 
 // State
 const showStartModal = ref(false)
-const startingFloat = ref(1000000) // Default 1,000,000 VND
+const startingFloat = ref(null) // Optional starting float, defaults to 0
 const startingFloatError = ref(null)
 const startingLoading = ref(false)
 const loadingHandovers = ref(false)
@@ -316,9 +317,7 @@ const canCloseShift = computed(() => {
 })
 
 const canStartShift = computed(() => {
-  return startingFloat.value !== null && 
-         startingFloat.value >= 0 && 
-         !startingFloatError.value
+  return !startingFloatError.value
 })
 
 // Confirmed handovers summary
@@ -505,17 +504,13 @@ const totalHandoverSummary = computed(() => {
 // Methods
 const validateStartingFloat = () => {
   startingFloatError.value = null
-  
-  if (startingFloat.value === null || startingFloat.value === '') {
-    startingFloatError.value = 'Vui lòng nhập tiền đầu ca'
-    return false
-  }
-  
-  if (startingFloat.value < 0) {
+
+  const val = startingFloat.value
+  if (val !== null && val !== '' && val < 0) {
     startingFloatError.value = 'Số tiền không được âm'
     return false
   }
-  
+
   return true
 }
 
@@ -525,9 +520,9 @@ const startShift = async () => {
   startingLoading.value = true
   
   try {
-    await cashierShiftStore.startCashierShift(startingFloat.value)
+    await cashierShiftStore.startCashierShift(startingFloat.value || 0)
     showStartModal.value = false
-    startingFloat.value = 1000000 // Reset to default
+    startingFloat.value = null // Reset
   } catch (error) {
     console.error('Failed to start cashier shift:', error)
   } finally {

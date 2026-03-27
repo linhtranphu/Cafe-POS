@@ -170,6 +170,8 @@ func main() {
 	orderService.SetSettingsRepository(shopSettingsRepo)
 	// Fund service (double-entry journal as single source of truth)
 	journalService := services.NewJournalService(journalRepo, client)
+	// Wire up journal service into order service for order payment journal entries
+	orderService.SetJournalService(journalService)
 	shiftService := services.NewShiftService(shiftRepo, orderRepo, smManager, journalService, cashierShiftRepo)
 	// Cashier services
 	cashierShiftService := services.NewCashierShiftService(cashierShiftRepo, shiftRepo, smManager, journalService, client)
@@ -275,6 +277,16 @@ func main() {
 		templatePath,
 	)
 	log.Println("✅ HTML template handler (bridge) initialized - will use print_bridge_url from settings")
+	
+	// Label template handler
+	var labelTemplateHandler *http.LabelTemplateHandler
+	labelTemplatePath := "./application/services/templates/label_template.tspl"
+	labelTemplateHandler = http.NewLabelTemplateHandler(
+		orderRepo,
+		shopSettingsRepo,
+		labelTemplatePath,
+	)
+	log.Println("✅ Label template handler initialized")
 	
 	// Chromedp print handler (DISABLED - Chromium removed from Docker image)
 	// Kept for reference only. Use print bridge instead.
@@ -528,7 +540,8 @@ func main() {
 				waiter.POST("/orders/:id/send", orderHandler.SendToBar)
 				waiter.POST("/orders/:id/serve", orderHandler.ServeOrder)
 				waiter.POST("/orders/:id/cancel", orderHandler.CancelOrder)
-				waiter.POST("/orders/:id/print-temp-bill", orderHandler.PrintTemporaryBill)
+	waiter.POST("/orders/:id/print-temp-bill", orderHandler.PrintTemporaryBill)
+				waiter.POST("/orders/merge", orderHandler.MergeOrders)
 				waiter.GET("/orders", orderHandler.GetMyOrders)
 				waiter.GET("/orders/:id", orderHandler.GetOrder)
 				
@@ -790,11 +803,17 @@ func main() {
 				if htmlTemplateHandlerBridge != nil {
 					manager.GET("/html-templates/bill", htmlTemplateHandlerBridge.GetHTMLTemplate)
 					manager.PUT("/html-templates/bill", htmlTemplateHandlerBridge.UpdateHTMLTemplate)
-					manager.GET("/html-templates/temp-bill", htmlTemplateHandlerBridge.GetTempBillTemplate)
-					manager.PUT("/html-templates/temp-bill", htmlTemplateHandlerBridge.UpdateTempBillTemplate)
 					manager.POST("/html-templates/test-print", htmlTemplateHandlerBridge.TestPrintHTMLTemplate)
 					manager.POST("/html-templates/preview", htmlTemplateHandlerBridge.PreviewHTMLTemplate)
 					log.Println("✅ HTML template routes registered (using print bridge from settings)")
+				}
+				
+				// Label template management routes
+				if labelTemplateHandler != nil {
+					manager.GET("/label-templates/order-item", labelTemplateHandler.GetLabelTemplate)
+					manager.PUT("/label-templates/order-item", labelTemplateHandler.UpdateLabelTemplate)
+					manager.POST("/label-templates/test-print", labelTemplateHandler.TestPrintLabel)
+					log.Println("✅ Label template routes registered")
 				}
 				
 				// Shop settings routes

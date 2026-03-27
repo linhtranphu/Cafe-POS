@@ -254,3 +254,60 @@ func (c *Client) PrintESCPOS(ctx context.Context, escposData []byte, printerIP s
 
 	return nil
 }
+// SendTSPLCommands sends TSPL commands to print bridge for label printing
+func (c *Client) SendTSPLCommands(ctx context.Context, tsplCommands string, printerIP string, printerPort int) error {
+	if printerPort == 0 {
+		printerPort = 9100
+	}
+
+	// Prepare request
+	reqBody := map[string]interface{}{
+		"commands":    tsplCommands,
+		"printer_ip":  printerIP,
+		"printer_port": printerPort,
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	// Create HTTP request
+	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/print-tspl", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	// Send request
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send request to print bridge: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Read response
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %w", err)
+	}
+
+	// Parse response
+	var printResp struct {
+		Success bool   `json:"success"`
+		Error   string `json:"error,omitempty"`
+		Message string `json:"message,omitempty"`
+	}
+	if err := json.Unmarshal(body, &printResp); err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	// Check for errors
+	if !printResp.Success {
+		return fmt.Errorf("print bridge error: %s", printResp.Error)
+	}
+
+	return nil
+}
+

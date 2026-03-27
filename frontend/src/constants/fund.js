@@ -87,6 +87,7 @@ export const FUND_TYPES = {
   CUSTOMER: 'customer',
   CASH_SHORTAGE: 'cash_shortage',
   CASH_OVERAGE: 'cash_overage',
+  EXTERNAL: 'external', // legacy fund type from old data
   ALL: 'all'
 }
 
@@ -103,6 +104,7 @@ export const FUND_TYPE_LABELS = {
   [FUND_TYPES.CUSTOMER]: 'Khách hàng',
   [FUND_TYPES.CASH_SHORTAGE]: 'Thiếu tiền',
   [FUND_TYPES.CASH_OVERAGE]: 'Thừa tiền',
+  [FUND_TYPES.EXTERNAL]: 'Ngoài (cũ)',
   [FUND_TYPES.ALL]: 'Tất cả quỹ'
 }
 
@@ -117,7 +119,8 @@ export const FUND_TYPE_ICONS = {
   [FUND_TYPES.SUPPLIER]: '🏭',
   [FUND_TYPES.CUSTOMER]: '🛒',
   [FUND_TYPES.CASH_SHORTAGE]: '📉',
-  [FUND_TYPES.CASH_OVERAGE]: '📈'
+  [FUND_TYPES.CASH_OVERAGE]: '📈',
+  [FUND_TYPES.EXTERNAL]: '💰',
 }
 
 // Fund type colors (Tailwind classes)

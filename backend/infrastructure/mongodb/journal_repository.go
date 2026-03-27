@@ -164,7 +164,10 @@ func (r *JournalRepository) GetAllFundBalances(ctx context.Context) (map[fund.Fu
 		fund.FundTypeWaiterFloat,
 		fund.FundTypeCashShortage, // audit: accumulated shortages from waiter handovers
 		fund.FundTypeCashOverage,  // audit: accumulated overages from waiter handovers
-		// owner/supplier/customer omitted — pure double-entry counterpart accounts
+		fund.FundTypeOwner,        // external counterpart: chủ quán
+		fund.FundTypeSupplier,     // external counterpart: nhà cung cấp
+		fund.FundTypeCustomer,     // external counterpart: khách hàng
+		"external",                // legacy fund type from old data
 	}
 
 	result := make(map[fund.FundType]*fund.FundBalance)

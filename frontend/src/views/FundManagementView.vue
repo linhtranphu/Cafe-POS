@@ -122,6 +122,37 @@
       </div>
     </div>
 
+    <!-- External Accounts Section -->
+    <div class="px-4 pb-4 mt-3">
+      <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Tài khoản ngoài</div>
+      <div v-if="loadingAllBalances" class="grid grid-cols-3 gap-3">
+        <div v-for="i in 3" :key="i" class="bg-white rounded-xl p-4 shadow animate-pulse">
+          <div class="h-4 bg-gray-200 rounded w-3/4 mb-3"></div>
+          <div class="h-6 bg-gray-200 rounded w-1/2"></div>
+        </div>
+      </div>
+      <div v-else class="grid grid-cols-3 gap-3">
+        <div
+          v-for="key in EXTERNAL_FUND_KEYS.filter(k => k !== 'cash_shortage' && k !== 'cash_overage')"
+          :key="key"
+          class="bg-gray-50 rounded-xl p-4 border border-gray-200 cursor-pointer hover:shadow-md transition-shadow"
+          @click="filterByFund(key)"
+        >
+          <div class="flex items-center gap-1 mb-2">
+            <span class="text-lg">{{ FUND_TYPE_ICONS[key] }}</span>
+            <span class="text-xs font-semibold text-gray-600">{{ FUND_TYPE_LABELS[key] }}</span>
+          </div>
+          <div class="text-base font-bold text-gray-800">
+            {{ formatCurrency(Math.abs(allBalances?.[key]?.total || 0)) }}
+          </div>
+          <div class="flex gap-1 mt-1 text-xs text-gray-400">
+            <span>TM: {{ formatCurrency(Math.abs(allBalances?.[key]?.cash || 0)) }}</span>
+            <span>CK: {{ formatCurrency(Math.abs(allBalances?.[key]?.transfer || 0)) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Action Buttons -->
     <div class="px-4 pb-4">
       <div class="grid grid-cols-3 gap-3">
@@ -320,14 +351,25 @@
               v-model="transferForm.to_fund_type"
               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
             >
-              <option
-                v-for="key in fundTypeKeys"
-                :key="key"
-                :value="key"
-                :disabled="key === transferForm.from_fund_type"
-              >
-                {{ FUND_TYPE_ICONS[key] }} {{ FUND_TYPE_LABELS[key] }}
-              </option>
+              <optgroup label="Quỹ nội bộ">
+                <option
+                  v-for="key in fundTypeKeys"
+                  :key="key"
+                  :value="key"
+                  :disabled="key === transferForm.from_fund_type"
+                >
+                  {{ FUND_TYPE_ICONS[key] }} {{ FUND_TYPE_LABELS[key] }}
+                </option>
+              </optgroup>
+              <optgroup label="Tài khoản ngoài">
+                <option
+                  v-for="key in EXTERNAL_FUND_KEYS"
+                  :key="key"
+                  :value="key"
+                >
+                  {{ FUND_TYPE_ICONS[key] }} {{ FUND_TYPE_LABELS[key] }}
+                </option>
+              </optgroup>
             </select>
           </div>
 
@@ -531,6 +573,20 @@ const fundTypeKeys = computed(() => [
   FUND_TYPES.PROFIT,
   FUND_TYPES.CASH_DRAWER,
   FUND_TYPES.WAITER_FLOAT
+])
+
+const EXTERNAL_FUND_KEYS = [
+  FUND_TYPES.OWNER,
+  FUND_TYPES.SUPPLIER,
+  FUND_TYPES.CUSTOMER,
+  FUND_TYPES.CASH_SHORTAGE,
+  FUND_TYPES.CASH_OVERAGE,
+  FUND_TYPES.EXTERNAL
+]
+
+const transferToFundKeys = computed(() => [
+  ...fundTypeKeys.value,
+  ...EXTERNAL_FUND_KEYS
 ])
 
 const REAL_FUND_KEYS = [

@@ -26,7 +26,7 @@ func NewCashierShiftHandler(cashierShiftService *services.CashierShiftService) *
 
 // StartCashierShiftRequest represents the request body for starting a cashier shift.
 type StartCashierShiftRequest struct {
-	StartingFloat float64 `json:"starting_float" binding:"required,min=0"`
+	StartingFloat *float64 `json:"starting_float" binding:"omitempty,min=0"`
 }
 
 // StartCashierShift handles POST /api/v1/cashier-shifts
@@ -74,12 +74,18 @@ func (h *CashierShiftHandler) StartCashierShift(c *gin.Context) {
 		return
 	}
 
+	// Resolve starting float: nil or omitted → 0
+	var startingFloat float64
+	if req.StartingFloat != nil {
+		startingFloat = *req.StartingFloat
+	}
+
 	// Start cashier shift
 	shift, err := h.cashierShiftService.StartCashierShift(
 		c.Request.Context(),
 		cashierOID,
 		username.(string),
-		req.StartingFloat,
+		startingFloat,
 	)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
