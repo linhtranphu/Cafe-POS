@@ -34,6 +34,16 @@ const (
 	FundTypeCashOverage  FundType = "cash_overage"  // Waiter bàn giao thừa tiền
 )
 
+// IsExternalFund returns true for counterpart accounts that do not hold real cash.
+// Balance validation is skipped for these when used as a transfer source.
+func IsExternalFund(ft FundType) bool {
+	switch ft {
+	case FundTypeOwner, FundTypeSupplier, FundTypeCustomer, FundTypeCashShortage, FundTypeCashOverage:
+		return true
+	}
+	return false
+}
+
 // SourceType represents the origin/source of a fund transaction
 type SourceType string
 

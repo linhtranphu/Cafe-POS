@@ -663,6 +663,7 @@ func main() {
 				manager.POST("/ingredients", ingredientHandler.CreateIngredient)
 				manager.GET("/ingredients", ingredientHandler.GetAllIngredients)
 				manager.GET("/ingredients/low-stock", ingredientHandler.GetLowStock)
+				manager.GET("/ingredients/summary", ingredientHandler.GetStockSummary)
 				manager.GET("/ingredients/:id", ingredientHandler.GetIngredient)
 				manager.GET("/ingredients/:id/history", ingredientHandler.GetStockHistory)
 				manager.PUT("/ingredients/:id", ingredientHandler.UpdateIngredient)

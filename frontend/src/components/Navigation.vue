@@ -61,6 +61,13 @@
           <span class="text-base font-medium text-center">Nhân viên</span>
         </router-link>
 
+        <!-- Inventory Stats -->
+        <router-link to="/manager/inventory-stats" @click="handleNavClick"
+          class="bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl p-6 flex flex-col items-center justify-center min-h-[120px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+          <div class="text-3xl mb-2">📦</div>
+          <span class="text-base font-medium text-center">Tồn kho</span>
+        </router-link>
+
         <!-- Print Management -->
         <router-link to="/print-management" @click="handleNavClick"
           class="bg-gradient-to-br from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white rounded-xl p-6 flex flex-col items-center justify-center min-h-[120px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">

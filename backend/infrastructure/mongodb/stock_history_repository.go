@@ -40,3 +40,51 @@ func (r *StockHistoryRepository) FindByIngredientID(ctx context.Context, ingredi
 	}
 	return histories, nil
 }
+
+func (r *StockHistoryRepository) GetSummaryByDateRange(ctx context.Context, from, to time.Time) ([]*ingredient.IngredientStockSummary, error) {
+	pipeline := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "created_at", Value: bson.D{{Key: "$gte", Value: from}, {Key: "$lte", Value: to}}},
+		}}},
+		bson.D{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$ingredient_id"},
+			{Key: "consumed", Value: bson.D{{Key: "$sum", Value: bson.D{{Key: "$cond", Value: bson.A{
+				bson.D{{Key: "$eq", Value: bson.A{"$type", "order"}}},
+				bson.D{{Key: "$abs", Value: "$quantity"}},
+				0,
+			}}}}}},
+			{Key: "restocked", Value: bson.D{{Key: "$sum", Value: bson.D{{Key: "$cond", Value: bson.A{
+				bson.D{{Key: "$eq", Value: bson.A{"$type", "purchase"}}},
+				"$quantity",
+				0,
+			}}}}}},
+			{Key: "wasted", Value: bson.D{{Key: "$sum", Value: bson.D{{Key: "$cond", Value: bson.A{
+				bson.D{{Key: "$eq", Value: bson.A{"$type", "waste"}}},
+				bson.D{{Key: "$abs", Value: "$quantity"}},
+				0,
+			}}}}}},
+			{Key: "adjusted", Value: bson.D{{Key: "$sum", Value: bson.D{{Key: "$cond", Value: bson.A{
+				bson.D{{Key: "$eq", Value: bson.A{"$type", "adjustment"}}},
+				"$quantity",
+				0,
+			}}}}}},
+			{Key: "order_count", Value: bson.D{{Key: "$sum", Value: bson.D{{Key: "$cond", Value: bson.A{
+				bson.D{{Key: "$eq", Value: bson.A{"$type", "order"}}},
+				1,
+				0,
+			}}}}}},
+		}}},
+	}
+
+	cursor, err := r.collection.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var summaries []*ingredient.IngredientStockSummary
+	if err = cursor.All(ctx, &summaries); err != nil {
+		return nil, err
+	}
+	return summaries, nil
+}

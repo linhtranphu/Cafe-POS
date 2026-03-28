@@ -378,10 +378,15 @@
                   <div class="text-4xl mb-2">💸</div>
                   <div class="font-bold">Chi phí</div>
                 </button>
-                <button v-if="user?.role === USER_ROLES.MANAGER" @click="$router.push('/manager/fund')" 
+                <button v-if="user?.role === USER_ROLES.MANAGER" @click="$router.push('/manager/fund')"
                   class="bg-gradient-to-br from-orange-500 to-yellow-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
                   <div class="text-4xl mb-2">💰</div>
                   <div class="font-bold">Quỹ tiền</div>
+                </button>
+                <button v-if="user?.role === USER_ROLES.MANAGER" @click="$router.push('/manager/inventory-stats')"
+                  class="bg-gradient-to-br from-emerald-500 to-teal-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+                  <div class="text-4xl mb-2">📦</div>
+                  <div class="font-bold">Tồn kho</div>
                 </button>
                 
                 <!-- Cashier Actions -->

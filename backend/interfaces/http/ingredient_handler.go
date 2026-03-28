@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 	"cafe-pos/backend/application/services"
 	"cafe-pos/backend/domain/ingredient"
 	"cafe-pos/backend/domain/user"
@@ -242,6 +243,38 @@ func (h *IngredientHandler) StockAdjust(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, item)
+}
+
+// GetStockSummary handles GET /api/ingredients/summary?from=2006-01-02&to=2006-01-02
+func (h *IngredientHandler) GetStockSummary(c *gin.Context) {
+	now := time.Now()
+
+	// Default: today from 00:00 to 23:59:59
+	from := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	to := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 999999999, now.Location())
+
+	if fromStr := c.Query("from"); fromStr != "" {
+		if t, err := time.ParseInLocation("2006-01-02", fromStr, now.Location()); err == nil {
+			from = t
+		}
+	}
+	if toStr := c.Query("to"); toStr != "" {
+		if t, err := time.ParseInLocation("2006-01-02", toStr, now.Location()); err == nil {
+			to = time.Date(t.Year(), t.Month(), t.Day(), 23, 59, 59, 999999999, t.Location())
+		}
+	}
+
+	items, err := h.ingredientService.GetStockSummaryReport(c.Request.Context(), from, to)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"items": items,
+		"from":  from.Format("2006-01-02"),
+		"to":    to.Format("2006-01-02"),
+	})
 }
 
 func (h *IngredientHandler) GetLowStock(c *gin.Context) {

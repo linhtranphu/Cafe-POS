@@ -14,6 +14,16 @@ const (
 	TransactionWaste      TransactionType = "waste"
 )
 
+// IngredientStockSummary is the aggregated stock movement for one ingredient in a date range
+type IngredientStockSummary struct {
+	IngredientID primitive.ObjectID `bson:"_id" json:"ingredient_id"`
+	Consumed     float64            `bson:"consumed" json:"consumed"`       // deducted by orders
+	Restocked    float64            `bson:"restocked" json:"restocked"`     // added by purchases
+	Wasted       float64            `bson:"wasted" json:"wasted"`           // removed as waste
+	Adjusted     float64            `bson:"adjusted" json:"adjusted"`       // net manual adjustments
+	OrderCount   int                `bson:"order_count" json:"order_count"` // number of order transactions
+}
+
 type StockHistory struct {
 	ID           primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	IngredientID primitive.ObjectID `bson:"ingredient_id" json:"ingredient_id"`

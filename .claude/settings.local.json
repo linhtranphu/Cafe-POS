@@ -60,7 +60,12 @@
       "Bash(go build ./application/... ./domain/... ./interfaces/... .)",
       "WebFetch(domain:print.tacafe.store)",
       "Bash(curl -s -X POST https://print.tacafe.store/render-and-print -H \"Content-Type: application/json\" -d '{\"\"html\"\":\"\"<h1>Test</h1>\"\",\"\"printerIP\"\":\"\"192.168.1.116\"\",\"\"printerPort\"\":9100,\"\"width\"\":576}' -w \"\\\\nHTTP_STATUS:%{http_code}\")",
-      "WebSearch"
+      "WebSearch",
+      "Read(//Volumes/Linh-DAT/Misc\\\\ Projects/Cafe\\\\ POS/backend/infrastructure/mongodb/**)",
+      "Read(//Volumes/Linh-DAT/Misc\\\\ Projects/Cafe\\\\ POS/frontend/src/views/**)",
+      "Bash(find '/Volumes/Linh-DAT/Misc Projects/Cafe POS/backend' -name *journal* -o -name *fund*)",
+      "Read(//Volumes/Linh-DAT/Misc\\\\ Projects/Cafe\\\\ POS/backend/domain/fund/**)",
+      "Read(//Volumes/Linh-DAT/Misc\\\\ Projects/Cafe\\\\ POS/backend/application/services/**)"
     ]
   }
 }

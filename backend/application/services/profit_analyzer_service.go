@@ -693,3 +693,4 @@ func (s *ProfitAnalyzerService) GetOperatingProfit(ctx context.Context, dateRang
 
 	return report, nil
 }
+

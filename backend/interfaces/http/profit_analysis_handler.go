@@ -89,7 +89,6 @@ func (h *ProfitAnalysisHandler) GetCategoryProfit(c *gin.Context) {
 	})
 }
 
-
 // GetOperatingProfit handles GET /api/reports/operating-profit
 // Requirements: 6.5.1, 6.5.6, 6.5.9
 func (h *ProfitAnalysisHandler) GetOperatingProfit(c *gin.Context) {

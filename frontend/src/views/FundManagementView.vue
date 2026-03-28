@@ -131,25 +131,55 @@
           <div class="h-6 bg-gray-200 rounded w-1/2"></div>
         </div>
       </div>
-      <div v-else class="grid grid-cols-3 gap-3">
+      <div v-else class="grid grid-cols-1 gap-3">
         <div
-          v-for="key in EXTERNAL_FUND_KEYS.filter(k => k !== 'cash_shortage' && k !== 'cash_overage')"
+          v-for="key in EXTERNAL_FUND_KEYS.filter(k => k !== 'cash_shortage' && k !== 'cash_overage' && k !== 'external')"
           :key="key"
-          class="bg-gray-50 rounded-xl p-4 border border-gray-200 cursor-pointer hover:shadow-md transition-shadow"
-          @click="filterByFund(key)"
+          class="bg-gray-50 rounded-xl p-4 border border-gray-200"
         >
-          <div class="flex items-center gap-1 mb-2">
-            <span class="text-lg">{{ FUND_TYPE_ICONS[key] }}</span>
-            <span class="text-xs font-semibold text-gray-600">{{ FUND_TYPE_LABELS[key] }}</span>
-          </div>
-          <div class="text-base font-bold text-gray-800">
-            {{ formatCurrency(Math.abs(allBalances?.[key]?.total || 0)) }}
-          </div>
-          <div class="flex gap-1 mt-1 text-xs text-gray-400">
-            <span>TM: {{ formatCurrency(Math.abs(allBalances?.[key]?.cash || 0)) }}</span>
-            <span>CK: {{ formatCurrency(Math.abs(allBalances?.[key]?.transfer || 0)) }}</span>
+          <div class="flex items-center justify-between">
+            <div class="cursor-pointer flex-1" @click="filterByFund(key)">
+              <div class="flex items-center gap-1 mb-1">
+                <span class="text-lg">{{ FUND_TYPE_ICONS[key] }}</span>
+                <span class="text-sm font-semibold text-gray-600">{{ FUND_TYPE_LABELS[key] }}</span>
+              </div>
+              <div class="text-base font-bold" :class="(allBalances?.[key]?.total || 0) < 0 ? 'text-red-600' : 'text-gray-800'">
+                {{ (allBalances?.[key]?.total || 0) < 0 ? '-' : '' }}{{ formatCurrency(Math.abs(allBalances?.[key]?.total || 0)) }}
+              </div>
+              <div class="flex gap-2 mt-0.5 text-xs text-gray-400">
+                <span>TM: {{ formatCurrency(Math.abs(allBalances?.[key]?.cash || 0)) }}</span>
+                <span>CK: {{ formatCurrency(Math.abs(allBalances?.[key]?.transfer || 0)) }}</span>
+              </div>
+            </div>
+            <button
+              v-if="(allBalances?.[key]?.total || 0) !== 0"
+              @click="openClearExternal(key)"
+              class="ml-3 px-3 py-1.5 text-xs font-semibold bg-orange-100 text-orange-700 hover:bg-orange-200 rounded-lg transition-colors whitespace-nowrap"
+            >
+              Bù trừ về 0
+            </button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Cash Shortage/Overage quick-clear buttons -->
+    <div class="px-4 pb-2 -mt-2">
+      <div class="flex gap-3">
+        <button
+          v-if="(allBalances?.cash_shortage?.total || 0) !== 0"
+          @click="openClearExternal('cash_shortage')"
+          class="flex-1 py-2 text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-xl transition-colors"
+        >
+          Xóa thiếu tiền ({{ formatCurrency(Math.abs(allBalances?.cash_shortage?.total || 0)) }})
+        </button>
+        <button
+          v-if="(allBalances?.cash_overage?.total || 0) !== 0"
+          @click="openClearExternal('cash_overage')"
+          class="flex-1 py-2 text-xs font-semibold bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors"
+        >
+          Xóa thừa tiền ({{ formatCurrency(Math.abs(allBalances?.cash_overage?.total || 0)) }})
+        </button>
       </div>
     </div>
 
@@ -332,21 +362,33 @@
         <div class="space-y-4">
           <!-- From fund -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Từ quỹ</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Từ tài khoản</label>
             <select
               v-model="transferForm.from_fund_type"
               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
             >
-              <option v-for="key in fundTypeKeys" :key="key" :value="key">
-                {{ FUND_TYPE_ICONS[key] }} {{ FUND_TYPE_LABELS[key] }}
-                ({{ formatCurrency(allBalances?.[key]?.total || 0) }})
-              </option>
+              <optgroup label="Quỹ nội bộ">
+                <option v-for="key in fundTypeKeys" :key="key" :value="key">
+                  {{ FUND_TYPE_ICONS[key] }} {{ FUND_TYPE_LABELS[key] }}
+                  ({{ formatCurrency(allBalances?.[key]?.total || 0) }})
+                </option>
+              </optgroup>
+              <optgroup label="Tài khoản ngoài">
+                <option
+                  v-for="key in EXTERNAL_FUND_KEYS.filter(k => k !== 'external')"
+                  :key="key"
+                  :value="key"
+                  :disabled="key === transferForm.to_fund_type"
+                >
+                  {{ FUND_TYPE_ICONS[key] }} {{ FUND_TYPE_LABELS[key] }}
+                </option>
+              </optgroup>
             </select>
           </div>
 
           <!-- To fund -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Đến quỹ</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Đến tài khoản</label>
             <select
               v-model="transferForm.to_fund_type"
               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
@@ -363,9 +405,10 @@
               </optgroup>
               <optgroup label="Tài khoản ngoài">
                 <option
-                  v-for="key in EXTERNAL_FUND_KEYS"
+                  v-for="key in EXTERNAL_FUND_KEYS.filter(k => k !== 'external')"
                   :key="key"
                   :value="key"
+                  :disabled="key === transferForm.from_fund_type"
                 >
                   {{ FUND_TYPE_ICONS[key] }} {{ FUND_TYPE_LABELS[key] }}
                 </option>
@@ -405,7 +448,8 @@
               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
             />
             <div class="text-xs text-gray-500 mt-1">
-              Số dư quỹ nguồn: {{ formatCurrency(sourceBalance) }}
+              <span v-if="isExternalSource">Tài khoản ngoài — không giới hạn số dư</span>
+              <span v-else>Số dư quỹ nguồn: {{ formatCurrency(sourceBalance) }}</span>
             </div>
           </div>
 
@@ -608,6 +652,13 @@ const realFundsTotal = computed(() => {
   }, { cash: 0, transfer: 0, total: 0 })
 })
 
+const EXTERNAL_FUND_SET = new Set([
+  FUND_TYPES.OWNER, FUND_TYPES.SUPPLIER, FUND_TYPES.CUSTOMER,
+  FUND_TYPES.CASH_SHORTAGE, FUND_TYPES.CASH_OVERAGE
+])
+
+const isExternalSource = computed(() => EXTERNAL_FUND_SET.has(transferForm.value.from_fund_type))
+
 const sourceBalance = computed(() => {
   if (!allBalances.value || !transferForm.value.from_fund_type) return 0
   const b = allBalances.value[transferForm.value.from_fund_type]
@@ -617,12 +668,12 @@ const sourceBalance = computed(() => {
 
 const isTransferValid = computed(() => {
   const f = transferForm.value
-  return f.from_fund_type &&
-    f.to_fund_type &&
-    f.from_fund_type !== f.to_fund_type &&
-    f.amount > 0 &&
-    f.amount <= sourceBalance.value &&
-    f.reason.length >= 10
+  if (!f.from_fund_type || !f.to_fund_type || f.from_fund_type === f.to_fund_type) return false
+  if (!f.amount || f.amount <= 0) return false
+  if (f.reason.length < 10) return false
+  // For external sources, no balance check
+  if (!isExternalSource.value && f.amount > sourceBalance.value) return false
+  return true
 })
 
 // Journal entry helpers
@@ -764,6 +815,23 @@ const submitTransfer = async () => {
   } finally {
     transferring.value = false
   }
+}
+
+const openClearExternal = (externalKey) => {
+  const balance = allBalances.value?.[externalKey]?.total || 0
+  if (balance === 0) return
+  const absBalance = Math.abs(balance)
+  // balance > 0: external has a debit balance → to zero it, transfer FROM external TO operating (credit external)
+  // balance < 0: external has a credit balance → to zero it, transfer FROM operating TO external (debit external)
+  const moneyType = (allBalances.value?.[externalKey]?.cash || 0) !== 0 ? 'cash' : 'transfer'
+  transferForm.value = {
+    from_fund_type: balance > 0 ? externalKey : FUND_TYPES.OPERATING,
+    to_fund_type: balance > 0 ? FUND_TYPES.OPERATING : externalKey,
+    money_type: moneyType,
+    amount: absBalance,
+    reason: `Bù trừ ${FUND_TYPE_LABELS[externalKey] || externalKey} về 0`
+  }
+  showTransferModal.value = true
 }
 
 const viewEntryDetail = (entry) => {

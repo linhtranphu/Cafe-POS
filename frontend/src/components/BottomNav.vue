@@ -40,8 +40,8 @@ const navItems = computed(() => {
     return [
       { path: '/dashboard', icon: '🏠', label: 'Dashboard' },
       { path: '/cashier/reports', icon: '📊', label: 'Báo cáo' },
+      { path: '/manager/inventory-stats', icon: '📦', label: 'Tồn kho' },
       { path: '/manager/profit-analysis', icon: '📈', label: 'Lợi nhuận' },
-      { path: '/settings', icon: '⚙️', label: 'Cài đặt' },
       { path: '/profile', icon: '👤', label: 'Cá nhân' }
     ]
   }

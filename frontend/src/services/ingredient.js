@@ -73,5 +73,13 @@ export const ingredientService = {
 
   async deleteCategory(id) {
     await api.delete(`/manager/ingredient-categories/${id}`)
+  },
+
+  async getStockSummary(from, to) {
+    const params = {}
+    if (from) params.from = from
+    if (to) params.to = to
+    const response = await api.get('/manager/ingredients/summary', { params })
+    return response.data
   }
 }

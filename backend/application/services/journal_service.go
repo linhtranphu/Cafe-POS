@@ -749,13 +749,16 @@ func (s *JournalService) RecordFundTransfer(
 			session.AbortTransaction(sc)
 			return fmt.Errorf("failed to get source balance: %w", err)
 		}
-		if cashAmount > fromBefore.Cash {
-			session.AbortTransaction(sc)
-			return fmt.Errorf("insufficient cash in %s: have %.0f, need %.0f", fromFund, fromBefore.Cash, cashAmount)
-		}
-		if transferAmount > fromBefore.Transfer {
-			session.AbortTransaction(sc)
-			return fmt.Errorf("insufficient transfer in %s: have %.0f, need %.0f", fromFund, fromBefore.Transfer, transferAmount)
+		// Skip balance check for external counterpart accounts — they don't hold real cash
+		if !fund.IsExternalFund(fromFund) {
+			if cashAmount > fromBefore.Cash {
+				session.AbortTransaction(sc)
+				return fmt.Errorf("insufficient cash in %s: have %.0f, need %.0f", fromFund, fromBefore.Cash, cashAmount)
+			}
+			if transferAmount > fromBefore.Transfer {
+				session.AbortTransaction(sc)
+				return fmt.Errorf("insufficient transfer in %s: have %.0f, need %.0f", fromFund, fromBefore.Transfer, transferAmount)
+			}
 		}
 
 		toBefore, err := s.repo.GetFundBalance(sc, toFund)

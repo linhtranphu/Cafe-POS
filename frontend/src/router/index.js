@@ -23,6 +23,7 @@ import CostAnalysisView from '../views/CostAnalysisView.vue'
 import SettingsView from '../views/SettingsView.vue'
 import BatchManagementView from '../views/BatchManagementView.vue'
 import PrintManagementView from '../views/PrintManagementView.vue'
+import InventoryStatsView from '../views/InventoryStatsView.vue'
 
 const routes = [
   {
@@ -237,6 +238,12 @@ const routes = [
     path: '/operating-expenses',
     name: 'OperatingExpenses',
     component: () => import('../views/OperatingExpenseView.vue'),
+    meta: { requiresAuth: true, requiresManager: true }
+  },
+  {
+    path: '/manager/inventory-stats',
+    name: 'InventoryStats',
+    component: InventoryStatsView,
     meta: { requiresAuth: true, requiresManager: true }
   }
 ]

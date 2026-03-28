@@ -22,6 +22,23 @@ type IngredientRepository interface {
 type StockHistoryRepository interface {
 	Create(ctx context.Context, history *ingredient.StockHistory) error
 	FindByIngredientID(ctx context.Context, ingredientID primitive.ObjectID) ([]*ingredient.StockHistory, error)
+	GetSummaryByDateRange(ctx context.Context, from, to time.Time) ([]*ingredient.IngredientStockSummary, error)
+}
+
+// StockReportItem combines an ingredient with its period stats
+type StockReportItem struct {
+	ID         primitive.ObjectID `json:"id"`
+	Name       string             `json:"name"`
+	Category   string             `json:"category"`
+	Unit       string             `json:"unit"`
+	CurrentQty float64            `json:"current_qty"`
+	MinStock   float64            `json:"min_stock"`
+	Status     string             `json:"status"` // "ok" | "low" | "out"
+	Consumed   float64            `json:"consumed"`
+	Restocked  float64            `json:"restocked"`
+	Wasted     float64            `json:"wasted"`
+	Adjusted   float64            `json:"adjusted"`
+	OrderCount int                `json:"order_count"`
 }
 
 type IngredientService struct {
@@ -604,4 +621,55 @@ func (s *IngredientService) GetCategories(ctx context.Context) ([]ingredient.Ing
 
 func (s *IngredientService) DeleteCategory(ctx context.Context, id primitive.ObjectID) error {
 	return s.ingredientRepo.DeleteCategory(ctx, id)
+}
+
+// GetStockSummaryReport returns all ingredients combined with their stock movement stats in a date range
+func (s *IngredientService) GetStockSummaryReport(ctx context.Context, from, to time.Time) ([]*StockReportItem, error) {
+	ingredients, err := s.ingredientRepo.FindAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	summaries, err := s.stockHistoryRepo.GetSummaryByDateRange(ctx, from, to)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build a lookup map
+	summaryMap := make(map[primitive.ObjectID]*ingredient.IngredientStockSummary, len(summaries))
+	for _, s := range summaries {
+		summaryMap[s.IngredientID] = s
+	}
+
+	items := make([]*StockReportItem, 0, len(ingredients))
+	for _, ing := range ingredients {
+		status := "ok"
+		if ing.Quantity <= 0 {
+			status = "out"
+		} else if ing.MinStock > 0 && ing.Quantity <= ing.MinStock {
+			status = "low"
+		}
+
+		item := &StockReportItem{
+			ID:         ing.ID,
+			Name:       ing.Name,
+			Category:   ing.Category,
+			Unit:       string(ing.Unit),
+			CurrentQty: ing.Quantity,
+			MinStock:   ing.MinStock,
+			Status:     status,
+		}
+
+		if s, ok := summaryMap[ing.ID]; ok {
+			item.Consumed = s.Consumed
+			item.Restocked = s.Restocked
+			item.Wasted = s.Wasted
+			item.Adjusted = s.Adjusted
+			item.OrderCount = s.OrderCount
+		}
+
+		items = append(items, item)
+	}
+
+	return items, nil
 }
