@@ -40,8 +40,9 @@ const navItems = computed(() => {
     return [
       { path: '/dashboard', icon: '🏠', label: 'Dashboard' },
       { path: '/cashier/reports', icon: '📊', label: 'Báo cáo' },
+      { path: '/manager/schedule', icon: '📅', label: 'Lịch ca' },
       { path: '/manager/inventory-stats', icon: '📦', label: 'Tồn kho' },
-      { path: '/manager/profit-analysis', icon: '📈', label: 'Lợi nhuận' },
+      { path: '/manager/attendance', icon: '⏱️', label: 'Giờ công' },
       { path: '/profile', icon: '👤', label: 'Cá nhân' }
     ]
   }
@@ -51,6 +52,7 @@ const navItems = computed(() => {
     return [
       { path: '/dashboard', icon: '🏠', label: 'Trang chủ' },
       { path: '/barista', icon: '🍹', label: 'Barista' },
+      { path: '/schedule', icon: '📅', label: 'Lịch ca' },
       { path: '/shifts', icon: '⏰', label: 'Ca làm' },
       { path: '/profile', icon: '👤', label: 'Cá nhân' }
     ]
@@ -62,7 +64,7 @@ const navItems = computed(() => {
     return [
       { path: '/dashboard', icon: '🏠', label: 'Trang chủ' },
       { path: '/cashier', icon: '💰', label: 'Thu ngân', badge: pendingCount },
-      { path: '/cashier/reports', icon: '📊', label: 'Báo cáo' },
+      { path: '/schedule', icon: '📅', label: 'Lịch ca' },
       { path: '/shifts', icon: '⏰', label: 'Ca làm' },
       { path: '/profile', icon: '👤', label: 'Cá nhân' }
     ]
@@ -73,6 +75,7 @@ const navItems = computed(() => {
     { path: '/dashboard', icon: '🏠', label: 'Trang chủ' },
     { path: '/create-order', icon: '➕', label: 'Tạo order' },
     { path: '/orders', icon: '📋', label: 'Orders' },
+    { path: '/schedule', icon: '📅', label: 'Lịch ca' },
     { path: '/shifts', icon: '⏰', label: 'Ca làm' },
     { path: '/profile', icon: '👤', label: 'Cá nhân' }
   ]

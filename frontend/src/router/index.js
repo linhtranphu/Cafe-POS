@@ -245,7 +245,24 @@ const routes = [
     name: 'InventoryStats',
     component: InventoryStatsView,
     meta: { requiresAuth: true, requiresManager: true }
-  }
+  },
+  {
+    path: '/manager/schedule',
+    name: 'ScheduleManagement',
+    component: () => import('../views/ScheduleManagementView.vue'),
+    meta: { requiresAuth: true, requiresManager: true }
+  },
+  {
+    path: '/schedule',
+    name: 'Schedule',
+    component: () => import('../views/ScheduleView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/manager/attendance',
+    component: () => import('../views/AttendanceView.vue'),
+    meta: { requiresAuth: true, requiresManager: true }
+  },
 ]
 
 const router = createRouter({

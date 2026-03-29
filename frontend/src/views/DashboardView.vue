@@ -155,11 +155,17 @@
             <span>Nhân sự & Hệ thống</span>
           </h2>
           <div class="grid grid-cols-2 gap-3">
-            <button @click="$router.push('/users')" 
+            <button @click="$router.push('/users')"
               class="bg-gradient-to-br from-violet-500 to-purple-600 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
               <div class="text-4xl mb-2">👥</div>
               <div class="font-bold text-base">Nhân viên</div>
               <div class="text-xs opacity-80 mt-1">Quản lý tài khoản</div>
+            </button>
+            <button @click="$router.push('/manager/schedule')"
+              class="bg-gradient-to-br from-indigo-500 to-purple-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+              <div class="text-4xl mb-2">📅</div>
+              <div class="font-bold text-base">Lịch ca</div>
+              <div class="text-xs opacity-80 mt-1">Đăng ký ca làm việc</div>
             </button>
             <button @click="$router.push('/print-management')" 
               class="bg-gradient-to-br from-teal-500 to-cyan-600 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
@@ -388,7 +394,6 @@
                   <div class="text-4xl mb-2">📦</div>
                   <div class="font-bold">Tồn kho</div>
                 </button>
-                
                 <!-- Cashier Actions -->
                 <button v-if="isCashier" @click="$router.push('/cashier')" 
                   class="bg-gradient-to-br from-yellow-500 to-orange-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
