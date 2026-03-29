@@ -161,6 +161,24 @@ func (r *ScheduleSlotRepository) Create(ctx context.Context, s *schedule.Schedul
 	return nil
 }
 
+func (r *ScheduleSlotRepository) FindByDate(ctx context.Context, date time.Time) ([]*schedule.ScheduleSlot, error) {
+	from := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
+	to := from.Add(24 * time.Hour)
+	opts := options.Find().SetSort(bson.D{{Key: "start_time", Value: 1}})
+	cursor, err := r.col.Find(ctx, bson.M{
+		"date": bson.M{"$gte": from, "$lt": to},
+	}, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	var list []*schedule.ScheduleSlot
+	if err = cursor.All(ctx, &list); err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
 func (r *ScheduleSlotRepository) FindByPeriod(ctx context.Context, periodID primitive.ObjectID) ([]*schedule.ScheduleSlot, error) {
 	opts := options.Find().SetSort(bson.D{{Key: "date", Value: 1}, {Key: "start_time", Value: 1}})
 	cursor, err := r.col.Find(ctx, bson.M{"period_id": periodID}, opts)

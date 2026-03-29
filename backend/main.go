@@ -858,6 +858,7 @@ func main() {
 				manager.POST("/schedule/periods/:id/slots", scheduleHandler.AddSlot)
 				manager.DELETE("/schedule/periods/:id/slots/:slotId", scheduleHandler.RemoveSlot)
 				manager.DELETE("/schedule/registrations/:regId", scheduleHandler.CancelRegistration)
+				manager.GET("/schedule/registrations-by-date", scheduleHandler.GetRegistrationsByDate)
 
 				// Attendance (actual work hours) routes
 				manager.POST("/attendance", attendanceHandler.AddEntry)

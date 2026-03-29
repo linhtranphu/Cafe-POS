@@ -33,6 +33,7 @@ type ScheduleSlotRepository interface {
 	Create(ctx context.Context, s *schedule.ScheduleSlot) error
 	FindByPeriod(ctx context.Context, periodID primitive.ObjectID) ([]*schedule.ScheduleSlot, error)
 	FindByID(ctx context.Context, id primitive.ObjectID) (*schedule.ScheduleSlot, error)
+	FindByDate(ctx context.Context, date time.Time) ([]*schedule.ScheduleSlot, error)
 	Delete(ctx context.Context, id primitive.ObjectID) error
 }
 
@@ -332,7 +333,57 @@ func (s *ScheduleService) GetMySchedule(ctx context.Context, userID primitive.Ob
 	return s.GetPeriodDetail(ctx, p.ID, &userID)
 }
 
+// ─── ScheduledStaff ───────────────────────────────────────────────────────────
+
+type ScheduledStaff struct {
+	StaffName      string  `json:"staff_name"`
+	TemplateName   string  `json:"template_name"`
+	StartTime      string  `json:"start_time"`
+	EndTime        string  `json:"end_time"`
+	ScheduledHours float64 `json:"scheduled_hours"`
+}
+
+func (s *ScheduleService) GetRegistrationsByDate(ctx context.Context, date time.Time) ([]ScheduledStaff, error) {
+	slots, err := s.slots.FindByDate(ctx, date)
+	if err != nil {
+		return nil, err
+	}
+	var result []ScheduledStaff
+	for _, sl := range slots {
+		regs, err := s.registrations.FindBySlot(ctx, sl.ID)
+		if err != nil {
+			continue
+		}
+		hours := calcShiftHours(sl.StartTime, sl.EndTime)
+		for _, reg := range regs {
+			result = append(result, ScheduledStaff{
+				StaffName:      reg.UserName,
+				TemplateName:   sl.TemplateName,
+				StartTime:      sl.StartTime,
+				EndTime:        sl.EndTime,
+				ScheduledHours: hours,
+			})
+		}
+	}
+	if result == nil {
+		result = []ScheduledStaff{}
+	}
+	return result, nil
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+func calcShiftHours(start, end string) float64 {
+	var sh, sm, eh, em int
+	fmt.Sscanf(start, "%d:%d", &sh, &sm)
+	fmt.Sscanf(end, "%d:%d", &eh, &em)
+	startMins := sh*60 + sm
+	endMins := eh*60 + em
+	if endMins <= startMins {
+		endMins += 24 * 60
+	}
+	return float64(endMins-startMins) / 60
+}
 
 func roleAllowed(userRole string, slotRoles []string) bool {
 	for _, r := range slotRoles {

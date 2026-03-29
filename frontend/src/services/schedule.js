@@ -59,6 +59,11 @@ export const removeSlot = async (periodId, slotId) => {
   return res.data
 }
 
+export const getRegistrationsByDate = async (date) => {
+  const res = await api.get('/manager/schedule/registrations-by-date', { params: { date } })
+  return res.data
+}
+
 export const cancelRegistration = async (regId) => {
   const res = await api.delete(`/manager/schedule/registrations/${regId}`)
   return res.data

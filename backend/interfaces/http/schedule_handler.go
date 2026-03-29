@@ -201,6 +201,26 @@ func (h *ScheduleHandler) CancelRegistration(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "ok"})
 }
 
+// GetRegistrationsByDate returns scheduled staff for a given date (manager)
+func (h *ScheduleHandler) GetRegistrationsByDate(c *gin.Context) {
+	dateStr := c.Query("date")
+	if dateStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "date is required"})
+		return
+	}
+	date, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date format, use YYYY-MM-DD"})
+		return
+	}
+	result, err := h.svc.GetRegistrationsByDate(c.Request.Context(), date)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
 // ─── Staff endpoints ──────────────────────────────────────────────────────────
 
 // GetCurrentPeriod returns the active open/published period with my registrations

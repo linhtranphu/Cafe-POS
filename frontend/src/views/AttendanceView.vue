@@ -97,9 +97,26 @@
             <input type="date" v-model="form.date"
               class="w-full px-4 py-3 border border-gray-200 rounded-xl text-base bg-white" />
           </div>
+          <!-- Scheduled staff for this date -->
           <div>
             <label class="text-sm font-semibold text-gray-700 mb-1.5 block">Tên nhân viên</label>
-            <input v-model="form.staff_name" placeholder="Nhập tên nhân viên"
+            <div v-if="loadingSchedule" class="text-xs text-gray-400 mb-2">Đang tải ca đăng ký...</div>
+            <div v-else-if="scheduledStaff.length" class="flex flex-wrap gap-1.5 mb-2">
+              <button
+                v-for="s in scheduledStaff" :key="s.staff_name + s.template_name"
+                @click="selectScheduledStaff(s)"
+                :class="[
+                  'px-3 py-1.5 rounded-xl text-xs font-semibold touch-manipulation border transition-all',
+                  form.staff_name === s.staff_name
+                    ? 'bg-blue-500 text-white border-blue-500'
+                    : 'bg-blue-50 text-blue-700 border-blue-200 active:bg-blue-100'
+                ]">
+                {{ s.staff_name }}
+                <span class="opacity-70 ml-1">{{ s.scheduled_hours }}h</span>
+              </button>
+            </div>
+            <div v-else-if="form.date" class="text-xs text-gray-400 italic mb-2">Không có nhân viên đăng ký ca ngày này.</div>
+            <input v-model="form.staff_name" placeholder="Nhập tên nhân viên (hoặc chọn ở trên)"
               class="w-full px-4 py-3 border border-gray-200 rounded-xl text-base" />
           </div>
           <div>
@@ -157,9 +174,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import BottomNav from '../components/BottomNav.vue'
 import * as attendanceApi from '../services/attendance.js'
+import { getRegistrationsByDate } from '../services/schedule.js'
 
 const quickHours = [-4, -2, -1, -0.5, 0.5, 1, 2, 4, 8]
 
@@ -241,17 +259,38 @@ const showForm = ref(false)
 const saving = ref(false)
 const formError = ref('')
 const form = ref({ date: '', staff_name: '', hours: 1, note: '' })
+const scheduledStaff = ref([])
+const loadingSchedule = ref(false)
+
+async function fetchScheduledStaff(date) {
+  if (!date) { scheduledStaff.value = []; return }
+  loadingSchedule.value = true
+  try {
+    scheduledStaff.value = await getRegistrationsByDate(date) || []
+  } catch {
+    scheduledStaff.value = []
+  } finally {
+    loadingSchedule.value = false
+  }
+}
+
+function selectScheduledStaff(s) {
+  form.value.staff_name = s.staff_name
+  form.value.hours = s.scheduled_hours
+  form.value.note = `${s.template_name} (${s.start_time}–${s.end_time})`
+}
 
 function openAddForm() {
   formError.value = ''
-  form.value = {
-    date: new Date().toISOString().split('T')[0],
-    staff_name: '',
-    hours: 1,
-    note: '',
-  }
+  const today = new Date().toISOString().split('T')[0]
+  form.value = { date: today, staff_name: '', hours: 1, note: '' }
+  fetchScheduledStaff(today)
   showForm.value = true
 }
+
+watch(() => form.value.date, (date) => {
+  fetchScheduledStaff(date)
+})
 
 async function saveEntry() {
   formError.value = ''
