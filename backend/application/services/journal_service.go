@@ -224,6 +224,18 @@ func (s *JournalService) recordCashierShiftEnd(
 	return entry, nil
 }
 
+// RecordWaiterShiftStartInSession records the waiter starting float within an existing
+// MongoDB session/transaction. Use this when the caller manages the outer transaction.
+func (s *JournalService) RecordWaiterShiftStartInSession(
+	ctx context.Context,
+	startCash float64,
+	waiterShiftID primitive.ObjectID,
+	waiterID primitive.ObjectID,
+	waiterName string,
+) (*fund.JournalEntry, error) {
+	return s.recordWaiterShiftStart(ctx, startCash, waiterShiftID, waiterID, waiterName)
+}
+
 // RecordWaiterShiftStart creates:
 //   DEBIT  waiter_float X  (waiter nhận tiền)
 //   CREDIT cash_drawer  X  (ngăn kéo xuất tiền)
@@ -807,6 +819,19 @@ func (s *JournalService) RecordFundTransfer(
 	return entry, err
 }
 
+// RecordOrderPaymentInSession records an order payment within an existing
+// MongoDB session/transaction. Use this when the caller manages the outer transaction.
+func (s *JournalService) RecordOrderPaymentInSession(
+	ctx context.Context,
+	cashAmount, transferAmount float64,
+	orderID primitive.ObjectID,
+	orderNumber string,
+	waiterID primitive.ObjectID,
+	waiterName string,
+) (*fund.JournalEntry, error) {
+	return s.recordOrderPayment(ctx, cashAmount, transferAmount, orderID, orderNumber, waiterID, waiterName)
+}
+
 // RecordOrderPayment creates:
 //
 //	DEBIT  waiter_float  X  (waiter nhận tiền từ khách)
@@ -837,55 +862,71 @@ func (s *JournalService) RecordOrderPayment(
 		if err := session.StartTransaction(); err != nil {
 			return err
 		}
-
-		waiterBefore, err := s.repo.GetFundBalance(sc, fund.FundTypeWaiterFloat)
+		e, err := s.recordOrderPayment(sc, cashAmount, transferAmount, orderID, orderNumber, waiterID, waiterName)
 		if err != nil {
-			session.AbortTransaction(sc)
-			return fmt.Errorf("failed to get waiter_float balance: %w", err)
-		}
-		customerBefore, err := s.repo.GetFundBalance(sc, fund.FundTypeCustomer)
-		if err != nil {
-			session.AbortTransaction(sc)
-			return fmt.Errorf("failed to get customer balance: %w", err)
-		}
-
-		var paymentType string
-		if cashAmount > 0 && transferAmount > 0 {
-			paymentType = "tiền mặt + chuyển khoản"
-		} else if cashAmount > 0 {
-			paymentType = "tiền mặt"
-		} else {
-			paymentType = "chuyển khoản"
-		}
-		desc := fmt.Sprintf("Thanh toán đơn %s - %.0fđ (%s) - %s", orderNumber, total, paymentType, waiterName)
-		e := fund.NewJournalEntry(fund.EventOrderPayment, orderID, desc, waiterID, waiterName, "waiter")
-
-		// DEBIT waiter_float (waiter nhận tiền từ khách)
-		waiterAfter := fund.FundBalance{
-			Cash:     waiterBefore.Cash + cashAmount,
-			Transfer: waiterBefore.Transfer + transferAmount,
-			Total:    waiterBefore.Total + total,
-		}
-		e.AddLine(fund.FundTypeWaiterFloat, fund.DirectionDebit, cashAmount, transferAmount, *waiterBefore, waiterAfter)
-
-		// CREDIT customer (khách hàng thanh toán)
-		customerAfter := fund.FundBalance{
-			Cash:     customerBefore.Cash - cashAmount,
-			Transfer: customerBefore.Transfer - transferAmount,
-			Total:    customerBefore.Total - total,
-		}
-		e.AddLine(fund.FundTypeCustomer, fund.DirectionCredit, cashAmount, transferAmount, *customerBefore, customerAfter)
-
-		if err := e.Validate(); err != nil {
 			session.AbortTransaction(sc)
 			return err
-		}
-		if err := s.repo.Create(sc, e); err != nil {
-			session.AbortTransaction(sc)
-			return fmt.Errorf("failed to persist journal entry: %w", err)
 		}
 		entry = e
 		return session.CommitTransaction(sc)
 	})
 	return entry, err
+}
+
+func (s *JournalService) recordOrderPayment(
+	ctx context.Context,
+	cashAmount, transferAmount float64,
+	orderID primitive.ObjectID,
+	orderNumber string,
+	waiterID primitive.ObjectID,
+	waiterName string,
+) (*fund.JournalEntry, error) {
+	total := cashAmount + transferAmount
+	if total <= 0 {
+		return nil, fmt.Errorf("payment amount must be greater than 0")
+	}
+
+	waiterBefore, err := s.repo.GetFundBalance(ctx, fund.FundTypeWaiterFloat)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get waiter_float balance: %w", err)
+	}
+	customerBefore, err := s.repo.GetFundBalance(ctx, fund.FundTypeCustomer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get customer balance: %w", err)
+	}
+
+	var paymentType string
+	if cashAmount > 0 && transferAmount > 0 {
+		paymentType = "tiền mặt + chuyển khoản"
+	} else if cashAmount > 0 {
+		paymentType = "tiền mặt"
+	} else {
+		paymentType = "chuyển khoản"
+	}
+	desc := fmt.Sprintf("Thanh toán đơn %s - %.0fđ (%s) - %s", orderNumber, total, paymentType, waiterName)
+	e := fund.NewJournalEntry(fund.EventOrderPayment, orderID, desc, waiterID, waiterName, "waiter")
+
+	// DEBIT waiter_float (waiter nhận tiền từ khách)
+	waiterAfter := fund.FundBalance{
+		Cash:     waiterBefore.Cash + cashAmount,
+		Transfer: waiterBefore.Transfer + transferAmount,
+		Total:    waiterBefore.Total + total,
+	}
+	e.AddLine(fund.FundTypeWaiterFloat, fund.DirectionDebit, cashAmount, transferAmount, *waiterBefore, waiterAfter)
+
+	// CREDIT customer (khách hàng thanh toán)
+	customerAfter := fund.FundBalance{
+		Cash:     customerBefore.Cash - cashAmount,
+		Transfer: customerBefore.Transfer - transferAmount,
+		Total:    customerBefore.Total - total,
+	}
+	e.AddLine(fund.FundTypeCustomer, fund.DirectionCredit, cashAmount, transferAmount, *customerBefore, customerAfter)
+
+	if err := e.Validate(); err != nil {
+		return nil, err
+	}
+	if err := s.repo.Create(ctx, e); err != nil {
+		return nil, fmt.Errorf("failed to persist journal entry: %w", err)
+	}
+	return e, nil
 }

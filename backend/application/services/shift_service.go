@@ -3,13 +3,15 @@ package services
 import (
 	"context"
 	"errors"
-	"log"
+	"fmt"
 	"time"
+
 	"cafe-pos/backend/domain"
 	"cafe-pos/backend/domain/cashier"
 	"cafe-pos/backend/domain/order"
 	"cafe-pos/backend/infrastructure/mongodb"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	mongoDriver "go.mongodb.org/mongo-driver/mongo"
 )
 
 type ShiftRepository interface {
@@ -32,6 +34,7 @@ type ShiftService struct {
 	stateMachineManager *domain.StateMachineManager
 	journalService      *JournalService
 	cashierShiftRepo    *mongodb.CashierShiftRepository
+	mongoClient         *mongoDriver.Client
 }
 
 func NewShiftService(
@@ -40,6 +43,7 @@ func NewShiftService(
 	stateMachineManager *domain.StateMachineManager,
 	journalService *JournalService,
 	cashierShiftRepo *mongodb.CashierShiftRepository,
+	mongoClient *mongoDriver.Client,
 ) *ShiftService {
 	return &ShiftService{
 		shiftRepo:           shiftRepo,
@@ -47,6 +51,7 @@ func NewShiftService(
 		stateMachineManager: stateMachineManager,
 		journalService:      journalService,
 		cashierShiftRepo:    cashierShiftRepo,
+		mongoClient:         mongoClient,
 	}
 }
 
@@ -100,22 +105,42 @@ func (s *ShiftService) StartShift(ctx context.Context, req *order.StartShiftRequ
 		StartedAt:          time.Now(),
 	}
 
-	if err := s.shiftRepo.Create(ctx, shift); err != nil {
-		return nil, err
-	}
-
-	// Record starting float journal entry after shift is persisted
-	if len(activeCashierShifts) > 0 && req.StartCash > 0 && s.journalService != nil {
+	// Wrap shift creation + journal entry + cashier update in a single transaction
+	// so that a failed journal recording also rolls back the shift creation.
+	needsJournal := len(activeCashierShifts) > 0 && req.StartCash > 0 && s.journalService != nil && s.mongoClient != nil
+	if needsJournal {
 		activeCashierShift := activeCashierShifts[0]
-		if _, err := s.journalService.RecordWaiterShiftStart(ctx, req.StartCash, shift.ID, userOID, userName); err != nil {
-			log.Printf("⚠️ [WAITER START FLOAT] Failed to record journal entry: %v (non-fatal)", err)
-		} else {
-			activeCashierShift.AddDistributedCash(req.StartCash)
-			if saveErr := s.cashierShiftRepo.Save(ctx, activeCashierShift); saveErr != nil {
-				log.Printf("⚠️ [WAITER START FLOAT] Failed to update cashier distributed cash: %v (non-fatal)", saveErr)
-			} else {
-				log.Printf("✅ [WAITER START FLOAT] Journal entry recorded: cash_drawer → waiter_float %.0f for %s", req.StartCash, userName)
+		session, err := s.mongoClient.StartSession()
+		if err != nil {
+			return nil, fmt.Errorf("không thể bắt đầu transaction: %w", err)
+		}
+		defer session.EndSession(ctx)
+
+		err = mongoDriver.WithSession(ctx, session, func(sc mongoDriver.SessionContext) error {
+			if err := session.StartTransaction(); err != nil {
+				return err
 			}
+			if err := s.shiftRepo.Create(sc, shift); err != nil {
+				session.AbortTransaction(sc)
+				return err
+			}
+			if _, err := s.journalService.RecordWaiterShiftStartInSession(sc, req.StartCash, shift.ID, userOID, userName); err != nil {
+				session.AbortTransaction(sc)
+				return fmt.Errorf("kế toán không ghi nhận được tiền đầu ca: %w", err)
+			}
+			activeCashierShift.AddDistributedCash(req.StartCash)
+			if err := s.cashierShiftRepo.Save(sc, activeCashierShift); err != nil {
+				session.AbortTransaction(sc)
+				return fmt.Errorf("không thể cập nhật ca thu ngân: %w", err)
+			}
+			return session.CommitTransaction(sc)
+		})
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		if err := s.shiftRepo.Create(ctx, shift); err != nil {
+			return nil, err
 		}
 	}
 

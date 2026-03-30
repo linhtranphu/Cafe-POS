@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"log"
 	"time"
+
 	"cafe-pos/backend/domain"
 	"cafe-pos/backend/domain/order"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	mongoDriver "go.mongodb.org/mongo-driver/mongo"
 )
 
 type OrderRepository interface {
@@ -31,9 +33,10 @@ type OrderService struct {
 	stateMachineManager *domain.StateMachineManager
 	batchUsageService   *BatchUsageService
 	ingredientService   *IngredientService
-	printService        PrintService              // Optional: for auto-printing
-	settingsRepo        ShopSettingsRepository    // Optional: for auto-print setting
-	journalService      *JournalService           // Optional: for double-entry journal
+	printService        PrintService           // Optional: for auto-printing
+	settingsRepo        ShopSettingsRepository // Optional: for auto-print setting
+	journalService      *JournalService        // Optional: for double-entry journal
+	mongoClient         *mongoDriver.Client    // Optional: for atomic payment transactions
 }
 
 func NewOrderService(
@@ -71,6 +74,11 @@ func (s *OrderService) SetSettingsRepository(settingsRepo ShopSettingsRepository
 // SetJournalService sets the journal service for double-entry bookkeeping (optional)
 func (s *OrderService) SetJournalService(journalService *JournalService) {
 	s.journalService = journalService
+}
+
+// SetMongoClient sets the MongoDB client for atomic payment transactions (optional)
+func (s *OrderService) SetMongoClient(client *mongoDriver.Client) {
+	s.mongoClient = client
 }
 
 func (s *OrderService) CreateOrder(ctx context.Context, req *order.CreateOrderRequest, waiterID, waiterName string) (*order.Order, error) {
@@ -165,160 +173,151 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *order.CreateOrderRe
 }
 
 func (s *OrderService) CollectPayment(ctx context.Context, id primitive.ObjectID, req *order.PaymentRequest) (*order.Order, error) {
-	o, err := s.orderRepo.FindByID(ctx, id)
+	// Quick pre-check (non-transactional): reject if order is already fully paid.
+	// Handles the common case of sequential double-clicks.
+	pre, err := s.orderRepo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-
-	// Validate state transition using state machine
-	if err := s.stateMachineManager.ValidateOrderTransition(o, order.EventPayOrder); err != nil {
-		return nil, fmt.Errorf("payment validation failed: %w", err)
+	if pre.AmountDue <= 0 {
+		return pre, nil
 	}
 
 	collectorID, _ := primitive.ObjectIDFromHex(req.CollectorID)
-	now := time.Now()
-	
-	// Add to amount paid
-	o.AmountPaid += req.Amount
-	o.PaymentMethod = req.PaymentMethod
-	o.CollectorID = collectorID
-	o.CollectorName = req.CollectorName
-	
-	// Recalculate amounts
-	o.CalculateTotal()
-	
-	// If fully paid, mark as PAID
-	if o.IsFullyPaid() {
-		o.Status = order.StatusPaid
-		o.PaidAt = &now
 
-		// Deduct inventory when order is PAID
-		if err := s.deductIngredients(ctx, o); err != nil {
-			log.Printf("WARNING: inventory deduction failed for paid order %s: %v", o.OrderNumber, err)
-			// Do not rollback payment — log only
+	// Wrap the read → validate → mutate → persist → journal into a single
+	// MongoDB transaction. This prevents double-recording when two concurrent
+	// requests both pass the pre-check above (race condition).
+	var o *order.Order
+
+	doPayment := func(sc context.Context) error {
+		loaded, err := s.orderRepo.FindByID(sc, id)
+		if err != nil {
+			return err
+		}
+
+		// Idempotency guard inside the transaction
+		if loaded.AmountDue <= 0 {
+			o = loaded
+			return nil
+		}
+
+		// Validate state transition using state machine
+		if err := s.stateMachineManager.ValidateOrderTransition(loaded, order.EventPayOrder); err != nil {
+			return fmt.Errorf("payment validation failed: %w", err)
+		}
+
+		now := time.Now()
+		loaded.AmountPaid += req.Amount
+		loaded.PaymentMethod = req.PaymentMethod
+		loaded.CollectorID = collectorID
+		loaded.CollectorName = req.CollectorName
+		loaded.CalculateTotal()
+
+		if loaded.IsFullyPaid() {
+			loaded.Status = order.StatusPaid
+			loaded.PaidAt = &now
+		}
+
+		if err := s.orderRepo.Update(sc, id, loaded); err != nil {
+			return err
+		}
+
+		// Record journal entry within the same transaction
+		if s.journalService != nil && loaded.IsFullyPaid() {
+			var cashAmount, transferAmount float64
+			if req.PaymentMethod == order.PaymentCash {
+				cashAmount = req.Amount
+			} else {
+				transferAmount = req.Amount
+			}
+			if _, err := s.journalService.RecordOrderPaymentInSession(
+				sc,
+				cashAmount, transferAmount,
+				loaded.ID,
+				loaded.OrderNumber,
+				loaded.WaiterID,
+				loaded.WaiterName,
+			); err != nil {
+				return fmt.Errorf("kế toán không ghi nhận được thanh toán: %w", err)
+			}
+		}
+
+		o = loaded
+		return nil
+	}
+
+	if s.mongoClient != nil {
+		session, err := s.mongoClient.StartSession()
+		if err != nil {
+			return nil, fmt.Errorf("không thể bắt đầu transaction: %w", err)
+		}
+		defer session.EndSession(ctx)
+
+		err = mongoDriver.WithSession(ctx, session, func(sc mongoDriver.SessionContext) error {
+			if err := session.StartTransaction(); err != nil {
+				return err
+			}
+			if err := doPayment(sc); err != nil {
+				session.AbortTransaction(sc)
+				return err
+			}
+			return session.CommitTransaction(sc)
+		})
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		if err := doPayment(ctx); err != nil {
+			return nil, err
 		}
 	}
 
-	// Update shift revenue based on payment method
+	// ── Side effects (outside the transaction, non-fatal) ──────────────────
+
+	// Deduct inventory
+	if o.IsFullyPaid() {
+		if err := s.deductIngredients(ctx, o); err != nil {
+			log.Printf("WARNING: inventory deduction failed for paid order %s: %v", o.OrderNumber, err)
+		}
+	}
+
+	// Update shift revenue counters
 	if !o.ShiftID.IsZero() {
-		log.Printf("💰 [PAYMENT] Received - ShiftID: %s, Method: %s, Amount: %.0f VND", 
-			o.ShiftID.Hex(), req.PaymentMethod, req.Amount)
-		
 		shift, err := s.shiftRepo.FindByID(ctx, o.ShiftID)
 		if err != nil {
 			log.Printf("❌ [PAYMENT] Failed to find shift: %v", err)
-		} else if shift == nil {
-			log.Printf("❌ [PAYMENT] Shift is nil")
-		} else {
-			log.Printf("✅ [PAYMENT] Found shift - ID: %s", shift.ID.Hex())
-			log.Printf("📊 [PAYMENT] BEFORE UPDATE:")
-			log.Printf("   - CurrentCash: %.0f VND", shift.CurrentCash)
-			log.Printf("   - RemainingCash: %.0f VND", shift.RemainingCash)
-			log.Printf("   - TransferRevenue: %.0f VND", shift.TransferRevenue)
-			log.Printf("   - RemainingTransfer: %.0f VND", shift.RemainingTransfer)
-			log.Printf("   - TotalRevenue: %.0f VND", shift.TotalRevenue)
-			
-			// Update total revenue for all payment methods
+		} else if shift != nil {
 			shift.TotalRevenue += req.Amount
-			
-			// Update specific payment method fields
 			if req.PaymentMethod == order.PaymentCash {
-				log.Printf("💵 [PAYMENT] Processing CASH payment")
 				shift.RemainingCash += req.Amount
 				shift.CurrentCash += req.Amount
 			} else if req.PaymentMethod == order.PaymentTransfer || req.PaymentMethod == order.PaymentQR {
-				log.Printf("🏦 [PAYMENT] Processing TRANSFER/QR payment")
 				shift.TransferRevenue += req.Amount
 				shift.RemainingTransfer += req.Amount
-			} else {
-				log.Printf("⚠️  [PAYMENT] Unknown payment method: %s", req.PaymentMethod)
 			}
-			
-			log.Printf("📊 [PAYMENT] AFTER UPDATE (in memory):")
-			log.Printf("   - CurrentCash: %.0f VND", shift.CurrentCash)
-			log.Printf("   - RemainingCash: %.0f VND", shift.RemainingCash)
-			log.Printf("   - TransferRevenue: %.0f VND", shift.TransferRevenue)
-			log.Printf("   - RemainingTransfer: %.0f VND", shift.RemainingTransfer)
-			log.Printf("   - TotalRevenue: %.0f VND", shift.TotalRevenue)
-			
-			// Update shift
 			if err := s.shiftRepo.Update(ctx, o.ShiftID, shift); err != nil {
-				log.Printf("❌ [PAYMENT] Failed to update shift in DB: %v", err)
-			} else {
-				log.Printf("✅ [PAYMENT] Shift updated successfully in DB")
-				
-				// Verify the update by reading back
-				verifyShift, verifyErr := s.shiftRepo.FindByID(ctx, o.ShiftID)
-				if verifyErr == nil && verifyShift != nil {
-					log.Printf("🔍 [PAYMENT] VERIFY (from DB):")
-					log.Printf("   - CurrentCash: %.0f VND", verifyShift.CurrentCash)
-					log.Printf("   - RemainingCash: %.0f VND", verifyShift.RemainingCash)
-					log.Printf("   - TransferRevenue: %.0f VND", verifyShift.TransferRevenue)
-					log.Printf("   - RemainingTransfer: %.0f VND", verifyShift.RemainingTransfer)
-					log.Printf("   - TotalRevenue: %.0f VND", verifyShift.TotalRevenue)
-				} else {
-					log.Printf("❌ [PAYMENT] Failed to verify shift update: %v", verifyErr)
-				}
+				log.Printf("❌ [PAYMENT] Failed to update shift: %v", err)
 			}
 		}
-	} else {
-		log.Printf("⚠️  [PAYMENT] Not updating shift - ShiftID is zero")
 	}
 
-	if err := s.orderRepo.Update(ctx, id, o); err != nil {
-		return nil, err
-	}
-
-	// Record double-entry journal for order payment
-	if s.journalService != nil && o.IsFullyPaid() {
-		var cashAmount, transferAmount float64
-		if req.PaymentMethod == order.PaymentCash {
-			cashAmount = req.Amount
-		} else {
-			transferAmount = req.Amount
-		}
-		if _, err := s.journalService.RecordOrderPayment(
-			ctx,
-			cashAmount, transferAmount,
-			o.ID,
-			o.OrderNumber,
-			o.WaiterID,
-			o.WaiterName,
-		); err != nil {
-			// Non-fatal: order already saved. Log and continue.
-			log.Printf("⚠️ [JOURNAL] Failed to record order payment journal for %s: %v", o.OrderNumber, err)
-		} else {
-			log.Printf("✅ [JOURNAL] Order payment recorded: %s %.0fđ (%s)", o.OrderNumber, req.Amount, req.PaymentMethod)
-		}
-	}
-
-	// Emit OrderCreated event for printing if order is now PAID
-	// This happens after order is committed to ensure order persistence before print jobs
+	// Auto-print
 	if o.Status == order.StatusPaid && s.printService != nil {
-		// Check auto-print setting before creating print jobs
-		autoPrintEnabled := true // Default to true if settings not available
+		autoPrintEnabled := true
 		if s.settingsRepo != nil {
 			settings, err := s.settingsRepo.FindFirst(ctx)
 			if err == nil && settings != nil {
 				autoPrintEnabled = settings.AutoPrintEnabled
 			}
 		}
-
 		if autoPrintEnabled {
-			// Call print service asynchronously to not block order creation
-			// Errors in print job creation should not affect order creation
 			go func() {
-				// Use background context to avoid cancellation
 				printCtx := context.Background()
 				if err := s.printService.CreatePrintJobsForOrder(printCtx, o); err != nil {
-					// Log error but don't fail the order creation
 					fmt.Printf("ERROR: Failed to create print jobs for order %s: %v\n", o.OrderNumber, err)
-				} else {
-					fmt.Printf("INFO: Print jobs created for order %s\n", o.OrderNumber)
 				}
 			}()
-		} else {
-			fmt.Printf("INFO: Auto-print disabled, skipping print jobs for order %s\n", o.OrderNumber)
 		}
 	}
 

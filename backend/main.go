@@ -172,7 +172,8 @@ func main() {
 	journalService := services.NewJournalService(journalRepo, client)
 	// Wire up journal service into order service for order payment journal entries
 	orderService.SetJournalService(journalService)
-	shiftService := services.NewShiftService(shiftRepo, orderRepo, smManager, journalService, cashierShiftRepo)
+	orderService.SetMongoClient(client)
+	shiftService := services.NewShiftService(shiftRepo, orderRepo, smManager, journalService, cashierShiftRepo, client)
 	// Cashier services
 	cashierShiftService := services.NewCashierShiftService(cashierShiftRepo, shiftRepo, smManager, journalService, client)
 	cashReconciliationService := services.NewCashReconciliationService(cashReconciliationRepo, shiftRepo, orderRepo)

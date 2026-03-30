@@ -83,6 +83,9 @@ func aggregateItems(orders []*order.Order) ([]ItemSalesBreakdown, int) {
 	itemMap := make(map[key]*ItemSalesBreakdown)
 
 	for _, ord := range orders {
+		if ord.PaymentMethod == "" {
+			continue // chưa thanh toán — không tính vào danh sách món đã bán
+		}
 		if ord.Status != order.StatusPaid && ord.Status != order.StatusQueued &&
 			ord.Status != order.StatusInProgress && ord.Status != order.StatusReady &&
 			ord.Status != order.StatusServed && ord.Status != order.StatusLocked {
