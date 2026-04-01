@@ -104,6 +104,7 @@ func TestMenuBatchIntegration(t *testing.T) {
 		batchDefinitionRepo,
 		ingredientRepo,
 		stockHistoryRepo,
+		nil,
 		batchCostCalculator,
 		client,
 	)

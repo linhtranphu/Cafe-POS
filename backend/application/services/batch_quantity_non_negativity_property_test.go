@@ -59,6 +59,7 @@ func TestProperty_IngredientQuantityNonNegative(t *testing.T) {
 				batchDefRepo,
 				ingredientRepo,
 				stockHistoryRepo,
+				nil,
 				batchCostCalc,
 				client,
 			)

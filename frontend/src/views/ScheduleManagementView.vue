@@ -34,6 +34,19 @@
               <span>Ca mẫu</span>
             </div>
           </button>
+          <button
+            @click="tab = 'weekly'"
+            :class="[
+              'flex-1 py-3 px-4 rounded-xl font-semibold text-sm transition-all touch-manipulation active:scale-98',
+              tab === 'weekly'
+                ? 'bg-blue-500 text-white shadow-lg'
+                : 'bg-gray-100 text-gray-700 active:bg-gray-200'
+            ]">
+            <div class="flex items-center justify-center gap-1.5">
+              <span>🗓️</span>
+              <span>Template tuần</span>
+            </div>
+          </button>
         </div>
       </div>
     </div>
@@ -261,6 +274,60 @@
           </div>
         </div>
       </div>
+
+      <!-- ── Tab: Template tuần ── -->
+      <div v-if="tab === 'weekly'">
+        <button
+          @click="openWeeklyTemplateForm()"
+          class="w-full mb-4 py-3 rounded-2xl bg-blue-500 text-white font-bold text-base shadow-sm active:bg-blue-600 transition-all touch-manipulation">
+          + Tạo template tuần mới
+        </button>
+
+        <div v-if="loadingWeeklyTemplates" class="flex justify-center py-12">
+          <div class="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+        <div v-else-if="weeklyTemplates.length === 0" class="text-center py-12 text-gray-400">
+          <div class="text-4xl mb-2">📭</div>
+          <p>Chưa có template tuần nào.</p>
+          <p class="text-xs mt-1">Template tuần giúp tự động tạo ca khi lập kỳ đăng ký mới.</p>
+        </div>
+
+        <div class="flex flex-col gap-3">
+          <div v-for="wt in weeklyTemplates" :key="wt.id"
+            class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="px-4 py-3 flex justify-between items-start">
+              <div>
+                <div class="font-bold text-gray-900">{{ wt.name }}</div>
+                <div class="text-xs text-gray-400 mt-0.5">
+                  {{ countWeeklyTemplateDays(wt) }} ngày có ca
+                </div>
+              </div>
+              <div class="flex gap-3 ml-2">
+                <button @click="openWeeklyTemplateForm(wt)"
+                  class="text-xs text-blue-500 underline touch-manipulation">Sửa</button>
+                <button @click="confirmDeleteWeeklyTemplate(wt)"
+                  class="text-xs text-red-400 underline touch-manipulation">Xóa</button>
+              </div>
+            </div>
+            <!-- Day summary -->
+            <div class="px-4 pb-3 flex flex-wrap gap-1.5">
+              <div v-for="day in weekDays" :key="day.key"
+                :class="[
+                  'flex items-center gap-1 text-xs px-2 py-1 rounded-lg',
+                  getWeeklyDayTemplates(wt, day.key).length
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'bg-gray-50 text-gray-400'
+                ]">
+                <span class="font-semibold">{{ day.label }}</span>
+                <span v-if="getWeeklyDayTemplates(wt, day.key).length">
+                  {{ getWeeklyDayTemplates(wt, day.key).map(id => templateName(id)).join(', ') }}
+                </span>
+                <span v-else>Nghỉ</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ── Template Modal ── -->
@@ -363,6 +430,19 @@
             <input type="datetime-local" v-model="periodForm.register_deadline"
               class="w-full px-4 py-3 border border-gray-200 rounded-xl text-base" />
           </div>
+          <div>
+            <label class="text-sm font-semibold text-gray-700 mb-1.5 block">Template tuần (tuỳ chọn)</label>
+            <select v-model="periodForm.weekly_template_id"
+              class="w-full px-4 py-3 border border-gray-200 rounded-xl text-base bg-white">
+              <option value="">Không dùng template</option>
+              <option v-for="wt in weeklyTemplates" :key="wt.id" :value="wt.id">
+                {{ wt.name }}
+              </option>
+            </select>
+            <p v-if="periodForm.weekly_template_id" class="text-xs text-blue-600 mt-1">
+              Hệ thống sẽ tự động tạo ca theo template cho toàn bộ kỳ.
+            </p>
+          </div>
         </div>
 
         <p v-if="periodError" class="mt-3 text-red-500 text-sm">{{ periodError }}</p>
@@ -450,12 +530,66 @@
       </div>
     </div>
 
+    <!-- ── Weekly Template Modal ── -->
+    <div v-if="showWeeklyTemplateModal"
+      class="fixed inset-0 z-50 flex items-end justify-center bg-black bg-opacity-40"
+      @click.self="showWeeklyTemplateModal = false">
+      <div class="bg-white rounded-t-3xl w-full max-w-lg p-6 pb-8 max-h-[90vh] overflow-y-auto">
+        <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+        <h3 class="text-xl font-bold text-gray-900 mb-1">
+          {{ editingWeeklyTemplate ? 'Sửa template tuần' : 'Tạo template tuần' }}
+        </h3>
+        <p class="text-xs text-gray-400 mb-4">Gán ca mẫu cho từng ngày trong tuần. Dùng khi tạo kỳ đăng ký để tự động sinh ca.</p>
+
+        <div class="mb-4">
+          <label class="text-sm font-semibold text-gray-700 mb-1.5 block">Tên template</label>
+          <input v-model="weeklyTemplateForm.name" placeholder="VD: Lịch tuần thường"
+            class="w-full px-4 py-3 border border-gray-200 rounded-xl text-base" />
+        </div>
+
+        <div class="mb-4">
+          <div class="text-sm font-semibold text-gray-700 mb-2">Ca mẫu theo ngày</div>
+          <div class="flex flex-col gap-3">
+            <div v-for="day in weekDays" :key="day.key">
+              <div class="text-xs font-semibold text-gray-500 mb-1">{{ day.fullLabel }}</div>
+              <div class="flex flex-wrap gap-2">
+                <label v-for="t in templates" :key="t.id"
+                  class="flex items-center gap-1.5 text-sm cursor-pointer">
+                  <input type="checkbox"
+                    :value="t.id"
+                    :checked="weeklyTemplateForm.days[day.key]?.includes(t.id)"
+                    @change="toggleWeeklyDayTemplate(day.key, t.id, $event.target.checked)"
+                    class="w-4 h-4 rounded accent-blue-500" />
+                  <span class="text-gray-700">{{ t.name }}</span>
+                  <span class="text-gray-400 text-xs">({{ t.start_time }}–{{ t.end_time }})</span>
+                </label>
+              </div>
+              <div v-if="!weeklyTemplateForm.days[day.key]?.length" class="text-xs text-gray-400 italic">Nghỉ</div>
+            </div>
+          </div>
+        </div>
+
+        <p v-if="weeklyTemplateError" class="text-red-500 text-sm mb-3">{{ weeklyTemplateError }}</p>
+
+        <div class="flex gap-3">
+          <button @click="showWeeklyTemplateModal = false"
+            class="flex-1 py-3 rounded-xl border border-gray-200 text-gray-700 font-semibold active:bg-gray-50 touch-manipulation">
+            Hủy
+          </button>
+          <button @click="saveWeeklyTemplate" :disabled="savingWeeklyTemplate"
+            class="flex-1 py-3 rounded-xl bg-blue-500 text-white font-semibold active:bg-blue-600 touch-manipulation disabled:opacity-50">
+            {{ savingWeeklyTemplate ? 'Đang lưu...' : 'Lưu' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <BottomNav />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, reactive } from 'vue'
 import BottomNav from '../components/BottomNav.vue'
 import * as scheduleApi from '../services/schedule.js'
 
@@ -535,7 +669,7 @@ const loadingPeriods = ref(false)
 const showPeriodModal = ref(false)
 const savingPeriod = ref(false)
 const periodError = ref('')
-const periodForm = ref({ name: '', start_date: '', end_date: '', register_deadline: '' })
+const periodForm = ref({ name: '', start_date: '', end_date: '', register_deadline: '', weekly_template_id: '' })
 
 const selectedPeriod = ref(null)
 const periodDetail = ref(null)
@@ -550,7 +684,7 @@ async function loadPeriods() {
 
 function openPeriodForm() {
   periodError.value = ''
-  periodForm.value = { name: '', start_date: '', end_date: '', register_deadline: '' }
+  periodForm.value = { name: '', start_date: '', end_date: '', register_deadline: '', weekly_template_id: '' }
   showPeriodModal.value = true
 }
 
@@ -571,6 +705,9 @@ async function savePeriod() {
     }
     if (f.register_deadline) {
       payload.register_deadline = new Date(f.register_deadline).toISOString()
+    }
+    if (f.weekly_template_id) {
+      payload.weekly_template_id = f.weekly_template_id
     }
     await scheduleApi.createPeriod(payload)
     showPeriodModal.value = false
@@ -634,13 +771,13 @@ async function cancelReg(p, sl, reg) {
 
 // ── Weekly slot creation ────────────────────────────────
 const weekDays = [
-  { key: 1, label: 'T2' },
-  { key: 2, label: 'T3' },
-  { key: 3, label: 'T4' },
-  { key: 4, label: 'T5' },
-  { key: 5, label: 'T6' },
-  { key: 6, label: 'T7' },
-  { key: 0, label: 'CN' },
+  { key: 1, label: 'T2', fullLabel: 'Thứ 2' },
+  { key: 2, label: 'T3', fullLabel: 'Thứ 3' },
+  { key: 3, label: 'T4', fullLabel: 'Thứ 4' },
+  { key: 4, label: 'T5', fullLabel: 'Thứ 5' },
+  { key: 5, label: 'T6', fullLabel: 'Thứ 6' },
+  { key: 6, label: 'T7', fullLabel: 'Thứ 7' },
+  { key: 0, label: 'CN', fullLabel: 'Chủ nhật' },
 ]
 const weekPattern = ref({ 0: '', 1: '', 2: '', 3: '', 4: '', 5: '', 6: '' })
 const weekRange = ref({ start: '', end: '' })
@@ -732,6 +869,99 @@ async function applyWeeklyPattern() {
   await loadPeriodDetail(weeklyPeriod.id)
 }
 
+// ── Weekly Templates (named, saved) ────────────────────
+const weeklyTemplates = ref([])
+const loadingWeeklyTemplates = ref(false)
+const showWeeklyTemplateModal = ref(false)
+const editingWeeklyTemplate = ref(null)
+const savingWeeklyTemplate = ref(false)
+const weeklyTemplateError = ref('')
+
+// days: { 0: ['id1'], 1: ['id1','id2'], ... }
+const defaultWeeklyTemplateForm = () => ({
+  name: '',
+  days: { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] },
+})
+const weeklyTemplateForm = ref(defaultWeeklyTemplateForm())
+
+async function loadWeeklyTemplates() {
+  loadingWeeklyTemplates.value = true
+  try { weeklyTemplates.value = await scheduleApi.getWeeklyTemplates() || [] }
+  finally { loadingWeeklyTemplates.value = false }
+}
+
+function openWeeklyTemplateForm(wt = null) {
+  editingWeeklyTemplate.value = wt
+  weeklyTemplateError.value = ''
+  if (wt) {
+    const days = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] }
+    for (const d of (wt.days || [])) {
+      days[d.day_of_week] = (d.template_ids || []).map(id => typeof id === 'object' ? id.$oid || id : id)
+    }
+    weeklyTemplateForm.value = { name: wt.name, days }
+  } else {
+    weeklyTemplateForm.value = defaultWeeklyTemplateForm()
+  }
+  showWeeklyTemplateModal.value = true
+}
+
+function toggleWeeklyDayTemplate(dayKey, templateId, checked) {
+  const current = weeklyTemplateForm.value.days[dayKey] || []
+  if (checked) {
+    if (!current.includes(templateId)) {
+      weeklyTemplateForm.value.days[dayKey] = [...current, templateId]
+    }
+  } else {
+    weeklyTemplateForm.value.days[dayKey] = current.filter(id => id !== templateId)
+  }
+}
+
+async function saveWeeklyTemplate() {
+  weeklyTemplateError.value = ''
+  if (!weeklyTemplateForm.value.name.trim()) {
+    weeklyTemplateError.value = 'Tên template không được để trống'
+    return
+  }
+  savingWeeklyTemplate.value = true
+  try {
+    const days = Object.entries(weeklyTemplateForm.value.days)
+      .filter(([, ids]) => ids.length > 0)
+      .map(([dow, ids]) => ({ day_of_week: parseInt(dow), template_ids: ids }))
+    const payload = { name: weeklyTemplateForm.value.name.trim(), days }
+    if (editingWeeklyTemplate.value) {
+      await scheduleApi.updateWeeklyTemplate(editingWeeklyTemplate.value.id, payload)
+    } else {
+      await scheduleApi.createWeeklyTemplate(payload)
+    }
+    showWeeklyTemplateModal.value = false
+    await loadWeeklyTemplates()
+  } catch (e) {
+    weeklyTemplateError.value = e.response?.data?.error || e.message
+  } finally {
+    savingWeeklyTemplate.value = false
+  }
+}
+
+async function confirmDeleteWeeklyTemplate(wt) {
+  if (!confirm(`Xóa template tuần "${wt.name}"?`)) return
+  await scheduleApi.deleteWeeklyTemplate(wt.id)
+  await loadWeeklyTemplates()
+}
+
+function getWeeklyDayTemplates(wt, dow) {
+  const day = (wt.days || []).find(d => d.day_of_week === dow)
+  return day ? (day.template_ids || []) : []
+}
+
+function countWeeklyTemplateDays(wt) {
+  return (wt.days || []).filter(d => d.template_ids?.length > 0).length
+}
+
+function templateName(id) {
+  const t = templates.value.find(t => t.id === id || (typeof id === 'object' && (id.$oid === t.id || id === t.id)))
+  return t ? t.name : '?'
+}
+
 // ── Helpers ────────────────────────────────────────────
 function fmtDate(d) {
   if (!d) return '—'
@@ -747,5 +977,5 @@ function statusLabel(s) {
   return { draft: 'Nháp', open: 'Đang mở', closed: 'Đã đóng', published: 'Đã công bố', cancelled: 'Đã huỷ' }[s] || s
 }
 
-onMounted(() => { loadTemplates(); loadPeriods() })
+onMounted(() => { loadTemplates(); loadPeriods(); loadWeeklyTemplates() })
 </script>

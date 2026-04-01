@@ -77,22 +77,31 @@ func (h *ScheduleHandler) DeleteTemplate(c *gin.Context) {
 // ─── Period endpoints (manager) ───────────────────────────────────────────────
 
 func (h *ScheduleHandler) CreatePeriod(c *gin.Context) {
-	var p schedule.SchedulePeriod
-	if err := c.ShouldBindJSON(&p); err != nil {
+	var body struct {
+		schedule.SchedulePeriod
+		WeeklyTemplateID string `json:"weekly_template_id"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	userIDStr, _ := c.Get("user_id")
 	userName, _ := c.Get("username")
 	if oid, err := primitive.ObjectIDFromHex(userIDStr.(string)); err == nil {
-		p.CreatedBy = oid
+		body.CreatedBy = oid
 	}
-	p.CreatedByName, _ = userName.(string)
-	if err := h.svc.CreatePeriod(c.Request.Context(), &p); err != nil {
+	body.CreatedByName, _ = userName.(string)
+	var weeklyTemplateID *primitive.ObjectID
+	if body.WeeklyTemplateID != "" {
+		if oid, err := primitive.ObjectIDFromHex(body.WeeklyTemplateID); err == nil {
+			weeklyTemplateID = &oid
+		}
+	}
+	if err := h.svc.CreatePeriodWithWeeklyTemplate(c.Request.Context(), &body.SchedulePeriod, weeklyTemplateID); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusCreated, p)
+	c.JSON(http.StatusCreated, body.SchedulePeriod)
 }
 
 func (h *ScheduleHandler) GetPeriods(c *gin.Context) {
@@ -221,6 +230,28 @@ func (h *ScheduleHandler) GetRegistrationsByDate(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// GetRegistrationsByPeriod returns all scheduled staff for a given period (manager)
+func (h *ScheduleHandler) GetRegistrationsByPeriod(c *gin.Context) {
+	var body struct {
+		PeriodID string `json:"period_id"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	periodID, err := primitive.ObjectIDFromHex(body.PeriodID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid period_id"})
+		return
+	}
+	result, err := h.svc.GetRegistrationsByPeriod(c.Request.Context(), periodID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
 // ─── Staff endpoints ──────────────────────────────────────────────────────────
 
 // GetCurrentPeriod returns the active open/published period with my registrations
@@ -304,4 +335,59 @@ func (h *ScheduleHandler) GetMySchedule(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, detail)
+}
+
+// ─── Weekly template endpoints (manager) ─────────────────────────────────────
+
+func (h *ScheduleHandler) CreateWeeklyTemplate(c *gin.Context) {
+	var wt schedule.WeeklyShiftTemplate
+	if err := c.ShouldBindJSON(&wt); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.svc.CreateWeeklyTemplate(c.Request.Context(), &wt); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, wt)
+}
+
+func (h *ScheduleHandler) GetWeeklyTemplates(c *gin.Context) {
+	list, err := h.svc.GetWeeklyTemplates(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, list)
+}
+
+func (h *ScheduleHandler) UpdateWeeklyTemplate(c *gin.Context) {
+	id, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	var wt schedule.WeeklyShiftTemplate
+	if err := c.ShouldBindJSON(&wt); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.svc.UpdateWeeklyTemplate(c.Request.Context(), id, &wt); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, wt)
+}
+
+func (h *ScheduleHandler) DeleteWeeklyTemplate(c *gin.Context) {
+	id, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	if err := h.svc.DeleteWeeklyTemplate(c.Request.Context(), id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "ok"})
 }

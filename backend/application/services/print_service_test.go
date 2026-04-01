@@ -8,6 +8,7 @@ import (
 
 	"cafe-pos/backend/domain/order"
 	"cafe-pos/backend/domain/printing"
+	"cafe-pos/backend/domain/settings"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -174,13 +175,13 @@ type MockTemplateRenderer struct {
 	mock.Mock
 }
 
-func (m *MockTemplateRenderer) RenderBill(ord *order.Order, tmpl *printing.PrintTemplate, shopInfo *ShopInfo) (string, error) {
-	args := m.Called(ord, tmpl, shopInfo)
+func (m *MockTemplateRenderer) RenderBill(ord *order.Order, tmpl *printing.PrintTemplate, shopSettings *settings.ShopSettings) (string, error) {
+	args := m.Called(ord, tmpl, shopSettings)
 	return args.String(0), args.Error(1)
 }
 
-func (m *MockTemplateRenderer) RenderLabel(ord *order.Order, itemIndex int, tmpl *printing.PrintTemplate, shopInfo *ShopInfo) (string, error) {
-	args := m.Called(ord, itemIndex, tmpl, shopInfo)
+func (m *MockTemplateRenderer) RenderLabel(ord *order.Order, itemIndex int, tmpl *printing.PrintTemplate, shopSettings *settings.ShopSettings) (string, error) {
+	args := m.Called(ord, itemIndex, tmpl, shopSettings)
 	return args.String(0), args.Error(1)
 }
 
@@ -249,6 +250,10 @@ func (m *MockOrderRepository) FindAll(ctx context.Context) ([]*order.Order, erro
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]*order.Order), args.Error(1)
+}
+
+func (m *MockOrderRepository) FindByIDs(ctx context.Context, ids []primitive.ObjectID) ([]*order.Order, error) {
+	return nil, nil
 }
 
 // Helper functions
@@ -339,7 +344,6 @@ func TestCreatePrintJobsForOrder_Success(t *testing.T) {
 		TemplateRepo:      mockTemplateRepo,
 		TemplateRenderer:  mockRenderer,
 		OrderRepo:         mockOrderRepo,
-		ShopInfo:          &ShopInfo{Name: "Test Shop", Address: "Test Address", Phone: "0123456789"},
 	})
 
 	// Execute
@@ -362,7 +366,6 @@ func TestCreatePrintJobsForOrder_NilOrder(t *testing.T) {
 		TemplateRepo:      new(MockPrintTemplateRepository),
 		TemplateRenderer:  new(MockTemplateRenderer),
 		OrderRepo:         new(MockOrderRepository),
-		ShopInfo:          &ShopInfo{},
 	})
 
 	// Execute
@@ -387,7 +390,6 @@ func TestCreatePrintJobsForOrder_NoDefaultBillPrinter(t *testing.T) {
 		TemplateRepo:      new(MockPrintTemplateRepository),
 		TemplateRenderer:  new(MockTemplateRenderer),
 		OrderRepo:         new(MockOrderRepository),
-		ShopInfo:          &ShopInfo{},
 	})
 
 	// Execute
@@ -426,7 +428,6 @@ func TestReprintBill_Success(t *testing.T) {
 		TemplateRepo:      mockTemplateRepo,
 		TemplateRenderer:  mockRenderer,
 		OrderRepo:         mockOrderRepo,
-		ShopInfo:          &ShopInfo{Name: "Test Shop"},
 	})
 
 	// Execute
@@ -452,7 +453,6 @@ func TestReprintBill_OrderNotFound(t *testing.T) {
 		TemplateRepo:      new(MockPrintTemplateRepository),
 		TemplateRenderer:  new(MockTemplateRenderer),
 		OrderRepo:         mockOrderRepo,
-		ShopInfo:          &ShopInfo{},
 	})
 
 	// Execute
@@ -491,7 +491,6 @@ func TestReprintLabel_Success(t *testing.T) {
 		TemplateRepo:      mockTemplateRepo,
 		TemplateRenderer:  mockRenderer,
 		OrderRepo:         mockOrderRepo,
-		ShopInfo:          &ShopInfo{Name: "Test Shop"},
 	})
 
 	// Execute
@@ -517,7 +516,6 @@ func TestReprintLabel_InvalidItemIndex(t *testing.T) {
 		TemplateRepo:      new(MockPrintTemplateRepository),
 		TemplateRenderer:  new(MockTemplateRenderer),
 		OrderRepo:         mockOrderRepo,
-		ShopInfo:          &ShopInfo{},
 	})
 
 	// Execute
@@ -545,7 +543,6 @@ func TestGetPendingJobs_Success(t *testing.T) {
 		TemplateRepo:      new(MockPrintTemplateRepository),
 		TemplateRenderer:  new(MockTemplateRenderer),
 		OrderRepo:         new(MockOrderRepository),
-		ShopInfo:          &ShopInfo{},
 	})
 
 	// Execute
@@ -573,7 +570,6 @@ func TestGetFailedJobs_Success(t *testing.T) {
 		TemplateRepo:      new(MockPrintTemplateRepository),
 		TemplateRenderer:  new(MockTemplateRenderer),
 		OrderRepo:         new(MockOrderRepository),
-		ShopInfo:          &ShopInfo{},
 	})
 
 	// Execute
@@ -606,7 +602,6 @@ func TestRetryJob_Success(t *testing.T) {
 		TemplateRepo:      new(MockPrintTemplateRepository),
 		TemplateRenderer:  new(MockTemplateRenderer),
 		OrderRepo:         new(MockOrderRepository),
-		ShopInfo:          &ShopInfo{},
 	})
 
 	// Execute
@@ -635,7 +630,6 @@ func TestRetryJob_NotFailedStatus(t *testing.T) {
 		TemplateRepo:      new(MockPrintTemplateRepository),
 		TemplateRenderer:  new(MockTemplateRenderer),
 		OrderRepo:         new(MockOrderRepository),
-		ShopInfo:          &ShopInfo{},
 	})
 
 	// Execute
@@ -665,7 +659,6 @@ func TestCancelJob_Success(t *testing.T) {
 		TemplateRepo:      new(MockPrintTemplateRepository),
 		TemplateRenderer:  new(MockTemplateRenderer),
 		OrderRepo:         new(MockOrderRepository),
-		ShopInfo:          &ShopInfo{},
 	})
 
 	// Execute
@@ -694,7 +687,6 @@ func TestCancelJob_NotPendingStatus(t *testing.T) {
 		TemplateRepo:      new(MockPrintTemplateRepository),
 		TemplateRenderer:  new(MockTemplateRenderer),
 		OrderRepo:         new(MockOrderRepository),
-		ShopInfo:          &ShopInfo{},
 	})
 
 	// Execute
@@ -719,7 +711,6 @@ func TestCancelJob_JobNotFound(t *testing.T) {
 		TemplateRepo:      new(MockPrintTemplateRepository),
 		TemplateRenderer:  new(MockTemplateRenderer),
 		OrderRepo:         new(MockOrderRepository),
-		ShopInfo:          &ShopInfo{},
 	})
 
 	// Execute
@@ -758,7 +749,6 @@ func TestCreatePrintJobsForOrder_TemplateRenderingError(t *testing.T) {
 		TemplateRepo:      mockTemplateRepo,
 		TemplateRenderer:  mockRenderer,
 		OrderRepo:         mockOrderRepo,
-		ShopInfo:          &ShopInfo{Name: "Test Shop"},
 	})
 
 	// Execute

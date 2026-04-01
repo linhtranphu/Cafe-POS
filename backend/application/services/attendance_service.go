@@ -12,6 +12,7 @@ import (
 type HoursEntryRepository interface {
 	Create(ctx context.Context, e *attendance.HoursEntry) error
 	FindByDateRange(ctx context.Context, from, to time.Time) ([]*attendance.HoursEntry, error)
+	Update(ctx context.Context, id primitive.ObjectID, hours float64, note string) error
 	Delete(ctx context.Context, id primitive.ObjectID) error
 }
 
@@ -39,6 +40,22 @@ func (s *AttendanceService) AddEntry(ctx context.Context, e *attendance.HoursEnt
 
 func (s *AttendanceService) GetEntries(ctx context.Context, from, to time.Time) ([]*attendance.HoursEntry, error) {
 	return s.repo.FindByDateRange(ctx, from, to)
+}
+
+func (s *AttendanceService) UpdateEntry(ctx context.Context, id primitive.ObjectID, hours float64, note string) error {
+	if hours == 0 {
+		return fmt.Errorf("số giờ không được bằng 0")
+	}
+	return s.repo.Update(ctx, id, hours, note)
+}
+
+func (s *AttendanceService) BulkAddEntries(ctx context.Context, entries []*attendance.HoursEntry) error {
+	for _, e := range entries {
+		if err := s.AddEntry(ctx, e); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *AttendanceService) DeleteEntry(ctx context.Context, id primitive.ObjectID) error {

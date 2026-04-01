@@ -88,6 +88,10 @@ func (m *mockMenuRepositoryForMenuService) Delete(ctx context.Context, id primit
 	return nil
 }
 
+func (m *mockMenuRepositoryForMenuService) FindByBatchDefinitionID(ctx context.Context, batchDefID primitive.ObjectID) ([]*menu.MenuItem, error) {
+	return nil, nil
+}
+
 // Test backward compatibility - single-size items
 
 func TestCreateMenuItem_SingleSize(t *testing.T) {

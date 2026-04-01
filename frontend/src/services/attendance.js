@@ -13,6 +13,16 @@ export const addEntry = async (data) => {
   return res.data
 }
 
+export const updateEntry = async (id, data) => {
+  const res = await api.patch(`/manager/attendance/${id}`, data)
+  return res.data
+}
+
+export const bulkAddEntries = async (entries) => {
+  const res = await api.post('/manager/attendance/bulk', entries)
+  return res.data
+}
+
 export const deleteEntry = async (id) => {
   const res = await api.delete(`/manager/attendance/${id}`)
   return res.data

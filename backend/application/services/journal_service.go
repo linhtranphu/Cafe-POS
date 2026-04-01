@@ -11,11 +11,22 @@ import (
 	mongoDriver "go.mongodb.org/mongo-driver/mongo"
 )
 
+// journalRepository is the storage interface required by JournalService.
+// The production implementation is *mongodb.JournalRepository; tests may
+// supply an in-memory stub.
+type journalRepository interface {
+	Create(ctx context.Context, entry *fund.JournalEntry) error
+	GetFundBalance(ctx context.Context, fundType fund.FundType) (*fund.FundBalance, error)
+	GetAllFundBalances(ctx context.Context) (map[fund.FundType]*fund.FundBalance, error)
+	List(ctx context.Context, filter mongodb.JournalFilter) ([]*fund.JournalEntry, int64, error)
+	FindByID(ctx context.Context, id primitive.ObjectID) (*fund.JournalEntry, error)
+}
+
 // JournalService handles all double-entry bookkeeping for internal fund transfers.
 // Every method creates a balanced JournalEntry (Σ DEBIT == Σ CREDIT).
 // External payments (expenses) stay in fund_transactions (single-entry).
 type JournalService struct {
-	repo        *mongodb.JournalRepository
+	repo        journalRepository
 	mongoClient *mongoDriver.Client
 }
 

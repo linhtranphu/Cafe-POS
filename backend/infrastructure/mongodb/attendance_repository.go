@@ -45,6 +45,14 @@ func (r *HoursEntryRepository) FindByDateRange(ctx context.Context, from, to tim
 	return list, nil
 }
 
+func (r *HoursEntryRepository) Update(ctx context.Context, id primitive.ObjectID, hours float64, note string) error {
+	_, err := r.col.UpdateOne(ctx,
+		bson.M{"_id": id},
+		bson.M{"$set": bson.M{"hours": hours, "note": note}},
+	)
+	return err
+}
+
 func (r *HoursEntryRepository) Delete(ctx context.Context, id primitive.ObjectID) error {
 	_, err := r.col.DeleteOne(ctx, bson.M{"_id": id})
 	return err

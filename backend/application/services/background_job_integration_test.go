@@ -310,3 +310,7 @@ func (m *mockStockHistoryRepository) Create(ctx context.Context, history *ingred
 func (m *mockStockHistoryRepository) FindByIngredientID(ctx context.Context, ingredientID primitive.ObjectID) ([]*ingredient.StockHistory, error) {
 	return m.histories[ingredientID], nil
 }
+
+func (m *mockStockHistoryRepository) GetSummaryByDateRange(ctx context.Context, from, to time.Time) ([]*ingredient.IngredientStockSummary, error) {
+	return nil, nil
+}

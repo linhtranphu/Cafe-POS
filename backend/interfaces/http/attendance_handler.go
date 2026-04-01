@@ -83,6 +83,53 @@ func (h *AttendanceHandler) GetEntries(c *gin.Context) {
 	c.JSON(http.StatusOK, entries)
 }
 
+func (h *AttendanceHandler) UpdateEntry(c *gin.Context) {
+	id, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	var body struct {
+		Hours float64 `json:"hours"`
+		Note  string  `json:"note"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.svc.UpdateEntry(c.Request.Context(), id, body.Hours, body.Note); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "ok"})
+}
+
+func (h *AttendanceHandler) BulkAddEntries(c *gin.Context) {
+	var items []attendance.HoursEntry
+	if err := c.ShouldBindJSON(&items); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	userIDStr, _ := c.Get("user_id")
+	userName, _ := c.Get("username")
+	var oid primitive.ObjectID
+	if id, err := primitive.ObjectIDFromHex(userIDStr.(string)); err == nil {
+		oid = id
+	}
+	createdByName, _ := userName.(string)
+	ptrs := make([]*attendance.HoursEntry, len(items))
+	for i := range items {
+		items[i].CreatedBy = oid
+		items[i].CreatedByName = createdByName
+		ptrs[i] = &items[i]
+	}
+	if err := h.svc.BulkAddEntries(c.Request.Context(), ptrs); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"message": "ok", "count": len(items)})
+}
+
 func (h *AttendanceHandler) DeleteEntry(c *gin.Context) {
 	id, err := primitive.ObjectIDFromHex(c.Param("id"))
 	if err != nil {

@@ -73,6 +73,10 @@ func (m *mockMenuRepository) FindByCategory(ctx context.Context, category string
 	return items, nil
 }
 
+func (m *mockMenuRepository) FindByBatchDefinitionID(ctx context.Context, batchDefID primitive.ObjectID) ([]*menu.MenuItem, error) {
+	return nil, nil
+}
+
 type mockIngredientRepository struct {
 	ingredients map[primitive.ObjectID]*ingredient.Ingredient
 }
@@ -480,6 +484,16 @@ func (m *mockOrderRepository) FindByOrderNumber(ctx context.Context, orderNumber
 func (m *mockOrderRepository) Delete(ctx context.Context, id primitive.ObjectID) error {
 	delete(m.orders, id)
 	return nil
+}
+
+func (m *mockOrderRepository) FindByIDs(ctx context.Context, ids []primitive.ObjectID) ([]*order.Order, error) {
+	var result []*order.Order
+	for _, id := range ids {
+		if o, ok := m.orders[id]; ok {
+			result = append(result, o)
+		}
+	}
+	return result, nil
 }
 
 type mockOrderItemRepository struct {

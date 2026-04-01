@@ -124,8 +124,14 @@ func (r *SchedulePeriodRepository) FindByID(ctx context.Context, id primitive.Ob
 
 func (r *SchedulePeriodRepository) FindOpenOrPublished(ctx context.Context) (*schedule.SchedulePeriod, error) {
 	var p schedule.SchedulePeriod
+	// Bao gồm cả "closed" vì manager cần tạo giờ công sau khi đóng đăng ký
+	// (trước khi publish lịch chính thức).
 	err := r.col.FindOne(ctx, bson.M{
-		"status": bson.M{"$in": []schedule.PeriodStatus{schedule.PeriodStatusOpen, schedule.PeriodStatusPublished}},
+		"status": bson.M{"$in": []schedule.PeriodStatus{
+			schedule.PeriodStatusOpen,
+			schedule.PeriodStatusClosed,
+			schedule.PeriodStatusPublished,
+		}},
 	}, options.FindOne().SetSort(bson.D{{Key: "start_date", Value: -1}})).Decode(&p)
 	if err != nil {
 		return nil, err
@@ -167,6 +173,24 @@ func (r *ScheduleSlotRepository) FindByDate(ctx context.Context, date time.Time)
 	opts := options.Find().SetSort(bson.D{{Key: "start_time", Value: 1}})
 	cursor, err := r.col.Find(ctx, bson.M{
 		"date": bson.M{"$gte": from, "$lt": to},
+	}, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	var list []*schedule.ScheduleSlot
+	if err = cursor.All(ctx, &list); err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+func (r *ScheduleSlotRepository) FindByDateRange(ctx context.Context, from, to time.Time) ([]*schedule.ScheduleSlot, error) {
+	fromDay := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, time.UTC)
+	toDay := time.Date(to.Year(), to.Month(), to.Day(), 23, 59, 59, 999999999, time.UTC)
+	opts := options.Find().SetSort(bson.D{{Key: "date", Value: 1}, {Key: "start_time", Value: 1}})
+	cursor, err := r.col.Find(ctx, bson.M{
+		"date": bson.M{"$gte": fromDay, "$lte": toDay},
 	}, opts)
 	if err != nil {
 		return nil, err
@@ -225,6 +249,15 @@ func (r *ShiftRegistrationRepository) Create(ctx context.Context, reg *schedule.
 	}
 	reg.ID = result.InsertedID.(primitive.ObjectID)
 	return nil
+}
+
+func (r *ShiftRegistrationRepository) FindByID(ctx context.Context, id primitive.ObjectID) (*schedule.ShiftRegistration, error) {
+	var reg schedule.ShiftRegistration
+	err := r.col.FindOne(ctx, bson.M{"_id": id}).Decode(&reg)
+	if err != nil {
+		return nil, err
+	}
+	return &reg, nil
 }
 
 func (r *ShiftRegistrationRepository) FindBySlot(ctx context.Context, slotID primitive.ObjectID) ([]*schedule.ShiftRegistration, error) {
@@ -286,5 +319,59 @@ func (r *ShiftRegistrationRepository) Cancel(ctx context.Context, id primitive.O
 		"status":     schedule.RegistrationStatusCancelled,
 		"updated_at": time.Now(),
 	}})
+	return err
+}
+
+// ─── WeeklyShiftTemplateRepository ───────────────────────────────────────────
+
+type WeeklyShiftTemplateRepository struct {
+	col *mongo.Collection
+}
+
+func NewWeeklyShiftTemplateRepository(db *mongo.Database) *WeeklyShiftTemplateRepository {
+	return &WeeklyShiftTemplateRepository{col: db.Collection("weekly_shift_templates")}
+}
+
+func (r *WeeklyShiftTemplateRepository) Create(ctx context.Context, wt *schedule.WeeklyShiftTemplate) error {
+	wt.CreatedAt = time.Now()
+	wt.UpdatedAt = time.Now()
+	result, err := r.col.InsertOne(ctx, wt)
+	if err != nil {
+		return err
+	}
+	wt.ID = result.InsertedID.(primitive.ObjectID)
+	return nil
+}
+
+func (r *WeeklyShiftTemplateRepository) FindAll(ctx context.Context) ([]*schedule.WeeklyShiftTemplate, error) {
+	opts := options.Find().SetSort(bson.D{{Key: "created_at", Value: 1}})
+	cursor, err := r.col.Find(ctx, bson.M{}, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	var list []*schedule.WeeklyShiftTemplate
+	if err = cursor.All(ctx, &list); err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+func (r *WeeklyShiftTemplateRepository) FindByID(ctx context.Context, id primitive.ObjectID) (*schedule.WeeklyShiftTemplate, error) {
+	var wt schedule.WeeklyShiftTemplate
+	if err := r.col.FindOne(ctx, bson.M{"_id": id}).Decode(&wt); err != nil {
+		return nil, err
+	}
+	return &wt, nil
+}
+
+func (r *WeeklyShiftTemplateRepository) Update(ctx context.Context, id primitive.ObjectID, wt *schedule.WeeklyShiftTemplate) error {
+	wt.UpdatedAt = time.Now()
+	_, err := r.col.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": wt})
+	return err
+}
+
+func (r *WeeklyShiftTemplateRepository) Delete(ctx context.Context, id primitive.ObjectID) error {
+	_, err := r.col.DeleteOne(ctx, bson.M{"_id": id})
 	return err
 }

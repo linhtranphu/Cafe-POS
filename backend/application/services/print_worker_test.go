@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"cafe-pos/backend/domain/printing"
+	"cafe-pos/backend/infrastructure/printbridge"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -55,6 +56,8 @@ func (m *MockPrinterManager) TestConnection(config *printing.PrinterConfig) erro
 	args := m.Called(config)
 	return args.Error(0)
 }
+
+func (m *MockPrinterManager) SetPrintBridgeClient(client *printbridge.Client) {}
 
 // Helper function to create a test print job for worker tests
 func createTestPrintJobForWorker(status printing.PrintJobStatus, retryCount int) *printing.PrintJob {

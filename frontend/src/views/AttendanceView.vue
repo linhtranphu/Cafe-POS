@@ -22,11 +22,17 @@
     <!-- Content -->
     <div class="flex-1 overflow-y-auto px-4 py-3 pb-24">
 
-      <!-- Add button -->
-      <button @click="openAddForm"
-        class="w-full mb-4 py-3 rounded-2xl bg-blue-500 text-white font-bold text-base shadow-sm active:bg-blue-600 touch-manipulation">
-        + Thêm giờ công
-      </button>
+      <!-- Action buttons -->
+      <div class="flex gap-2 mb-4">
+        <button @click="openAddForm"
+          class="flex-1 py-3 rounded-2xl bg-blue-500 text-white font-bold text-base shadow-sm active:bg-blue-600 touch-manipulation">
+          + Thêm giờ công
+        </button>
+        <button @click="openGenerateModal"
+          class="flex-1 py-3 rounded-2xl bg-emerald-500 text-white font-bold text-base shadow-sm active:bg-emerald-600 touch-manipulation">
+          ⚡ Tạo từ lịch
+        </button>
+      </div>
 
       <!-- Staff summary -->
       <div v-if="staffSummary.length" class="mb-4">
@@ -68,10 +74,14 @@
                 <div v-if="e.note" class="text-xs text-gray-400 mt-0.5 truncate">{{ e.note }}</div>
                 <div class="text-xs text-gray-300 mt-0.5">bởi {{ e.created_by_name }}</div>
               </div>
-              <div class="flex items-center gap-3 ml-2 shrink-0">
+              <div class="flex items-center gap-2 ml-2 shrink-0">
                 <span :class="['text-lg font-bold', e.hours > 0 ? 'text-green-600' : 'text-red-500']">
                   {{ e.hours > 0 ? '+' : '' }}{{ e.hours }}h
                 </span>
+                <button @click="openEditForm(e)"
+                  class="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 active:bg-blue-100 active:text-blue-500 touch-manipulation text-sm">
+                  ✏️
+                </button>
                 <button @click="removeEntry(e)"
                   class="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 text-gray-400 active:bg-red-100 active:text-red-500 touch-manipulation text-base font-bold">
                   ×
@@ -83,22 +93,22 @@
       </div>
     </div>
 
-    <!-- Add Entry Modal -->
+    <!-- Add / Edit Entry Modal -->
     <div v-if="showForm"
       class="fixed inset-0 z-50 flex items-end justify-center bg-black bg-opacity-40"
       @click.self="showForm = false">
       <div class="bg-white rounded-t-3xl w-full max-w-lg p-6 pb-8 max-h-[85vh] overflow-y-auto">
         <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
-        <h3 class="text-xl font-bold text-gray-900 mb-5">Thêm giờ công</h3>
+        <h3 class="text-xl font-bold text-gray-900 mb-5">{{ editingId ? 'Sửa giờ công' : 'Thêm giờ công' }}</h3>
 
         <div class="flex flex-col gap-4">
-          <div>
+          <div v-if="!editingId">
             <label class="text-sm font-semibold text-gray-700 mb-1.5 block">Ngày</label>
             <input type="date" v-model="form.date"
               class="w-full px-4 py-3 border border-gray-200 rounded-xl text-base bg-white" />
           </div>
-          <!-- Scheduled staff for this date -->
-          <div>
+          <!-- Scheduled staff for this date (only when adding) -->
+          <div v-if="!editingId">
             <label class="text-sm font-semibold text-gray-700 mb-1.5 block">Tên nhân viên</label>
             <div v-if="loadingSchedule" class="text-xs text-gray-400 mb-2">Đang tải ca đăng ký...</div>
             <div v-else-if="scheduledStaff.length" class="flex flex-wrap gap-1.5 mb-2">
@@ -118,6 +128,10 @@
             <div v-else-if="form.date" class="text-xs text-gray-400 italic mb-2">Không có nhân viên đăng ký ca ngày này.</div>
             <input v-model="form.staff_name" placeholder="Nhập tên nhân viên (hoặc chọn ở trên)"
               class="w-full px-4 py-3 border border-gray-200 rounded-xl text-base" />
+          </div>
+          <div v-else>
+            <label class="text-sm font-semibold text-gray-700 mb-1.5 block">Nhân viên</label>
+            <div class="px-4 py-3 bg-gray-50 rounded-xl text-base text-gray-700 font-semibold">{{ form.staff_name }}</div>
           </div>
           <div>
             <label class="text-sm font-semibold text-gray-700 mb-1.5 block">
@@ -169,6 +183,77 @@
       </div>
     </div>
 
+    <!-- Generate from Schedule Modal -->
+    <div v-if="showGenerateModal"
+      class="fixed inset-0 z-50 flex items-end justify-center bg-black bg-opacity-40"
+      @click.self="showGenerateModal = false">
+      <div class="bg-white rounded-t-3xl w-full max-w-lg p-6 pb-8 max-h-[90vh] flex flex-col">
+        <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-4"></div>
+        <h3 class="text-xl font-bold text-gray-900 mb-1">Tạo giờ công từ lịch đăng ký</h3>
+        <p v-if="activePeriod" class="text-sm text-gray-500 mb-4">
+          {{ activePeriod.name }} ·
+          {{ fmtDateShort(activePeriod.start_date.split('T')[0]) }} — {{ fmtDateShort(activePeriod.end_date.split('T')[0]) }}
+        </p>
+        <p v-else class="text-sm text-gray-400 mb-4">Đang tải kỳ đăng ký...</p>
+
+        <div v-if="loadingGenerate" class="flex justify-center py-8">
+          <div class="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+
+        <div v-else-if="generateError && !generateItems.length" class="text-center py-8 text-gray-400">
+          <div class="text-3xl mb-2">📭</div>
+          <p class="text-red-500 text-sm">{{ generateError }}</p>
+        </div>
+
+        <div v-else-if="!generateItems.length" class="text-center py-8 text-gray-400">
+          <div class="text-3xl mb-2">📭</div>
+          <p>Không có nhân viên nào đăng ký ca trong kỳ này.</p>
+        </div>
+
+        <div v-else class="flex-1 overflow-y-auto flex flex-col gap-2 mb-4">
+          <div v-for="(item, idx) in generateItems" :key="idx"
+            :class="[
+              'flex items-center gap-3 px-4 py-3 rounded-xl border transition-all',
+              item.selected ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-200 opacity-60'
+            ]">
+            <button @click="item.selected = !item.selected"
+              :class="[
+                'w-6 h-6 rounded-full flex-shrink-0 border-2 flex items-center justify-center text-xs font-bold',
+                item.selected ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-300'
+              ]">
+              {{ item.selected ? '✓' : '' }}
+            </button>
+            <div class="flex-1 min-w-0">
+              <div class="font-semibold text-gray-900 text-sm">{{ item.staff_name }}</div>
+              <div class="text-xs text-gray-500">
+                {{ fmtDateShort(item.date) }} · {{ item.template_name }} ({{ item.start_time }}–{{ item.end_time }})
+              </div>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+              <button @click="adjustGenerateHours(item, -0.5)"
+                class="w-6 h-6 flex items-center justify-center rounded-lg bg-red-50 text-red-500 font-bold text-sm active:bg-red-100 touch-manipulation">−</button>
+              <span class="w-12 text-center text-sm font-bold text-emerald-700">{{ item.hours }}h</span>
+              <button @click="adjustGenerateHours(item, 0.5)"
+                class="w-6 h-6 flex items-center justify-center rounded-lg bg-green-50 text-green-600 font-bold text-sm active:bg-green-100 touch-manipulation">+</button>
+            </div>
+          </div>
+        </div>
+
+        <p v-if="generateError && generateItems.length" class="mb-3 text-red-500 text-sm">{{ generateError }}</p>
+
+        <div v-if="generateItems.length" class="flex gap-3">
+          <button @click="showGenerateModal = false"
+            class="flex-1 py-3 rounded-xl border border-gray-200 text-gray-700 font-semibold active:bg-gray-50 touch-manipulation">
+            Hủy
+          </button>
+          <button @click="confirmGenerate" :disabled="generating || !selectedGenerateItems.length"
+            class="flex-2 px-6 py-3 rounded-xl bg-emerald-500 text-white font-semibold active:bg-emerald-600 touch-manipulation disabled:opacity-50 whitespace-nowrap">
+            {{ generating ? 'Đang tạo...' : `Tạo ${selectedGenerateItems.length} giờ công` }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <BottomNav />
   </div>
 </template>
@@ -177,7 +262,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import BottomNav from '../components/BottomNav.vue'
 import * as attendanceApi from '../services/attendance.js'
-import { getRegistrationsByDate } from '../services/schedule.js'
+import { getRegistrationsByDate, getRegistrationsByPeriod, getCurrentPeriod } from '../services/schedule.js'
 
 const quickHours = [-4, -2, -1, -0.5, 0.5, 1, 2, 4, 8]
 
@@ -191,6 +276,15 @@ function getMonday(d) {
   m.setDate(m.getDate() + diff)
   m.setHours(0, 0, 0, 0)
   return m
+}
+
+// Dùng ngày LOCAL (không phải UTC) để tránh lệch múi giờ UTC+7
+function toLocalDateStr(d) {
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, '0'),
+    String(d.getDate()).padStart(2, '0'),
+  ].join('-')
 }
 
 const weekStart = computed(() => {
@@ -217,8 +311,8 @@ const loading = ref(false)
 async function loadEntries() {
   loading.value = true
   try {
-    const from = weekStart.value.toISOString().split('T')[0]
-    const to = weekEnd.value.toISOString().split('T')[0]
+    const from = toLocalDateStr(weekStart.value)
+    const to = toLocalDateStr(weekEnd.value)
     entries.value = await attendanceApi.getEntries(from, to) || []
   } finally {
     loading.value = false
@@ -254,8 +348,9 @@ const staffSummary = computed(() => {
     .sort((a, b) => b.total - a.total)
 })
 
-// ── Form ─────────────────────────────────────────────
+// ── Add / Edit Form ───────────────────────────────────
 const showForm = ref(false)
+const editingId = ref(null)
 const saving = ref(false)
 const formError = ref('')
 const form = ref({ date: '', staff_name: '', hours: 1, note: '' })
@@ -281,6 +376,7 @@ function selectScheduledStaff(s) {
 }
 
 function openAddForm() {
+  editingId.value = null
   formError.value = ''
   const today = new Date().toISOString().split('T')[0]
   form.value = { date: today, staff_name: '', hours: 1, note: '' }
@@ -288,24 +384,43 @@ function openAddForm() {
   showForm.value = true
 }
 
+function openEditForm(entry) {
+  editingId.value = entry.id
+  formError.value = ''
+  form.value = {
+    date: entry.date.split('T')[0],
+    staff_name: entry.staff_name,
+    hours: entry.hours,
+    note: entry.note || '',
+  }
+  showForm.value = true
+}
+
 watch(() => form.value.date, (date) => {
-  fetchScheduledStaff(date)
+  if (!editingId.value) fetchScheduledStaff(date)
 })
 
 async function saveEntry() {
   formError.value = ''
-  if (!form.value.staff_name.trim()) { formError.value = 'Vui lòng nhập tên nhân viên'; return }
-  if (!form.value.date) { formError.value = 'Vui lòng chọn ngày'; return }
   if (!form.value.hours) { formError.value = 'Số giờ không được bằng 0'; return }
 
   saving.value = true
   try {
-    await attendanceApi.addEntry({
-      date: new Date(form.value.date + 'T00:00:00Z').toISOString(),
-      staff_name: form.value.staff_name.trim(),
-      hours: form.value.hours,
-      note: form.value.note,
-    })
+    if (editingId.value) {
+      await attendanceApi.updateEntry(editingId.value, {
+        hours: form.value.hours,
+        note: form.value.note,
+      })
+    } else {
+      if (!form.value.staff_name.trim()) { formError.value = 'Vui lòng nhập tên nhân viên'; saving.value = false; return }
+      if (!form.value.date) { formError.value = 'Vui lòng chọn ngày'; saving.value = false; return }
+      await attendanceApi.addEntry({
+        date: new Date(form.value.date + 'T00:00:00Z').toISOString(),
+        staff_name: form.value.staff_name.trim(),
+        hours: form.value.hours,
+        note: form.value.note,
+      })
+    }
     showForm.value = false
     await loadEntries()
   } catch (e) {
@@ -325,9 +440,78 @@ async function removeEntry(e) {
   }
 }
 
+// ── Generate from Schedule ────────────────────────────
+const showGenerateModal = ref(false)
+const generateItems = ref([])
+const loadingGenerate = ref(false)
+const generating = ref(false)
+const generateError = ref('')
+const activePeriod = ref(null)
+
+const selectedGenerateItems = computed(() => generateItems.value.filter(i => i.selected))
+
+async function openGenerateModal() {
+  generateError.value = ''
+  generateItems.value = []
+  activePeriod.value = null
+  showGenerateModal.value = true
+  loadingGenerate.value = true
+  try {
+    const period = await getCurrentPeriod()
+    if (!period) {
+      generateError.value = 'Không có kỳ đăng ký nào đang mở hoặc đã công bố.'
+      return
+    }
+    activePeriod.value = period
+    const list = await getRegistrationsByPeriod(period.id) || []
+    generateItems.value = list.map(item => ({
+      ...item,
+      hours: item.scheduled_hours,
+      selected: true,
+    }))
+  } catch (e) {
+    generateError.value = e.response?.data?.error || e.message
+  } finally {
+    loadingGenerate.value = false
+  }
+}
+
+function adjustGenerateHours(item, delta) {
+  item.hours = Math.round((item.hours + delta) * 10) / 10
+  if (item.hours === 0) item.hours = delta > 0 ? 0.5 : -0.5
+}
+
+async function confirmGenerate() {
+  generateError.value = ''
+  const selected = selectedGenerateItems.value
+  if (!selected.length) return
+  generating.value = true
+  try {
+    const payload = selected.map(item => ({
+      date: new Date(item.date + 'T00:00:00Z').toISOString(),
+      staff_name: item.staff_name,
+      hours: item.hours,
+      note: `${item.template_name} (${item.start_time}–${item.end_time})`,
+    }))
+    await attendanceApi.bulkAddEntries(payload)
+    showGenerateModal.value = false
+    await loadEntries()
+  } catch (e) {
+    generateError.value = e.response?.data?.error || e.message
+  } finally {
+    generating.value = false
+  }
+}
+
 // ── Helpers ──────────────────────────────────────────
 function fmtDate(d) {
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+function fmtDateShort(dateStr) {
+  return new Date(dateStr + 'T12:00:00Z').toLocaleDateString('vi-VN', {
+    weekday: 'short', day: '2-digit', month: '2-digit',
+  })
 }
 
 onMounted(loadEntries)

@@ -74,6 +74,7 @@ func TestProperty_BatchCreationRollback(t *testing.T) {
 				batchDefRepo,
 				ingredientRepo,
 				stockHistoryRepo,
+				nil,
 				batchCostCalc,
 				client,
 			)
@@ -213,6 +214,7 @@ func TestProperty_BatchCreationSuccess(t *testing.T) {
 				batchDefRepo,
 				ingredientRepo,
 				stockHistoryRepo,
+				nil,
 				batchCostCalc,
 				client,
 			)
@@ -360,6 +362,7 @@ func TestProperty_ConcurrentBatchCreation(t *testing.T) {
 				batchDefRepo,
 				ingredientRepo,
 				stockHistoryRepo,
+				nil,
 				batchCostCalc,
 				client,
 			)

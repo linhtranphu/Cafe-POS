@@ -41,7 +41,6 @@ const navItems = computed(() => {
       { path: '/dashboard', icon: '🏠', label: 'Dashboard' },
       { path: '/cashier/reports', icon: '📊', label: 'Báo cáo' },
       { path: '/manager/schedule', icon: '📅', label: 'Lịch ca' },
-      { path: '/manager/inventory-stats', icon: '📦', label: 'Tồn kho' },
       { path: '/manager/attendance', icon: '⏱️', label: 'Giờ công' },
       { path: '/profile', icon: '👤', label: 'Cá nhân' }
     ]

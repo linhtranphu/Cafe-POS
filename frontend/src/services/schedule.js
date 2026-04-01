@@ -64,8 +64,35 @@ export const getRegistrationsByDate = async (date) => {
   return res.data
 }
 
+export const getRegistrationsByPeriod = async (periodId) => {
+  const res = await api.post('/manager/schedule/registrations-by-period', { period_id: periodId })
+  return res.data
+}
+
 export const cancelRegistration = async (regId) => {
   const res = await api.delete(`/manager/schedule/registrations/${regId}`)
+  return res.data
+}
+
+// ─── Weekly Templates (manager) ───────────────────────────────────────────────
+
+export const getWeeklyTemplates = async () => {
+  const res = await api.get('/manager/schedule/weekly-templates')
+  return res.data
+}
+
+export const createWeeklyTemplate = async (data) => {
+  const res = await api.post('/manager/schedule/weekly-templates', data)
+  return res.data
+}
+
+export const updateWeeklyTemplate = async (id, data) => {
+  const res = await api.put(`/manager/schedule/weekly-templates/${id}`, data)
+  return res.data
+}
+
+export const deleteWeeklyTemplate = async (id) => {
+  const res = await api.delete(`/manager/schedule/weekly-templates/${id}`)
   return res.data
 }
 

@@ -37,6 +37,9 @@ type SchedulePeriod struct {
 	StartDate        time.Time          `bson:"start_date" json:"start_date"`
 	EndDate          time.Time          `bson:"end_date" json:"end_date"`
 	RegisterDeadline time.Time          `bson:"register_deadline" json:"register_deadline"`
+	// MaxHoursPercent giới hạn tổng giờ đăng ký của mỗi nhân viên trong kỳ,
+	// tính theo % tổng số giờ của kỳ (0 = không giới hạn).
+	MaxHoursPercent  float64            `bson:"max_hours_percent" json:"max_hours_percent"`
 	Status           PeriodStatus       `bson:"status" json:"status"`
 	CreatedBy        primitive.ObjectID `bson:"created_by" json:"created_by"`
 	CreatedByName    string             `bson:"created_by_name" json:"created_by_name"`
@@ -91,4 +94,20 @@ type SlotWithRegistrations struct {
 type PeriodDetail struct {
 	SchedulePeriod
 	Slots []SlotWithRegistrations `json:"slots"`
+}
+
+// DayShiftConfig maps a day of week to one or more shift templates
+type DayShiftConfig struct {
+	DayOfWeek   int                  `bson:"day_of_week" json:"day_of_week"` // 0=Sun,1=Mon,...,6=Sat
+	TemplateIDs []primitive.ObjectID `bson:"template_ids" json:"template_ids"`
+}
+
+// WeeklyShiftTemplate is a saved weekly pattern of shift assignments per day of week
+type WeeklyShiftTemplate struct {
+	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	Name      string             `bson:"name" json:"name"`
+	Days      []DayShiftConfig   `bson:"days" json:"days"`
+	IsActive  bool               `bson:"is_active" json:"is_active"`
+	CreatedAt time.Time          `bson:"created_at" json:"created_at"`
+	UpdatedAt time.Time          `bson:"updated_at" json:"updated_at"`
 }

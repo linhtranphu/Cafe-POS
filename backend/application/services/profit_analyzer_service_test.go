@@ -57,6 +57,10 @@ func (m *mockMenuRepo) Delete(ctx context.Context, id primitive.ObjectID) error 
 	return nil
 }
 
+func (m *mockMenuRepo) FindByBatchDefinitionID(ctx context.Context, batchDefID primitive.ObjectID) ([]*menu.MenuItem, error) {
+	return nil, nil
+}
+
 type mockOrderItemRepo struct {
 	items []*order.OrderItemWithCost
 }

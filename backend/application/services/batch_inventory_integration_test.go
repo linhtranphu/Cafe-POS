@@ -44,6 +44,7 @@ func TestBatchInventoryIntegration(t *testing.T) {
 		batchDefinitionRepo,
 		ingredientRepo,
 		stockHistoryRepo,
+		nil,
 		batchCostCalculator,
 		client,
 	)

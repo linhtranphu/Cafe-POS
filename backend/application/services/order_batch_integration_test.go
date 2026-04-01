@@ -374,6 +374,10 @@ func (m *mockOrderRepoForBatchIntegration) FindAll(ctx context.Context) ([]*orde
 	return nil, nil
 }
 
+func (m *mockOrderRepoForBatchIntegration) FindByIDs(ctx context.Context, ids []primitive.ObjectID) ([]*order.Order, error) {
+	return nil, nil
+}
+
 type mockShiftRepoForBatchIntegration struct {
 	shifts map[primitive.ObjectID]*order.Shift
 }
@@ -474,6 +478,10 @@ func (m *mockMenuRepoForBatchIntegration) Update(ctx context.Context, id primiti
 
 func (m *mockMenuRepoForBatchIntegration) Delete(ctx context.Context, id primitive.ObjectID) error {
 	return nil
+}
+
+func (m *mockMenuRepoForBatchIntegration) FindByBatchDefinitionID(ctx context.Context, batchDefID primitive.ObjectID) ([]*menu.MenuItem, error) {
+	return nil, nil
 }
 
 type mockBatchRecordRepoForBatchIntegration struct {

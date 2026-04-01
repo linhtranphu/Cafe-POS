@@ -337,6 +337,7 @@ func main() {
 	// Ingredient service (stockHistoryRepo already initialized above)
 	ingredientRestockRepo := mongodb.NewIngredientRestockRepository(db)
 	ingredientService := services.NewIngredientService(ingredientRepo, stockHistoryRepo)
+	orderService.SetIngredientService(ingredientService)
 	ingredientHandler := http.NewIngredientHandler(ingredientService)
 	facilityRepo := mongodb.NewFacilityRepository(db)
 	facilityService := services.NewFacilityService(facilityRepo)
@@ -357,7 +358,8 @@ func main() {
 	schedulePeriodRepo := mongodb.NewSchedulePeriodRepository(db)
 	scheduleSlotRepo := mongodb.NewScheduleSlotRepository(db)
 	shiftRegistrationRepo := mongodb.NewShiftRegistrationRepository(db)
-	scheduleService := services.NewScheduleService(scheduleTemplateRepo, schedulePeriodRepo, scheduleSlotRepo, shiftRegistrationRepo)
+	weeklyShiftTemplateRepo := mongodb.NewWeeklyShiftTemplateRepository(db)
+	scheduleService := services.NewScheduleService(scheduleTemplateRepo, schedulePeriodRepo, scheduleSlotRepo, shiftRegistrationRepo, weeklyShiftTemplateRepo)
 	scheduleHandler := http.NewScheduleHandler(scheduleService)
 
 	// Menu cost and profit analysis handlers
@@ -852,6 +854,11 @@ func main() {
 				manager.PUT("/schedule/templates/:id", scheduleHandler.UpdateTemplate)
 				manager.DELETE("/schedule/templates/:id", scheduleHandler.DeleteTemplate)
 
+				manager.POST("/schedule/weekly-templates", scheduleHandler.CreateWeeklyTemplate)
+				manager.GET("/schedule/weekly-templates", scheduleHandler.GetWeeklyTemplates)
+				manager.PUT("/schedule/weekly-templates/:id", scheduleHandler.UpdateWeeklyTemplate)
+				manager.DELETE("/schedule/weekly-templates/:id", scheduleHandler.DeleteWeeklyTemplate)
+
 				manager.POST("/schedule/periods", scheduleHandler.CreatePeriod)
 				manager.GET("/schedule/periods", scheduleHandler.GetPeriods)
 				manager.PATCH("/schedule/periods/:id/status", scheduleHandler.SetPeriodStatus)
@@ -860,10 +867,13 @@ func main() {
 				manager.DELETE("/schedule/periods/:id/slots/:slotId", scheduleHandler.RemoveSlot)
 				manager.DELETE("/schedule/registrations/:regId", scheduleHandler.CancelRegistration)
 				manager.GET("/schedule/registrations-by-date", scheduleHandler.GetRegistrationsByDate)
+				manager.POST("/schedule/registrations-by-period", scheduleHandler.GetRegistrationsByPeriod)
 
 				// Attendance (actual work hours) routes
 				manager.POST("/attendance", attendanceHandler.AddEntry)
+				manager.POST("/attendance/bulk", attendanceHandler.BulkAddEntries)
 				manager.GET("/attendance", attendanceHandler.GetEntries)
+				manager.PATCH("/attendance/:id", attendanceHandler.UpdateEntry)
 				manager.DELETE("/attendance/:id", attendanceHandler.DeleteEntry)
 			}
 		}

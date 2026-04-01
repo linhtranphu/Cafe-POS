@@ -82,6 +82,16 @@ func (m *mockOrderRepositoryForVariants) Delete(ctx context.Context, id primitiv
 	return nil
 }
 
+func (m *mockOrderRepositoryForVariants) FindByIDs(ctx context.Context, ids []primitive.ObjectID) ([]*order.Order, error) {
+	var result []*order.Order
+	for _, id := range ids {
+		if o, ok := m.orders[id]; ok {
+			result = append(result, o)
+		}
+	}
+	return result, nil
+}
+
 type mockShiftRepositoryForVariants struct {
 	shifts map[primitive.ObjectID]*order.Shift
 }
@@ -204,6 +214,10 @@ func (m *mockMenuRepositoryForVariants) Update(ctx context.Context, id primitive
 
 func (m *mockMenuRepositoryForVariants) Delete(ctx context.Context, id primitive.ObjectID) error {
 	return nil
+}
+
+func (m *mockMenuRepositoryForVariants) FindByBatchDefinitionID(ctx context.Context, batchDefID primitive.ObjectID) ([]*menu.MenuItem, error) {
+	return nil, nil
 }
 
 // Test backward compatibility - single-size items

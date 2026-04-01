@@ -7,6 +7,7 @@ import (
 
 	"cafe-pos/backend/domain/order"
 	"cafe-pos/backend/domain/printing"
+	"cafe-pos/backend/domain/settings"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -39,10 +40,10 @@ func TestRenderBill_Success(t *testing.T) {
 		CreatedAt: time.Now(),
 	}
 	
-	shopInfo := &ShopInfo{
-		Name:    "Coffee Shop",
-		Address: "123 Main St",
-		Phone:   "0123456789",
+	shopInfo := &settings.ShopSettings{
+		ShopName:    "Coffee Shop",
+		ShopAddress: "123 Main St",
+		ShopPhone:   "0123456789",
 	}
 	
 	// Render bill with default template
@@ -77,7 +78,7 @@ func TestRenderBill_Success(t *testing.T) {
 
 func TestRenderBill_NilOrder(t *testing.T) {
 	renderer := NewTemplateRenderer()
-	shopInfo := &ShopInfo{Name: "Test", Address: "Test", Phone: "Test"}
+	shopInfo := &settings.ShopSettings{Name: "Test", Address: "Test", Phone: "Test"}
 	
 	_, err := renderer.RenderBill(nil, nil, shopInfo)
 	if err == nil {
@@ -104,10 +105,10 @@ func TestRenderBill_CustomTemplate(t *testing.T) {
 		CreatedAt:   time.Now(),
 	}
 	
-	shopInfo := &ShopInfo{
-		Name:    "Custom Shop",
-		Address: "456 Custom St",
-		Phone:   "9876543210",
+	shopInfo := &settings.ShopSettings{
+		ShopName:    "Custom Shop",
+		ShopAddress: "456 Custom St",
+		ShopPhone:   "9876543210",
 	}
 	
 	customTemplate := &printing.PrintTemplate{
@@ -138,10 +139,10 @@ func TestRenderBill_InvalidCustomTemplate_FallbackToDefault(t *testing.T) {
 		CreatedAt:   time.Now(),
 	}
 	
-	shopInfo := &ShopInfo{
-		Name:    "Test Shop",
-		Address: "Test Address",
-		Phone:   "1234567890",
+	shopInfo := &settings.ShopSettings{
+		ShopName:    "Test Shop",
+		ShopAddress: "Test Address",
+		ShopPhone:   "1234567890",
 	}
 	
 	// Invalid template with syntax error
@@ -187,10 +188,10 @@ func TestRenderLabel_Success(t *testing.T) {
 		CreatedAt: time.Now(),
 	}
 	
-	shopInfo := &ShopInfo{
-		Name:    "Coffee Shop",
-		Address: "123 Main St",
-		Phone:   "0123456789",
+	shopInfo := &settings.ShopSettings{
+		ShopName:    "Coffee Shop",
+		ShopAddress: "123 Main St",
+		ShopPhone:   "0123456789",
 	}
 	
 	// Render label for first item
@@ -228,7 +229,7 @@ func TestRenderLabel_SecondItem(t *testing.T) {
 		CreatedAt: time.Now(),
 	}
 	
-	shopInfo := &ShopInfo{Name: "Shop", Address: "Addr", Phone: "Phone"}
+	shopInfo := &settings.ShopSettings{Name: "Shop", Address: "Addr", Phone: "Phone"}
 	
 	// Render label for second item (index 1)
 	content, err := renderer.RenderLabel(ord, 1, nil, shopInfo)
@@ -255,7 +256,7 @@ func TestRenderLabel_InvalidItemIndex(t *testing.T) {
 		Items:       []order.OrderItem{{Name: "Item 1"}},
 	}
 	
-	shopInfo := &ShopInfo{Name: "Shop", Address: "Addr", Phone: "Phone"}
+	shopInfo := &settings.ShopSettings{Name: "Shop", Address: "Addr", Phone: "Phone"}
 	
 	// Test negative index
 	_, err := renderer.RenderLabel(ord, -1, nil, shopInfo)
@@ -272,7 +273,7 @@ func TestRenderLabel_InvalidItemIndex(t *testing.T) {
 
 func TestRenderLabel_NilOrder(t *testing.T) {
 	renderer := NewTemplateRenderer()
-	shopInfo := &ShopInfo{Name: "Test", Address: "Test", Phone: "Test"}
+	shopInfo := &settings.ShopSettings{Name: "Test", Address: "Test", Phone: "Test"}
 	
 	_, err := renderer.RenderLabel(nil, 0, nil, shopInfo)
 	if err == nil {
@@ -304,7 +305,7 @@ func TestRenderLabel_CustomTemplate(t *testing.T) {
 		CreatedAt: time.Now(),
 	}
 	
-	shopInfo := &ShopInfo{Name: "Shop", Address: "Addr", Phone: "Phone"}
+	shopInfo := &settings.ShopSettings{Name: "Shop", Address: "Addr", Phone: "Phone"}
 	
 	customTemplate := &printing.PrintTemplate{
 		Content: `Order: {{.Order.OrderNumber}}
@@ -332,7 +333,7 @@ func TestRenderLabel_InvalidCustomTemplate_FallbackToDefault(t *testing.T) {
 		CreatedAt: time.Now(),
 	}
 	
-	shopInfo := &ShopInfo{Name: "Shop", Address: "Addr", Phone: "Phone"}
+	shopInfo := &settings.ShopSettings{Name: "Shop", Address: "Addr", Phone: "Phone"}
 	
 	// Invalid template
 	invalidTemplate := &printing.PrintTemplate{
