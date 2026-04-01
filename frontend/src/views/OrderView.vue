@@ -375,11 +375,15 @@
                 class="w-full bg-blue-500 text-white py-3 rounded-xl font-medium active:bg-blue-600">
                 ✏️ Chỉnh sửa
               </button>
-              <button v-if="isStatus(selectedOrder, ORDER_STATUS.CREATED)" 
+              <button v-if="isStatus(selectedOrder, ORDER_STATUS.CREATED) && (!selectedOrder.bill_printed || canReprint)"
                 @click="confirmCancelOrder(selectedOrder)"
                 class="w-full bg-red-500 text-white py-3 rounded-xl font-medium active:bg-red-600">
                 ❌ Hủy order
               </button>
+              <div v-if="isStatus(selectedOrder, ORDER_STATUS.CREATED) && selectedOrder.bill_printed && !canReprint"
+                class="w-full bg-red-100 text-red-600 py-3 rounded-xl font-medium text-center text-sm">
+                🔒 Order đã in tem – chỉ cashier mới được hủy
+              </div>
               <button v-if="isStatus(selectedOrder, ORDER_STATUS.PAID) && selectedOrder.amount_due <= 0" 
                 @click="sendToBar(selectedOrder.id)"
                 class="w-full bg-blue-500 text-white py-3 rounded-xl font-medium active:bg-blue-600">

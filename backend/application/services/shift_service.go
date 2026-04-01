@@ -246,6 +246,18 @@ func (s *ShiftService) CloseShiftAndLockOrders(ctx context.Context, shiftID prim
 		return nil, err
 	}
 
+	// Kiểm tra không còn order chưa thanh toán trước khi đóng ca
+	orders, _ := s.orderRepo.FindByShiftID(ctx, shiftID)
+	unpaidCount := 0
+	for _, o := range orders {
+		if o.Status == order.StatusCreated {
+			unpaidCount++
+		}
+	}
+	if unpaidCount > 0 {
+		return nil, fmt.Errorf("ca còn %d order chưa thanh toán, vui lòng xử lý trước khi đóng ca", unpaidCount)
+	}
+
 	// End the shift
 	shift, err = s.EndShift(ctx, shiftID, req)
 	if err != nil {
@@ -253,19 +265,11 @@ func (s *ShiftService) CloseShiftAndLockOrders(ctx context.Context, shiftID prim
 	}
 
 	now := time.Now()
-	orders, _ := s.orderRepo.FindByShiftID(ctx, shiftID)
 	for _, o := range orders {
 		switch o.Status {
 		case order.StatusCreated:
-			// Huỷ đơn chưa thanh toán, sau đó khoá lại
-			o.Status = order.StatusCancelled
-			o.CancelReason = "Ca làm việc đã kết thúc"
-			o.UpdatedAt = now
-			s.orderRepo.Update(ctx, o.ID, o)
-			o.Status = order.StatusLocked
-			o.LockedAt = &now
-			o.UpdatedAt = now
-			s.orderRepo.Update(ctx, o.ID, o)
+			// Không thể xảy ra (đã kiểm tra ở trên), bỏ qua
+			continue
 		case order.StatusPaid, order.StatusQueued, order.StatusInProgress, order.StatusReady, order.StatusServed, order.StatusCancelled:
 			// Khoá đơn đã thanh toán và đơn hoàn thành
 			o.Status = order.StatusLocked

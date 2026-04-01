@@ -5,6 +5,7 @@ import (
 	"cafe-pos/backend/application/services"
 	"cafe-pos/backend/domain"
 	"cafe-pos/backend/domain/order"
+	"cafe-pos/backend/domain/user"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -341,6 +342,16 @@ func (h *OrderHandler) CancelOrder(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
 		return
+	}
+
+	// BR: Nếu order đã in tem, chỉ cashier/manager mới được hủy
+	if o.BillPrinted {
+		callerRole, _ := c.Get("role")
+		role, _ := callerRole.(user.Role)
+		if role != user.RoleCashier && role != user.RoleManager {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Order đã in tem, chỉ cashier mới được hủy"})
+			return
+		}
 	}
 
 	// Validate state transition using state machine

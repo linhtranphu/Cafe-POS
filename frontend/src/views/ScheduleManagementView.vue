@@ -431,6 +431,22 @@
               class="w-full px-4 py-3 border border-gray-200 rounded-xl text-base" />
           </div>
           <div>
+            <label class="text-sm font-semibold text-gray-700 mb-1.5 block">
+              Giới hạn giờ đăng ký / nhân viên
+              <span class="font-normal text-gray-400">(tuỳ chọn)</span>
+            </label>
+            <div class="flex items-center gap-2">
+              <input type="number" v-model.number="periodForm.max_hours_percent"
+                min="0" max="100" step="5" placeholder="0"
+                class="w-24 px-4 py-3 border border-gray-200 rounded-xl text-base text-center" />
+              <span class="text-gray-500 text-sm">% tổng giờ trong kỳ</span>
+            </div>
+            <p v-if="periodForm.max_hours_percent > 0" class="text-xs text-blue-600 mt-1">
+              Mỗi nhân viên không được đăng ký quá {{ periodForm.max_hours_percent }}% số giờ của kỳ.
+            </p>
+            <p v-else class="text-xs text-gray-400 mt-1">0 = không giới hạn.</p>
+          </div>
+          <div>
             <label class="text-sm font-semibold text-gray-700 mb-1.5 block">Template tuần (tuỳ chọn)</label>
             <select v-model="periodForm.weekly_template_id"
               class="w-full px-4 py-3 border border-gray-200 rounded-xl text-base bg-white">
@@ -669,7 +685,7 @@ const loadingPeriods = ref(false)
 const showPeriodModal = ref(false)
 const savingPeriod = ref(false)
 const periodError = ref('')
-const periodForm = ref({ name: '', start_date: '', end_date: '', register_deadline: '', weekly_template_id: '' })
+const periodForm = ref({ name: '', start_date: '', end_date: '', register_deadline: '', weekly_template_id: '', max_hours_percent: 0 })
 
 const selectedPeriod = ref(null)
 const periodDetail = ref(null)
@@ -684,7 +700,7 @@ async function loadPeriods() {
 
 function openPeriodForm() {
   periodError.value = ''
-  periodForm.value = { name: '', start_date: '', end_date: '', register_deadline: '', weekly_template_id: '' }
+  periodForm.value = { name: '', start_date: '', end_date: '', register_deadline: '', weekly_template_id: '', max_hours_percent: 0 }
   showPeriodModal.value = true
 }
 
@@ -702,6 +718,7 @@ async function savePeriod() {
       name: f.name.trim(),
       start_date: new Date(f.start_date + 'T00:00:00Z').toISOString(),
       end_date: new Date(f.end_date + 'T00:00:00Z').toISOString(),
+      max_hours_percent: f.max_hours_percent || 0,
     }
     if (f.register_deadline) {
       payload.register_deadline = new Date(f.register_deadline).toISOString()

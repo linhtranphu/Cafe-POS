@@ -873,6 +873,7 @@ func main() {
 				manager.POST("/attendance", attendanceHandler.AddEntry)
 				manager.POST("/attendance/bulk", attendanceHandler.BulkAddEntries)
 				manager.GET("/attendance", attendanceHandler.GetEntries)
+				manager.GET("/attendance/summary", attendanceHandler.GetStaffSummary)
 				manager.PATCH("/attendance/:id", attendanceHandler.UpdateEntry)
 				manager.DELETE("/attendance/:id", attendanceHandler.DeleteEntry)
 			}

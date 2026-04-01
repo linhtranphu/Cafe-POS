@@ -12,6 +12,7 @@ import (
 type HoursEntryRepository interface {
 	Create(ctx context.Context, e *attendance.HoursEntry) error
 	FindByDateRange(ctx context.Context, from, to time.Time) ([]*attendance.HoursEntry, error)
+	FindByStaffAndDateRange(ctx context.Context, staffName string, from, to time.Time) ([]*attendance.HoursEntry, error)
 	Update(ctx context.Context, id primitive.ObjectID, hours float64, note string) error
 	Delete(ctx context.Context, id primitive.ObjectID) error
 }
@@ -60,4 +61,28 @@ func (s *AttendanceService) BulkAddEntries(ctx context.Context, entries []*atten
 
 func (s *AttendanceService) DeleteEntry(ctx context.Context, id primitive.ObjectID) error {
 	return s.repo.Delete(ctx, id)
+}
+
+// StaffSummary là kết quả tổng kết giờ công của một nhân viên trong khoảng thời gian.
+type StaffSummary struct {
+	StaffName  string                  `json:"staff_name"`
+	TotalHours float64                 `json:"total_hours"`
+	Entries    []*attendance.HoursEntry `json:"entries"`
+}
+
+// GetStaffSummary trả về danh sách giờ công + tổng giờ cho một nhân viên trong khoảng thời gian.
+func (s *AttendanceService) GetStaffSummary(ctx context.Context, staffName string, from, to time.Time) (*StaffSummary, error) {
+	entries, err := s.repo.FindByStaffAndDateRange(ctx, staffName, from, to)
+	if err != nil {
+		return nil, err
+	}
+	var total float64
+	for _, e := range entries {
+		total += e.Hours
+	}
+	return &StaffSummary{
+		StaffName:  staffName,
+		TotalHours: total,
+		Entries:    entries,
+	}, nil
 }

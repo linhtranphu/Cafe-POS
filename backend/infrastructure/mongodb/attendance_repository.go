@@ -30,10 +30,20 @@ func (r *HoursEntryRepository) Create(ctx context.Context, e *attendance.HoursEn
 }
 
 func (r *HoursEntryRepository) FindByDateRange(ctx context.Context, from, to time.Time) ([]*attendance.HoursEntry, error) {
+	return r.findRange(ctx, from, to, "")
+}
+
+func (r *HoursEntryRepository) FindByStaffAndDateRange(ctx context.Context, staffName string, from, to time.Time) ([]*attendance.HoursEntry, error) {
+	return r.findRange(ctx, from, to, staffName)
+}
+
+func (r *HoursEntryRepository) findRange(ctx context.Context, from, to time.Time, staffName string) ([]*attendance.HoursEntry, error) {
+	filter := bson.M{"date": bson.M{"$gte": from, "$lte": to}}
+	if staffName != "" {
+		filter["staff_name"] = staffName
+	}
 	opts := options.Find().SetSort(bson.D{{Key: "date", Value: 1}, {Key: "staff_name", Value: 1}})
-	cursor, err := r.col.Find(ctx, bson.M{
-		"date": bson.M{"$gte": from, "$lte": to},
-	}, opts)
+	cursor, err := r.col.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
 	}

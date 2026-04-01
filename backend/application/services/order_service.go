@@ -794,6 +794,11 @@ func (s *OrderService) MergeOrders(ctx context.Context, req *order.MergeOrdersRe
 			return nil, fmt.Errorf("order %s không thể gộp (status: %s)", o.OrderNumber, o.Status)
 		}
 
+		// Chỉ cho phép gộp order đã in tem
+		if !o.BillPrinted {
+			return nil, fmt.Errorf("order %s chưa in tem, chỉ những order đã in tem mới được gộp", o.OrderNumber)
+		}
+
 		// First order sets the shift ID
 		if i == 0 {
 			shiftID = o.ShiftID
@@ -883,7 +888,7 @@ func (s *OrderService) MergeOrders(ctx context.Context, req *order.MergeOrdersRe
 		CollectorID:   collectorID,
 		CollectorName: collectorName,
 		PaidAt:        paidAt,
-		BillPrinted:   false, // New order hasn't been printed yet
+		BillPrinted:   true, // Gộp từ các order đã in tem
 	}
 
 	// Calculate totals
@@ -897,7 +902,7 @@ func (s *OrderService) MergeOrders(ctx context.Context, req *order.MergeOrdersRe
 	log.Printf("[ORDER] Created merged order %s from %d orders", mergedOrder.OrderNumber, len(orders))
 
 	// Cancel all original orders
-	cancelReason := fmt.Sprintf("Đã gộp vào order #%s", mergedOrder.OrderNumber)
+	cancelReason := fmt.Sprintf("Được merged, #%s", mergedOrder.OrderNumber)
 	for _, o := range orders {
 		o.Status = order.StatusCancelled
 		o.CancelReason = cancelReason
@@ -905,7 +910,6 @@ func (s *OrderService) MergeOrders(ctx context.Context, req *order.MergeOrdersRe
 
 		if err := s.orderRepo.Update(ctx, o.ID, o); err != nil {
 			log.Printf("[ORDER ERROR] Failed to cancel order %s: %v", o.OrderNumber, err)
-			// Continue with other orders even if one fails
 		} else {
 			log.Printf("[ORDER] Cancelled order %s (merged into %s)", o.OrderNumber, mergedOrder.OrderNumber)
 		}

@@ -27,3 +27,8 @@ export const deleteEntry = async (id) => {
   const res = await api.delete(`/manager/attendance/${id}`)
   return res.data
 }
+
+export const getStaffSummary = async (staffName, from, to) => {
+  const res = await api.get('/manager/attendance/summary', { params: { staff: staffName, from, to } })
+  return res.data
+}

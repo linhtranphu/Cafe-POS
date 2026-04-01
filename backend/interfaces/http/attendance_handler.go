@@ -130,6 +130,37 @@ func (h *AttendanceHandler) BulkAddEntries(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "ok", "count": len(items)})
 }
 
+func (h *AttendanceHandler) GetStaffSummary(c *gin.Context) {
+	staffName := c.Query("staff")
+	if staffName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "staff is required"})
+		return
+	}
+	fromStr := c.Query("from")
+	toStr := c.Query("to")
+	if fromStr == "" || toStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "from and to are required"})
+		return
+	}
+	from, err := time.Parse("2006-01-02", fromStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid from date"})
+		return
+	}
+	to, err := time.Parse("2006-01-02", toStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid to date"})
+		return
+	}
+	to = time.Date(to.Year(), to.Month(), to.Day(), 23, 59, 59, 999999999, time.UTC)
+	summary, err := h.svc.GetStaffSummary(c.Request.Context(), staffName, from, to)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, summary)
+}
+
 func (h *AttendanceHandler) DeleteEntry(c *gin.Context) {
 	id, err := primitive.ObjectIDFromHex(c.Param("id"))
 	if err != nil {
