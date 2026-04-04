@@ -612,6 +612,7 @@ func main() {
 				// Cashier-specific routes
 				cashier.GET("/shifts/:id/status", cashierHandler.GetShiftStatus)
 				cashier.GET("/shifts/:id/payments", cashierHandler.GetPaymentsByShift)
+				cashier.GET("/shifts/:id/orders", cashierHandler.GetOrdersByShift)
 				cashier.POST("/discrepancies", cashierHandler.ReportDiscrepancy)
 				cashier.GET("/discrepancies/pending", cashierHandler.GetPendingDiscrepancies)
 				cashier.POST("/discrepancies/:id/resolve", cashierHandler.ResolveDiscrepancy)

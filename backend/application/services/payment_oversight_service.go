@@ -109,6 +109,49 @@ func (s *PaymentOversightService) GetTodayPayments() ([]*PaymentSummary, error) 
 	return payments, nil
 }
 
+// OrderSummary represents an order for cashier overview
+type OrderSummary struct {
+	OrderID       string    `json:"order_id"`
+	OrderNumber   string    `json:"order_number"`
+	CustomerName  string    `json:"customer_name"`
+	WaiterName    string    `json:"waiter_name"`
+	Total         float64   `json:"total"`
+	Status        string    `json:"status"`
+	PaymentMethod string    `json:"payment_method"`
+	BillPrinted   bool      `json:"bill_printed"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+// GetAllOrdersByShift returns all orders for a shift (including unpaid)
+func (s *PaymentOversightService) GetAllOrdersByShift(shiftID string) ([]*OrderSummary, error) {
+	shiftObjID, err := primitive.ObjectIDFromHex(shiftID)
+	if err != nil {
+		return nil, errors.New("invalid shift ID")
+	}
+
+	orders, err := s.orderRepo.FindByShiftID(context.Background(), shiftObjID)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []*OrderSummary
+	for _, ord := range orders {
+		result = append(result, &OrderSummary{
+			OrderID:       ord.ID.Hex(),
+			OrderNumber:   ord.OrderNumber,
+			CustomerName:  ord.CustomerName,
+			WaiterName:    ord.WaiterName,
+			Total:         ord.Total,
+			Status:        string(ord.Status),
+			PaymentMethod: string(ord.PaymentMethod),
+			BillPrinted:   ord.BillPrinted,
+			CreatedAt:     ord.CreatedAt,
+		})
+	}
+
+	return result, nil
+}
+
 // FR-CASH-05: Xử lý sai lệch thanh toán
 func (s *PaymentOversightService) ReportDiscrepancy(orderID, reason string, amount float64, cashierID string) error {
 	// Validate order exists

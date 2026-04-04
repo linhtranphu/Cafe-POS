@@ -6,6 +6,8 @@ export const cashierService = {
   
   // Payment Oversight
   getPaymentsByShift: (shiftId) => api.get(`/cashier/shifts/${shiftId}/payments`),
+  getOrdersByShift: (shiftId) => api.get(`/cashier/shifts/${shiftId}/orders`),
+  cancelOrder: (orderId, reason) => api.post(`/cashier/orders/${orderId}/cancel`, { reason }),
   reportDiscrepancy: (data) => api.post('/cashier/discrepancies', data),
   getPendingDiscrepancies: () => api.get('/cashier/discrepancies/pending'),
   resolveDiscrepancy: (discrepancyId) => api.post(`/cashier/discrepancies/${discrepancyId}/resolve`),

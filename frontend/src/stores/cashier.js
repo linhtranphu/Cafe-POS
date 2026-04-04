@@ -6,6 +6,7 @@ export const useCashierStore = defineStore('cashier', {
   state: () => ({
     shiftStatus: null,
     payments: [],
+    orders: [],
     discrepancies: [],
     reconciliation: null,
     reports: [],
@@ -61,6 +62,35 @@ export const useCashierStore = defineStore('cashier', {
         return response.data
       } catch (error) {
         this.error = error.response?.data?.error || 'Failed to get shift status'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async getOrdersByShift(shiftId) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await cashierService.getOrdersByShift(shiftId)
+        this.orders = response.data.orders || []
+        return this.orders
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Failed to get orders'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async cancelOrder(orderId, reason) {
+      this.loading = true
+      this.error = null
+      try {
+        await cashierService.cancelOrder(orderId, reason)
+        return true
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Failed to cancel order'
         throw error
       } finally {
         this.loading = false
@@ -224,6 +254,7 @@ export const useCashierStore = defineStore('cashier', {
     reset() {
       this.shiftStatus = null
       this.payments = []
+      this.orders = []
       this.discrepancies = []
       this.reconciliation = null
       this.reports = []

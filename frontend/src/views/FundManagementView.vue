@@ -1,7 +1,8 @@
 <template>
   <div class="min-h-screen bg-gray-50 pb-24">
     <!-- Header -->
-    <div class="bg-gradient-to-r from-orange-500 to-yellow-500 text-white p-4 sticky top-0 z-10 shadow-md">
+    <div class="bg-gradient-to-r from-orange-500 to-yellow-500 text-white sticky top-0 z-10 shadow-md"
+      style="padding: max(1rem, env(safe-area-inset-top)) 1rem 1rem">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
           <button @click="goBack" class="p-2 hover:bg-white/20 rounded-lg transition-colors">

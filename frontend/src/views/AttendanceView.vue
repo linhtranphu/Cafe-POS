@@ -3,7 +3,7 @@
 
     <!-- Header -->
     <div class="sticky top-0 z-40 bg-white shadow-sm flex-shrink-0">
-      <div class="px-4 py-4" style="padding-top: max(1rem, env(safe-area-inset-top))">
+      <div class="px-4 pb-4" style="padding-top: max(1rem, env(safe-area-inset-top))">
         <h1 class="text-2xl font-bold text-gray-900 mb-3">⏱️ Giờ công thực tế</h1>
 
         <!-- Week navigation -->

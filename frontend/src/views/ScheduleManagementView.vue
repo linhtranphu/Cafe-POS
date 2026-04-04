@@ -7,44 +7,57 @@
         <h1 class="text-2xl font-bold text-gray-900 mb-4">📅 Quản lý lịch ca</h1>
 
         <!-- Tabs -->
-        <div class="flex gap-2">
+        <div class="flex gap-1.5">
           <button
-            @click="tab = 'periods'"
+            @click="switchTab('today')"
             :class="[
-              'flex-1 py-3 px-4 rounded-xl font-semibold text-sm transition-all touch-manipulation active:scale-98',
-              tab === 'periods'
-                ? 'bg-blue-500 text-white shadow-lg'
-                : 'bg-gray-100 text-gray-700 active:bg-gray-200'
+              'flex-1 py-2.5 px-2 rounded-xl font-semibold text-xs transition-all touch-manipulation',
+              tab === 'today'
+                ? 'bg-indigo-600 text-white shadow-lg'
+                : 'bg-gray-100 text-gray-600 active:bg-gray-200'
             ]">
-            <div class="flex items-center justify-center gap-1.5">
-              <span>📆</span>
-              <span>Kỳ đăng ký</span>
+            <div class="flex flex-col items-center gap-0.5">
+              <span class="text-base">👥</span>
+              <span>Hôm nay</span>
             </div>
           </button>
           <button
-            @click="tab = 'templates'"
+            @click="switchTab('periods')"
             :class="[
-              'flex-1 py-3 px-4 rounded-xl font-semibold text-sm transition-all touch-manipulation active:scale-98',
+              'flex-1 py-2.5 px-2 rounded-xl font-semibold text-xs transition-all touch-manipulation',
+              tab === 'periods'
+                ? 'bg-blue-500 text-white shadow-lg'
+                : 'bg-gray-100 text-gray-600 active:bg-gray-200'
+            ]">
+            <div class="flex flex-col items-center gap-0.5">
+              <span class="text-base">📆</span>
+              <span>Kỳ ĐK</span>
+            </div>
+          </button>
+          <button
+            @click="switchTab('templates')"
+            :class="[
+              'flex-1 py-2.5 px-2 rounded-xl font-semibold text-xs transition-all touch-manipulation',
               tab === 'templates'
                 ? 'bg-blue-500 text-white shadow-lg'
-                : 'bg-gray-100 text-gray-700 active:bg-gray-200'
+                : 'bg-gray-100 text-gray-600 active:bg-gray-200'
             ]">
-            <div class="flex items-center justify-center gap-1.5">
-              <span>🗂️</span>
+            <div class="flex flex-col items-center gap-0.5">
+              <span class="text-base">🗂️</span>
               <span>Ca mẫu</span>
             </div>
           </button>
           <button
-            @click="tab = 'weekly'"
+            @click="switchTab('weekly')"
             :class="[
-              'flex-1 py-3 px-4 rounded-xl font-semibold text-sm transition-all touch-manipulation active:scale-98',
+              'flex-1 py-2.5 px-2 rounded-xl font-semibold text-xs transition-all touch-manipulation',
               tab === 'weekly'
                 ? 'bg-blue-500 text-white shadow-lg'
-                : 'bg-gray-100 text-gray-700 active:bg-gray-200'
+                : 'bg-gray-100 text-gray-600 active:bg-gray-200'
             ]">
-            <div class="flex items-center justify-center gap-1.5">
-              <span>🗓️</span>
-              <span>Template tuần</span>
+            <div class="flex flex-col items-center gap-0.5">
+              <span class="text-base">🗓️</span>
+              <span>Mẫu tuần</span>
             </div>
           </button>
         </div>
@@ -53,6 +66,138 @@
 
     <!-- Content -->
     <div class="flex-1 overflow-y-auto px-4 py-3 pb-24">
+
+      <!-- ── Tab: Hôm nay ── -->
+      <div v-if="tab === 'today'">
+
+        <!-- Date navigation -->
+        <div class="flex items-center gap-2 mb-4">
+          <button @click="changeViewDate(-1)"
+            class="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-600 active:bg-gray-100 touch-manipulation shadow-sm text-lg font-bold">
+            ‹
+          </button>
+          <div class="flex-1">
+            <input type="date" v-model="viewDateStr"
+              @change="loadTodayStaff"
+              class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white text-center font-semibold text-gray-800 focus:outline-none focus:border-indigo-400" />
+          </div>
+          <button @click="changeViewDate(1)"
+            class="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-600 active:bg-gray-100 touch-manipulation shadow-sm text-lg font-bold">
+            ›
+          </button>
+          <button v-if="viewDateStr !== todayStr" @click="goToToday"
+            class="px-3 py-2.5 rounded-xl bg-indigo-100 text-indigo-700 text-xs font-bold active:bg-indigo-200 touch-manipulation whitespace-nowrap">
+            Hôm nay
+          </button>
+        </div>
+
+        <!-- Date label -->
+        <div class="mb-3">
+          <div class="text-base font-bold text-gray-900">
+            {{ viewDateLabel }}
+            <span v-if="viewDateStr === todayStr" class="ml-2 text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full font-semibold">Hôm nay</span>
+          </div>
+        </div>
+
+        <!-- Loading -->
+        <div v-if="loadingToday" class="flex flex-col items-center justify-center py-16 gap-3">
+          <div class="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+          <p class="text-sm text-gray-400">Đang tải lịch...</p>
+        </div>
+
+        <!-- Empty state -->
+        <div v-else-if="!todayStaff.length" class="text-center py-16">
+          <div class="text-5xl mb-3">🗓️</div>
+          <p class="text-gray-500 font-semibold">Không có ca làm ngày này</p>
+          <p class="text-xs text-gray-400 mt-1">Chưa có nhân viên nào đăng ký ca</p>
+        </div>
+
+        <!-- Staff list -->
+        <div v-else class="flex flex-col gap-3">
+
+          <!-- Summary bar -->
+          <div class="flex gap-2">
+            <div class="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 px-4 py-3 flex items-center gap-3">
+              <div class="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-lg">👤</div>
+              <div>
+                <div class="text-2xl font-bold text-gray-900 leading-none">{{ todayStaff.length }}</div>
+                <div class="text-xs text-gray-400 mt-0.5">Nhân viên</div>
+              </div>
+            </div>
+            <div class="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 px-4 py-3 flex items-center gap-3">
+              <div class="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-lg">🕐</div>
+              <div>
+                <div class="text-2xl font-bold text-gray-900 leading-none">{{ todayShiftGroups.length }}</div>
+                <div class="text-xs text-gray-400 mt-0.5">Ca làm việc</div>
+              </div>
+            </div>
+            <div v-if="activeShiftCount > 0" class="flex-1 bg-white rounded-2xl shadow-sm border border-green-200 px-4 py-3 flex items-center gap-3">
+              <div class="w-9 h-9 rounded-full bg-green-500 flex items-center justify-center text-white text-lg animate-pulse">✓</div>
+              <div>
+                <div class="text-2xl font-bold text-green-600 leading-none">{{ activeShiftCount }}</div>
+                <div class="text-xs text-gray-400 mt-0.5">Đang làm</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Shifts grouped -->
+          <div v-for="group in todayShiftGroups" :key="group.key"
+            :class="[
+              'bg-white rounded-2xl shadow-sm border-2 overflow-hidden',
+              group.status === 'active' ? 'border-green-300' :
+              group.status === 'upcoming' ? 'border-indigo-200' :
+              'border-gray-100'
+            ]">
+
+            <!-- Shift header -->
+            <div :class="[
+              'px-4 py-3 flex items-center justify-between',
+              group.status === 'active' ? 'bg-green-50' :
+              group.status === 'upcoming' ? 'bg-indigo-50' :
+              'bg-gray-50'
+            ]">
+              <div class="flex items-center gap-2.5">
+                <div :class="[
+                  'w-2.5 h-2.5 rounded-full',
+                  group.status === 'active' ? 'bg-green-500 animate-pulse' :
+                  group.status === 'upcoming' ? 'bg-indigo-400' :
+                  'bg-gray-300'
+                ]"></div>
+                <div>
+                  <div class="font-bold text-gray-900 text-base">{{ group.templateName }}</div>
+                  <div class="text-xs text-gray-500 mt-0.5">{{ group.startTime }} – {{ group.endTime }}</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span :class="[
+                  'px-2.5 py-1 rounded-full text-xs font-bold',
+                  group.status === 'active' ? 'bg-green-500 text-white' :
+                  group.status === 'upcoming' ? 'bg-indigo-500 text-white' :
+                  'bg-gray-200 text-gray-500'
+                ]">
+                  {{ group.status === 'active' ? 'Đang làm' : group.status === 'upcoming' ? 'Sắp tới' : 'Đã xong' }}
+                </span>
+                <span class="text-sm font-bold text-gray-500">{{ group.staff.length }} người</span>
+              </div>
+            </div>
+
+            <!-- Staff list -->
+            <div class="px-4 py-3 flex flex-wrap gap-2">
+              <div v-for="(s, idx) in group.staff" :key="idx"
+                class="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
+                <div :class="[
+                  'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0',
+                  avatarColor(s.staff_name)
+                ]">
+                  {{ initials(s.staff_name) }}
+                </div>
+                <span class="text-sm font-semibold text-gray-800">{{ s.staff_name }}</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
 
       <!-- ── Tab: Kỳ đăng ký ── -->
       <div v-if="tab === 'periods'">
@@ -609,9 +754,105 @@ import { ref, computed, onMounted, reactive } from 'vue'
 import BottomNav from '../components/BottomNav.vue'
 import * as scheduleApi from '../services/schedule.js'
 
-const tab = ref('periods')
+const tab = ref('today')
 const allRoles = ['waiter', 'barista', 'cashier']
 const slotAddMode = ref('single')
+
+// ── Hôm nay ────────────────────────────────────────────
+const todayStr = new Date().toISOString().split('T')[0]
+const viewDateStr = ref(todayStr)
+const todayStaff = ref([])
+const loadingToday = ref(false)
+
+function switchTab(t) {
+  tab.value = t
+  if (t === 'today') loadTodayStaff()
+}
+
+const viewDateLabel = computed(() => {
+  const d = new Date(viewDateStr.value + 'T00:00:00')
+  return d.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })
+})
+
+async function loadTodayStaff() {
+  loadingToday.value = true
+  try {
+    todayStaff.value = await scheduleApi.getRegistrationsByDate(viewDateStr.value) || []
+  } catch (e) {
+    todayStaff.value = []
+  } finally {
+    loadingToday.value = false
+  }
+}
+
+function changeViewDate(delta) {
+  const d = new Date(viewDateStr.value + 'T00:00:00')
+  d.setDate(d.getDate() + delta)
+  viewDateStr.value = d.toISOString().split('T')[0]
+  loadTodayStaff()
+}
+
+function goToToday() {
+  viewDateStr.value = todayStr
+  loadTodayStaff()
+}
+
+// Group staff by shift (template + time)
+const todayShiftGroups = computed(() => {
+  const map = new Map()
+  for (const s of todayStaff.value) {
+    const key = `${s.template_name}|${s.start_time}|${s.end_time}`
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        templateName: s.template_name,
+        startTime: s.start_time,
+        endTime: s.end_time,
+        staff: [],
+        status: shiftStatus(s.start_time, s.end_time),
+      })
+    }
+    map.get(key).staff.push(s)
+  }
+  // Sort: active first, then upcoming, then past
+  const order = { active: 0, upcoming: 1, past: 2 }
+  return [...map.values()].sort((a, b) => {
+    const od = order[a.status] - order[b.status]
+    if (od !== 0) return od
+    return a.startTime.localeCompare(b.startTime)
+  })
+})
+
+const activeShiftCount = computed(() =>
+  todayShiftGroups.value.filter(g => g.status === 'active').length
+)
+
+function shiftStatus(startTime, endTime) {
+  if (viewDateStr.value !== todayStr) return 'past'
+  const now = new Date()
+  const [sh, sm] = startTime.split(':').map(Number)
+  const [eh, em] = endTime.split(':').map(Number)
+  const start = new Date(now); start.setHours(sh, sm, 0, 0)
+  const end = new Date(now); end.setHours(eh, em, 0, 0)
+  if (now >= start && now < end) return 'active'
+  if (now < start) return 'upcoming'
+  return 'past'
+}
+
+const avatarColors = [
+  'bg-blue-100 text-blue-700', 'bg-green-100 text-green-700',
+  'bg-purple-100 text-purple-700', 'bg-orange-100 text-orange-700',
+  'bg-pink-100 text-pink-700', 'bg-teal-100 text-teal-700',
+  'bg-amber-100 text-amber-700', 'bg-rose-100 text-rose-700',
+]
+function avatarColor(name) {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffffffff
+  return avatarColors[Math.abs(h) % avatarColors.length]
+}
+function initials(name) {
+  return name.trim().split(/\s+/).map(w => w[0]).slice(-2).join('').toUpperCase()
+}
 
 // ── Templates ──────────────────────────────────────────
 const templates = ref([])
@@ -994,5 +1235,5 @@ function statusLabel(s) {
   return { draft: 'Nháp', open: 'Đang mở', closed: 'Đã đóng', published: 'Đã công bố', cancelled: 'Đã huỷ' }[s] || s
 }
 
-onMounted(() => { loadTemplates(); loadPeriods(); loadWeeklyTemplates() })
+onMounted(() => { loadTodayStaff(); loadTemplates(); loadPeriods(); loadWeeklyTemplates() })
 </script>

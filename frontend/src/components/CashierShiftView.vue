@@ -266,73 +266,161 @@
       </button>
     </div>
 
-    <!-- Payment List (Waiter shifts only) -->
+    <!-- Order List (Waiter shifts only) -->
     <div v-if="selectedShift && isWaiterShift" class="bg-white rounded-2xl p-4 shadow-sm mb-4">
       <div class="flex items-center justify-between mb-3">
-        <h2 class="text-lg font-bold text-gray-800">💳 Danh sách thanh toán</h2>
-        <span class="text-sm text-gray-600">{{ payments.length }} giao dịch</span>
+        <h2 class="text-lg font-bold text-gray-800">🧾 Danh sách order</h2>
+        <span class="text-sm text-gray-600">{{ orders.length }} order</span>
       </div>
 
-      <div v-if="loadingPayments" class="text-center py-10">
+      <!-- Order status filter -->
+      <div v-if="orders.length > 0" class="flex gap-1.5 mb-3 flex-wrap">
+        <button
+          @click="orderFilter = 'all'"
+          :class="orderFilter === 'all' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-600'"
+          class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all touch-manipulation"
+        >
+          Tất cả ({{ orders.length }})
+        </button>
+        <button
+          @click="orderFilter = 'unpaid'"
+          :class="orderFilter === 'unpaid' ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-600'"
+          class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all touch-manipulation"
+        >
+          Chưa thu ({{ unpaidOrdersCount }})
+        </button>
+        <button
+          @click="orderFilter = 'paid'"
+          :class="orderFilter === 'paid' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-600'"
+          class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all touch-manipulation"
+        >
+          Đã thu ({{ paidOrdersCount }})
+        </button>
+      </div>
+
+      <div v-if="loadingOrders" class="text-center py-10">
         <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
       </div>
 
-      <div v-else-if="payments.length === 0" class="text-center py-10">
+      <div v-else-if="orders.length === 0" class="text-center py-10">
         <div class="text-5xl mb-3">📭</div>
-        <p class="text-gray-500">Chưa có thanh toán nào</p>
+        <p class="text-gray-500">Chưa có order nào</p>
       </div>
 
       <div v-else class="space-y-3">
         <div
-          v-for="payment in payments"
-          :key="payment.order_id"
+          v-for="order in filteredOrders"
+          :key="order.order_id"
           class="bg-white border rounded-xl p-4 shadow-sm"
+          :class="order.status === 'CREATED' ? (order.bill_printed ? 'border-red-300 bg-red-50' : 'border-orange-200 bg-orange-50') : ''"
         >
           <!-- Header -->
-          <div class="flex justify-between items-start mb-3">
+          <div class="flex justify-between items-start mb-2">
             <div>
-              <h3 class="font-bold text-gray-800">{{ payment.customer_name || 'Khách lẻ' }}</h3>
-              <p class="text-xs text-gray-500">{{ formatDateTime(payment.paid_at) }}</p>
+              <div class="flex items-center gap-2">
+                <h3 class="font-bold text-gray-800">#{{ order.order_number }}</h3>
+                <span v-if="order.bill_printed && order.status === 'CREATED'"
+                  class="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 border border-red-200">
+                  🖨️ Đã in tem
+                </span>
+              </div>
+              <p class="text-sm text-gray-700">{{ order.customer_name || 'Khách lẻ' }}</p>
+              <p class="text-xs text-gray-500">{{ order.waiter_name }} • {{ formatDateTime(order.created_at) }}</p>
             </div>
             <div class="text-right">
-              <div class="text-lg font-bold text-green-600">{{ formatPrice(payment.amount) }}</div>
-              <span :class="getPaymentMethodBadge(payment.payment_method)">
-                {{ getPaymentMethodText(payment.payment_method) }}
+              <div class="text-lg font-bold" :class="order.status === 'CREATED' ? 'text-orange-600' : 'text-green-600'">
+                {{ formatPrice(order.total) }}
+              </div>
+              <span v-if="order.payment_method" :class="getPaymentMethodBadge(order.payment_method)">
+                {{ getPaymentMethodText(order.payment_method) }}
               </span>
             </div>
           </div>
 
           <!-- Status -->
           <div class="mb-3">
-            <span :class="getStatusBadge(payment.status)">
-              {{ getStatusText(payment.status) }}
+            <span :class="getStatusBadge(order.status)">
+              {{ getStatusText(order.status) }}
             </span>
           </div>
 
           <!-- Actions -->
           <div class="flex gap-2">
+            <!-- Cancel button for CREATED orders (including bill-printed) -->
             <button
-              @click="showOverrideModal(payment)"
-              class="flex-1 py-2.5 bg-orange-50 text-orange-600 rounded-lg text-xs sm:text-sm font-medium active:scale-95 transition-transform border border-orange-200 min-h-[44px]"
+              v-if="order.status === 'CREATED'"
+              @click="showCancelOrderModal(order)"
+              class="flex-1 py-2.5 rounded-lg text-xs sm:text-sm font-medium active:scale-95 transition-transform min-h-[44px]"
+              :class="order.bill_printed
+                ? 'bg-red-500 text-white border border-red-600'
+                : 'bg-red-50 text-red-600 border border-red-200'"
             >
-              ✏️ Điều chỉnh
+              🚫 Huỷ order
             </button>
-            <button
-              @click="showDiscrepancyModal(payment)"
-              class="flex-1 py-2.5 bg-yellow-50 text-yellow-600 rounded-lg text-xs sm:text-sm font-medium active:scale-95 transition-transform border border-yellow-200 min-h-[44px]"
-            >
-              ⚠️ Báo lỗi
-            </button>
-            <button
-              @click="lockOrder(payment.order_id)"
-              class="flex-1 py-2.5 bg-red-50 text-red-600 rounded-lg text-xs sm:text-sm font-medium active:scale-95 transition-transform border border-red-200 min-h-[44px]"
-            >
-              🔒 Khóa
-            </button>
+
+            <!-- Payment actions for paid orders -->
+            <template v-if="order.status !== 'CREATED' && order.status !== 'CANCELLED' && order.status !== 'LOCKED'">
+              <button
+                @click="showOverrideModalByOrder(order)"
+                class="flex-1 py-2.5 bg-orange-50 text-orange-600 rounded-lg text-xs sm:text-sm font-medium active:scale-95 transition-transform border border-orange-200 min-h-[44px]"
+              >
+                ✏️ Điều chỉnh
+              </button>
+              <button
+                @click="showDiscrepancyModalByOrder(order)"
+                class="flex-1 py-2.5 bg-yellow-50 text-yellow-600 rounded-lg text-xs sm:text-sm font-medium active:scale-95 transition-transform border border-yellow-200 min-h-[44px]"
+              >
+                ⚠️ Báo lỗi
+              </button>
+              <button
+                @click="lockOrder(order.order_id)"
+                class="flex-1 py-2.5 bg-gray-50 text-gray-600 rounded-lg text-xs sm:text-sm font-medium active:scale-95 transition-transform border border-gray-200 min-h-[44px]"
+              >
+                🔒 Khóa
+              </button>
+            </template>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Cancel Order Modal -->
+    <transition name="slide-up">
+      <div v-if="showCancelForm" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
+        <div class="bg-white rounded-t-3xl w-full p-6">
+          <h3 class="text-xl font-bold mb-2">🚫 Huỷ order</h3>
+          <p class="text-sm text-gray-600 mb-3">
+            Order <strong>#{{ cancelTarget?.order_number }}</strong>
+            - {{ cancelTarget?.customer_name || 'Khách lẻ' }}
+            - {{ formatPrice(cancelTarget?.total) }}
+          </p>
+          <div v-if="cancelTarget?.bill_printed" class="bg-red-50 border border-red-200 rounded-xl p-3 mb-3 flex items-center gap-2">
+            <span class="text-lg">🖨️</span>
+            <p class="text-sm text-red-700 font-medium">Order này đã in tem — cashier xác nhận huỷ</p>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium mb-2">Lý do huỷ *</label>
+            <textarea
+              v-model="cancelReason"
+              rows="3"
+              class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-red-500"
+              placeholder="Nhập lý do huỷ order..."
+            ></textarea>
+          </div>
+          <div class="flex gap-2">
+            <button type="button" @click="showCancelForm = false; cancelReason = ''"
+              class="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-xl font-medium">
+              Quay lại
+            </button>
+            <button @click="confirmCancelOrder"
+              :disabled="!cancelReason.trim()"
+              class="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white px-4 py-3 rounded-xl font-medium">
+              Xác nhận huỷ
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
 
     <!-- Modals -->
     <OverridePaymentModal
@@ -394,14 +482,18 @@ const cashierStore = useCashierStore()
 const activeTab = ref('waiter') // 'waiter' | 'barista'
 const selectedShiftId = ref('')
 const loadingShiftDetails = ref(false)
-const loadingPayments = ref(false)
+const loadingOrders = ref(false)
 const statusFilter = ref('all') // 'all' | 'open' | 'closed'
+const orderFilter = ref('all') // 'all' | 'unpaid' | 'paid'
 
 // Modal state for payment actions
 const showOverride = ref(false)
 const showDiscrepancy = ref(false)
 const showCloseForm = ref(false)
+const showCancelForm = ref(false)
 const selectedPayment = ref(null)
+const cancelTarget = ref(null)
+const cancelReason = ref('')
 
 const closeForm = ref({
   end_cash: 0
@@ -411,6 +503,16 @@ const closeForm = ref({
 const shifts = computed(() => shiftStore.shifts)
 const shiftStatus = computed(() => cashierStore.shiftStatus)
 const payments = computed(() => cashierStore.payments)
+const orders = computed(() => cashierStore.orders)
+
+const unpaidOrdersCount = computed(() => orders.value.filter(o => o.status === 'CREATED').length)
+const paidOrdersCount = computed(() => orders.value.filter(o => o.status !== 'CREATED' && o.status !== 'CANCELLED').length)
+
+const filteredOrders = computed(() => {
+  if (orderFilter.value === 'unpaid') return orders.value.filter(o => o.status === 'CREATED')
+  if (orderFilter.value === 'paid') return orders.value.filter(o => o.status !== 'CREATED' && o.status !== 'CANCELLED')
+  return orders.value
+})
 
 // Get all shifts for current tab (no date filter)
 const allShifts = computed(() => {
@@ -477,8 +579,10 @@ const isWaiterShift = computed(() => {
 // Event handlers
 const onTabChange = (tab) => {
   activeTab.value = tab
-  selectedShiftId.value = '' // Clear selection when switching tabs
-  statusFilter.value = 'all' // Reset filter when switching tabs
+  selectedShiftId.value = ''
+  statusFilter.value = 'all'
+  orderFilter.value = 'all'
+  cashierStore.orders = []
 }
 
 // Select shift (replaces onShiftSelect for button-based selection)
@@ -487,23 +591,20 @@ const selectShift = async (shiftId) => {
   await onShiftSelect()
 }
 
-// Load shift details and payments when a shift is selected
+// Load shift details and orders when a shift is selected
 const onShiftSelect = async () => {
   if (!selectedShiftId.value) return
-  
+
   loadingShiftDetails.value = true
   try {
-    const statusData = await cashierStore.getShiftStatus(selectedShiftId.value)
-    console.log('Shift status data:', statusData)
-    console.log('Cash revenue:', statusData.cash_revenue)
-    console.log('Transfer revenue:', statusData.transfer_revenue)
-    console.log('QR revenue:', statusData.qr_revenue)
-    
-    // Only load payments for waiter shifts
+    await cashierStore.getShiftStatus(selectedShiftId.value)
+
+    // Only load orders for waiter shifts
     if (isWaiterShift.value) {
-      loadingPayments.value = true
-      await cashierStore.getPaymentsByShift(selectedShiftId.value)
-      loadingPayments.value = false
+      loadingOrders.value = true
+      await cashierStore.getOrdersByShift(selectedShiftId.value)
+      loadingOrders.value = false
+      orderFilter.value = 'all'
     }
   } catch (error) {
     console.error('Error loading shift details:', error)
@@ -532,9 +633,36 @@ const closeShift = async () => {
   }
 }
 
+// Cancel order handlers
+const showCancelOrderModal = (order) => {
+  cancelTarget.value = order
+  cancelReason.value = ''
+  showCancelForm.value = true
+}
+
+const confirmCancelOrder = async () => {
+  if (!cancelReason.value.trim()) return
+  try {
+    await cashierStore.cancelOrder(cancelTarget.value.order_id, cancelReason.value)
+    showCancelForm.value = false
+    cancelReason.value = ''
+    await cashierStore.getOrdersByShift(selectedShiftId.value)
+    await cashierStore.getShiftStatus(selectedShiftId.value)
+    alert('✅ Đã huỷ order #' + cancelTarget.value.order_number)
+  } catch (error) {
+    console.error('Cancel order failed:', error)
+    alert('❌ Lỗi: ' + (error.response?.data?.error || error.message))
+  }
+}
+
 // Payment action handlers
 const showOverrideModal = (payment) => {
   selectedPayment.value = payment
+  showOverride.value = true
+}
+
+const showOverrideModalByOrder = (order) => {
+  selectedPayment.value = { order_id: order.order_id, order_number: order.order_number, amount: order.total, payment_method: order.payment_method, status: order.status }
   showOverride.value = true
 }
 
@@ -543,11 +671,16 @@ const showDiscrepancyModal = (payment) => {
   showDiscrepancy.value = true
 }
 
+const showDiscrepancyModalByOrder = (order) => {
+  selectedPayment.value = { order_id: order.order_id, order_number: order.order_number, amount: order.total }
+  showDiscrepancy.value = true
+}
+
 const handleOverridePayment = async (reason) => {
   try {
     await cashierStore.overridePayment(selectedPayment.value.order_id, reason)
     showOverride.value = false
-    await cashierStore.getPaymentsByShift(selectedShiftId.value)
+    await cashierStore.getOrdersByShift(selectedShiftId.value)
     alert('✅ Đã điều chỉnh thanh toán')
   } catch (error) {
     console.error('Override failed:', error)
@@ -573,7 +706,7 @@ const lockOrder = async (orderId) => {
   if (confirm('Bạn có chắc muốn khóa order này? Không thể hoàn tác!')) {
     try {
       await cashierStore.lockOrder(orderId)
-      await cashierStore.getPaymentsByShift(selectedShiftId.value)
+      await cashierStore.getOrdersByShift(selectedShiftId.value)
       alert('✅ Đã khóa order')
     } catch (error) {
       console.error('Lock order failed:', error)

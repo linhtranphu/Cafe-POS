@@ -53,6 +53,19 @@ func (h *CashierHandler) GetPaymentsByShift(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"payments": payments})
 }
 
+// GetOrdersByShift returns all orders for a shift (including unpaid)
+func (h *CashierHandler) GetOrdersByShift(c *gin.Context) {
+	shiftID := c.Param("id")
+
+	orders, err := h.oversightService.GetAllOrdersByShift(shiftID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"orders": orders})
+}
+
 // FR-CASH-05: Xử lý sai lệch thanh toán
 func (h *CashierHandler) ReportDiscrepancy(c *gin.Context) {
 	var req struct {
