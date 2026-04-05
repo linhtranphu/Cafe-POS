@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"cafe-pos/backend/application/services"
+	"cafe-pos/backend/domain/order"
 
 	"github.com/gin-gonic/gin"
 )
@@ -222,4 +223,27 @@ func (h *CashierHandler) GetOrderAudits(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"audits": audits})
+}
+
+// ChangePaymentMethod sửa phương thức thanh toán của đơn đã thanh toán
+func (h *CashierHandler) ChangePaymentMethod(c *gin.Context) {
+	orderID := c.Param("id")
+
+	var req struct {
+		PaymentMethod string `json:"payment_method" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	cashierID := c.GetString("user_id")
+
+	err := h.oversightService.ChangePaymentMethod(orderID, order.PaymentMethod(req.PaymentMethod), cashierID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Payment method updated successfully"})
 }

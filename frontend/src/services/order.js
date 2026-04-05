@@ -31,6 +31,11 @@ export const orderService = {
     return response.data
   },
 
+  async changePaymentMethod(id, paymentMethod) {
+    const response = await api.patch(`/waiter/orders/${id}/payment-method`, { payment_method: paymentMethod })
+    return response.data
+  },
+
   async printTemporaryBill(id) {
     const response = await api.post(`/waiter/orders/${id}/print-temp-bill`)
     return response.data

@@ -178,6 +178,9 @@ func main() {
 	cashierShiftService := services.NewCashierShiftService(cashierShiftRepo, shiftRepo, smManager, journalService, client)
 	cashReconciliationService := services.NewCashReconciliationService(cashReconciliationRepo, shiftRepo, orderRepo)
 	paymentOversightService := services.NewPaymentOversightService(orderRepo, paymentDiscrepancyRepo, paymentAuditRepo)
+	paymentOversightService.SetJournalService(journalService)
+	paymentOversightService.SetShiftRepository(shiftRepo)
+	paymentOversightService.SetMongoClient(client)
 	cashierReportService := services.NewCashierReportService(orderRepo, cashReconciliationRepo, shiftRepo, paymentAuditRepo, cashHandoverRepo)
 	// Handover service
 	cashHandoverService := services.NewCashHandoverService(cashHandoverRepo, cashDiscrepancyRepo, shiftRepo, cashierShiftRepo, orderRepo, client, journalService)
@@ -384,7 +387,7 @@ func main() {
 	// CORS
 	r.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
@@ -555,6 +558,7 @@ func main() {
 				waiter.POST("/orders/:id/send", orderHandler.SendToBar)
 				waiter.POST("/orders/:id/serve", orderHandler.ServeOrder)
 				waiter.POST("/orders/:id/cancel", orderHandler.CancelOrder)
+				waiter.PATCH("/orders/:id/payment-method", cashierHandler.ChangePaymentMethod)
 	waiter.POST("/orders/:id/print-temp-bill", orderHandler.PrintTemporaryBill)
 				waiter.POST("/orders/merge", orderHandler.MergeOrders)
 				waiter.GET("/orders", orderHandler.GetMyOrders)
@@ -563,6 +567,7 @@ func main() {
 				
 				// Menu (read-only)
 				waiter.GET("/menu", menuHandler.GetAllMenuItems)
+				waiter.GET("/menu-categories", menuCategoryHandler.GetAllCategories)
 				
 				waiter.GET("/profile", func(c *gin.Context) {
 					c.JSON(200, gin.H{"message": "waiter access"})
@@ -618,6 +623,7 @@ func main() {
 				cashier.POST("/discrepancies/:id/resolve", cashierHandler.ResolveDiscrepancy)
 				cashier.POST("/reconcile/cash", cashierHandler.ReconcileCash)
 				cashier.POST("/orders/:id/override", cashierHandler.OverridePayment)
+				cashier.PATCH("/orders/:id/payment-method", cashierHandler.ChangePaymentMethod)
 				cashier.POST("/orders/:id/lock", cashierHandler.LockOrder)
 				cashier.GET("/reports/shift/:id", cashierHandler.GenerateShiftReport)
 				cashier.GET("/reports/daily", cashierHandler.GetDailyReport)
@@ -642,6 +648,7 @@ func main() {
 				// Menu category routes
 				manager.POST("/menu-categories", menuCategoryHandler.CreateCategory)
 				manager.GET("/menu-categories", menuCategoryHandler.GetAllCategories)
+				manager.PUT("/menu-categories/reorder", menuCategoryHandler.ReorderCategories)
 				manager.GET("/menu-categories/:id", menuCategoryHandler.GetCategory)
 				manager.PUT("/menu-categories/:id", menuCategoryHandler.UpdateCategory)
 				manager.DELETE("/menu-categories/:id", menuCategoryHandler.DeleteCategory)
@@ -863,6 +870,7 @@ func main() {
 				manager.POST("/schedule/periods", scheduleHandler.CreatePeriod)
 				manager.GET("/schedule/periods", scheduleHandler.GetPeriods)
 				manager.PATCH("/schedule/periods/:id/status", scheduleHandler.SetPeriodStatus)
+				manager.PATCH("/schedule/periods/:id/max-hours", scheduleHandler.UpdatePeriodMaxHoursPercent)
 				manager.GET("/schedule/periods/:id", scheduleHandler.GetPeriodDetail)
 				manager.POST("/schedule/periods/:id/slots", scheduleHandler.AddSlot)
 				manager.DELETE("/schedule/periods/:id/slots/:slotId", scheduleHandler.RemoveSlot)

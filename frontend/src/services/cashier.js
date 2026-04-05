@@ -12,6 +12,7 @@ export const cashierService = {
   getPendingDiscrepancies: () => api.get('/cashier/discrepancies/pending'),
   resolveDiscrepancy: (discrepancyId) => api.post(`/cashier/discrepancies/${discrepancyId}/resolve`),
   overridePayment: (orderId, data) => api.post(`/cashier/orders/${orderId}/override`, data),
+  changePaymentMethod: (orderId, paymentMethod) => api.patch(`/cashier/orders/${orderId}/payment-method`, { payment_method: paymentMethod }),
   lockOrder: (orderId) => api.post(`/cashier/orders/${orderId}/lock`),
   
   // Reconciliation

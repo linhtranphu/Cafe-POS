@@ -843,6 +843,93 @@ func (s *JournalService) RecordOrderPaymentInSession(
 	return s.recordOrderPayment(ctx, cashAmount, transferAmount, orderID, orderNumber, waiterID, waiterName)
 }
 
+// RecordPaymentMethodCorrectionInSession records a correction when payment method is changed
+// on an already-paid order. It reverses the old method and records the new one within an
+// existing MongoDB session/transaction.
+//
+// Example: CASH → TRANSFER (amount X)
+//
+//	CREDIT waiter_float: cash=X   (reverse: waiter gives back cash)
+//	DEBIT  customer:     cash=X   (reverse: customer cash restored)
+//	DEBIT  waiter_float: transfer=X  (new: waiter receives transfer)
+//	CREDIT customer:     transfer=X  (new: customer pays by transfer)
+func (s *JournalService) RecordPaymentMethodCorrectionInSession(
+	ctx context.Context,
+	oldCashAmount, oldTransferAmount float64,
+	newCashAmount, newTransferAmount float64,
+	orderID primitive.ObjectID,
+	orderNumber string,
+	waiterID primitive.ObjectID,
+	waiterName string,
+) (*fund.JournalEntry, error) {
+	waiterBefore, err := s.repo.GetFundBalance(ctx, fund.FundTypeWaiterFloat)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get waiter_float balance: %w", err)
+	}
+	customerBefore, err := s.repo.GetFundBalance(ctx, fund.FundTypeCustomer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get customer balance: %w", err)
+	}
+
+	oldTotal := oldCashAmount + oldTransferAmount
+	newTotal := newCashAmount + newTransferAmount
+
+	// Determine description
+	oldMethod := "tiền mặt"
+	if oldTransferAmount > 0 {
+		oldMethod = "chuyển khoản"
+	}
+	newMethod := "chuyển khoản"
+	if newCashAmount > 0 {
+		newMethod = "tiền mặt"
+	}
+	desc := fmt.Sprintf("Sửa HTTT đơn %s: %s → %s (%.0fđ) - %s", orderNumber, oldMethod, newMethod, oldTotal, waiterName)
+
+	e := fund.NewJournalEntry(fund.EventOrderPaymentCorrection, orderID, desc, waiterID, waiterName, "waiter")
+
+	// Step 1: Reverse old payment
+	// CREDIT waiter_float (gives back old amount)
+	waiterAfterStep1 := fund.FundBalance{
+		Cash:     waiterBefore.Cash - oldCashAmount,
+		Transfer: waiterBefore.Transfer - oldTransferAmount,
+		Total:    waiterBefore.Total - oldTotal,
+	}
+	e.AddLine(fund.FundTypeWaiterFloat, fund.DirectionCredit, oldCashAmount, oldTransferAmount, *waiterBefore, waiterAfterStep1)
+
+	// DEBIT customer (restores customer balance)
+	customerAfterStep1 := fund.FundBalance{
+		Cash:     customerBefore.Cash + oldCashAmount,
+		Transfer: customerBefore.Transfer + oldTransferAmount,
+		Total:    customerBefore.Total + oldTotal,
+	}
+	e.AddLine(fund.FundTypeCustomer, fund.DirectionDebit, oldCashAmount, oldTransferAmount, *customerBefore, customerAfterStep1)
+
+	// Step 2: Record new payment
+	// DEBIT waiter_float (receives new amount)
+	waiterAfterStep2 := fund.FundBalance{
+		Cash:     waiterAfterStep1.Cash + newCashAmount,
+		Transfer: waiterAfterStep1.Transfer + newTransferAmount,
+		Total:    waiterAfterStep1.Total + newTotal,
+	}
+	e.AddLine(fund.FundTypeWaiterFloat, fund.DirectionDebit, newCashAmount, newTransferAmount, waiterAfterStep1, waiterAfterStep2)
+
+	// CREDIT customer (customer pays by new method)
+	customerAfterStep2 := fund.FundBalance{
+		Cash:     customerAfterStep1.Cash - newCashAmount,
+		Transfer: customerAfterStep1.Transfer - newTransferAmount,
+		Total:    customerAfterStep1.Total - newTotal,
+	}
+	e.AddLine(fund.FundTypeCustomer, fund.DirectionCredit, newCashAmount, newTransferAmount, customerAfterStep1, customerAfterStep2)
+
+	if err := e.Validate(); err != nil {
+		return nil, err
+	}
+	if err := s.repo.Create(ctx, e); err != nil {
+		return nil, fmt.Errorf("failed to persist correction journal entry: %w", err)
+	}
+	return e, nil
+}
+
 // RecordOrderPayment creates:
 //
 //	DEBIT  waiter_float  X  (waiter nhận tiền từ khách)

@@ -147,6 +147,14 @@ func (r *SchedulePeriodRepository) UpdateStatus(ctx context.Context, id primitiv
 	return err
 }
 
+func (r *SchedulePeriodRepository) UpdateMaxHoursPercent(ctx context.Context, id primitive.ObjectID, percent float64) error {
+	_, err := r.col.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": bson.M{
+		"max_hours_percent": percent,
+		"updated_at":        time.Now(),
+	}})
+	return err
+}
+
 // ─── ScheduleSlotRepository ───────────────────────────────────────────────────
 
 type ScheduleSlotRepository struct {

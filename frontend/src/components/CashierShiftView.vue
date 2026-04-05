@@ -361,6 +361,12 @@
             <!-- Payment actions for paid orders -->
             <template v-if="order.status !== 'CREATED' && order.status !== 'CANCELLED' && order.status !== 'LOCKED'">
               <button
+                @click="showChangePaymentMethodModal(order)"
+                class="flex-1 py-2.5 bg-blue-50 text-blue-600 rounded-lg text-xs sm:text-sm font-medium active:scale-95 transition-transform border border-blue-200 min-h-[44px]"
+              >
+                💳 Sửa HTTT
+              </button>
+              <button
                 @click="showOverrideModalByOrder(order)"
                 class="flex-1 py-2.5 bg-orange-50 text-orange-600 rounded-lg text-xs sm:text-sm font-medium active:scale-95 transition-transform border border-orange-200 min-h-[44px]"
               >
@@ -383,6 +389,52 @@
         </div>
       </div>
     </div>
+
+    <!-- Change Payment Method Modal -->
+    <transition name="slide-up">
+      <div v-if="showChangePaymentForm" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
+        <div class="bg-white rounded-t-3xl w-full p-6">
+          <h3 class="text-xl font-bold mb-2">💳 Sửa hình thức thanh toán</h3>
+          <p class="text-sm text-gray-600 mb-4">
+            Order <strong>#{{ changePaymentTarget?.order_number }}</strong>
+            - {{ formatPrice(changePaymentTarget?.total) }}
+            - Hiện tại: <span class="font-semibold">{{ getPaymentMethodText(changePaymentTarget?.payment_method) }}</span>
+          </p>
+          <div class="grid grid-cols-3 gap-3 mb-6">
+            <button
+              v-for="method in availablePaymentMethods"
+              :key="method.value"
+              @click="selectedNewPaymentMethod = method.value"
+              :disabled="method.value === changePaymentTarget?.payment_method"
+              :class="[
+                'py-4 rounded-xl font-semibold text-sm border-2 transition-all touch-manipulation',
+                selectedNewPaymentMethod === method.value
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : method.value === changePaymentTarget?.payment_method
+                    ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                    : 'border-gray-200 bg-white text-gray-700 active:bg-gray-50'
+              ]"
+            >
+              <div class="text-2xl mb-1">{{ method.icon }}</div>
+              <div>{{ method.label }}</div>
+              <div v-if="method.value === changePaymentTarget?.payment_method" class="text-xs mt-1 text-gray-400">(hiện tại)</div>
+            </button>
+          </div>
+          <div class="flex gap-2">
+            <button type="button" @click="showChangePaymentForm = false; selectedNewPaymentMethod = ''"
+              class="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-xl font-medium">
+              Quay lại
+            </button>
+            <button
+              @click="confirmChangePaymentMethod"
+              :disabled="!selectedNewPaymentMethod || selectedNewPaymentMethod === changePaymentTarget?.payment_method"
+              class="flex-1 bg-blue-500 disabled:bg-gray-300 text-white px-4 py-3 rounded-xl font-medium">
+              Xác nhận sửa
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
 
     <!-- Cancel Order Modal -->
     <transition name="slide-up">
@@ -491,9 +543,18 @@ const showOverride = ref(false)
 const showDiscrepancy = ref(false)
 const showCloseForm = ref(false)
 const showCancelForm = ref(false)
+const showChangePaymentForm = ref(false)
 const selectedPayment = ref(null)
 const cancelTarget = ref(null)
 const cancelReason = ref('')
+const changePaymentTarget = ref(null)
+const selectedNewPaymentMethod = ref('')
+
+const availablePaymentMethods = [
+  { value: 'CASH', label: 'Tiền mặt', icon: '💵' },
+  { value: 'TRANSFER', label: 'Chuyển khoản', icon: '🏦' },
+  { value: 'QR', label: 'QR Code', icon: '📱' },
+]
 
 const closeForm = ref({
   end_cash: 0
@@ -698,6 +759,27 @@ const handleReportDiscrepancy = async (data) => {
     alert('✅ Đã báo lỗi')
   } catch (error) {
     console.error('Report discrepancy failed:', error)
+    alert('❌ Lỗi: ' + (error.response?.data?.error || error.message))
+  }
+}
+
+const showChangePaymentMethodModal = (order) => {
+  changePaymentTarget.value = order
+  selectedNewPaymentMethod.value = ''
+  showChangePaymentForm.value = true
+}
+
+const confirmChangePaymentMethod = async () => {
+  if (!selectedNewPaymentMethod.value || selectedNewPaymentMethod.value === changePaymentTarget.value?.payment_method) return
+  try {
+    await cashierStore.changePaymentMethod(changePaymentTarget.value.order_id, selectedNewPaymentMethod.value)
+    showChangePaymentForm.value = false
+    selectedNewPaymentMethod.value = ''
+    await cashierStore.getOrdersByShift(selectedShiftId.value)
+    await cashierStore.getShiftStatus(selectedShiftId.value)
+    alert('✅ Đã sửa hình thức thanh toán')
+  } catch (error) {
+    console.error('Change payment method failed:', error)
     alert('❌ Lỗi: ' + (error.response?.data?.error || error.message))
   }
 }

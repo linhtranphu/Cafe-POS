@@ -3,18 +3,23 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"cafe-pos/backend/domain/cashier"
 	"cafe-pos/backend/domain/order"
 	"cafe-pos/backend/infrastructure/mongodb"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	mongoDriver "go.mongodb.org/mongo-driver/mongo"
 )
 
 type PaymentOversightService struct {
 	orderRepo       *mongodb.OrderRepository
 	discrepancyRepo *mongodb.PaymentDiscrepancyRepository
 	auditRepo       *mongodb.PaymentAuditRepository
+	journalService  *JournalService
+	shiftRepo       *mongodb.ShiftRepository
+	mongoClient     *mongoDriver.Client
 }
 
 func NewPaymentOversightService(
@@ -27,6 +32,18 @@ func NewPaymentOversightService(
 		discrepancyRepo: discrepancyRepo,
 		auditRepo:       auditRepo,
 	}
+}
+
+func (s *PaymentOversightService) SetJournalService(js *JournalService) {
+	s.journalService = js
+}
+
+func (s *PaymentOversightService) SetShiftRepository(repo *mongodb.ShiftRepository) {
+	s.shiftRepo = repo
+}
+
+func (s *PaymentOversightService) SetMongoClient(client *mongoDriver.Client) {
+	s.mongoClient = client
 }
 
 type PaymentSummary struct {
@@ -278,4 +295,141 @@ func (s *PaymentOversightService) GetAuditsByOrder(orderID string) ([]*cashier.P
 
 func (s *PaymentOversightService) GetAuditsByCashier(cashierID string) ([]*cashier.PaymentAudit, error) {
 	return s.auditRepo.FindByCashierID(cashierID)
+}
+
+// ChangePaymentMethod sửa phương thức thanh toán của đơn đã thanh toán.
+// Cập nhật kế toán (journal), bộ đếm ca (shift counters), và ghi audit.
+func (s *PaymentOversightService) ChangePaymentMethod(orderID string, newMethod order.PaymentMethod, cashierID string) error {
+	orderObjID, err := primitive.ObjectIDFromHex(orderID)
+	if err != nil {
+		return errors.New("invalid order ID")
+	}
+
+	ord, err := s.orderRepo.FindByID(context.Background(), orderObjID)
+	if err != nil {
+		return errors.New("order not found")
+	}
+
+	if ord.Status == order.StatusLocked {
+		return errors.New("cannot change payment method of locked order")
+	}
+	if ord.Status != order.StatusPaid {
+		return errors.New("can only change payment method of paid orders")
+	}
+	if ord.PaymentMethod == newMethod {
+		return fmt.Errorf("order already uses payment method %s", newMethod)
+	}
+
+	oldMethod := ord.PaymentMethod
+	amount := ord.AmountPaid
+
+	// Build old/new cash+transfer amounts for journal
+	var oldCash, oldTransfer, newCash, newTransfer float64
+	if oldMethod == order.PaymentCash {
+		oldCash = amount
+	} else {
+		oldTransfer = amount
+	}
+	if newMethod == order.PaymentCash {
+		newCash = amount
+	} else {
+		newTransfer = amount
+	}
+
+	// Wrap order update + journal into one transaction
+	doChange := func(ctx context.Context) error {
+		loaded, err := s.orderRepo.FindByID(ctx, orderObjID)
+		if err != nil {
+			return err
+		}
+		loaded.PaymentMethod = newMethod
+		loaded.UpdatedAt = time.Now()
+		if err := s.orderRepo.Update(ctx, orderObjID, loaded); err != nil {
+			return err
+		}
+
+		if s.journalService != nil {
+			cashierObjID, _ := primitive.ObjectIDFromHex(cashierID)
+			if _, err := s.journalService.RecordPaymentMethodCorrectionInSession(
+				ctx,
+				oldCash, oldTransfer,
+				newCash, newTransfer,
+				loaded.ID,
+				loaded.OrderNumber,
+				loaded.WaiterID,
+				loaded.WaiterName,
+			); err != nil {
+				// Log but don't block — cashierObjID used to silence unused warning
+				_ = cashierObjID
+				return fmt.Errorf("kế toán không ghi nhận được sửa HTTT: %w", err)
+			}
+		}
+		return nil
+	}
+
+	if s.mongoClient != nil {
+		session, err := s.mongoClient.StartSession()
+		if err != nil {
+			return fmt.Errorf("cannot start transaction: %w", err)
+		}
+		defer session.EndSession(context.Background())
+		err = mongoDriver.WithSession(context.Background(), session, func(sc mongoDriver.SessionContext) error {
+			if err := session.StartTransaction(); err != nil {
+				return err
+			}
+			if err := doChange(sc); err != nil {
+				session.AbortTransaction(sc)
+				return err
+			}
+			return session.CommitTransaction(sc)
+		})
+		if err != nil {
+			return err
+		}
+	} else {
+		if err := doChange(context.Background()); err != nil {
+			return err
+		}
+	}
+
+	// Update shift revenue counters (non-fatal, outside transaction)
+	if s.shiftRepo != nil && !ord.ShiftID.IsZero() {
+		shift, err := s.shiftRepo.FindByID(context.Background(), ord.ShiftID)
+		if err == nil && shift != nil {
+			// Reverse old method
+			if oldMethod == order.PaymentCash {
+				shift.RemainingCash -= amount
+				shift.CurrentCash -= amount
+			} else {
+				shift.TransferRevenue -= amount
+				shift.RemainingTransfer -= amount
+			}
+			// Add new method
+			if newMethod == order.PaymentCash {
+				shift.RemainingCash += amount
+				shift.CurrentCash += amount
+			} else {
+				shift.TransferRevenue += amount
+				shift.RemainingTransfer += amount
+			}
+			_ = s.shiftRepo.Update(context.Background(), ord.ShiftID, shift)
+		}
+	}
+
+	// Create audit record
+	cashierObjID, _ := primitive.ObjectIDFromHex(cashierID)
+	audit := &cashier.PaymentAudit{
+		OrderID:          orderID,
+		Action:           cashier.AuditActionPaymentMethodChange,
+		CashierID:        cashierObjID.Hex(),
+		Reason:           fmt.Sprintf("Sửa HTTT: %s → %s", oldMethod, newMethod),
+		OldStatus:        string(order.StatusPaid),
+		NewStatus:        string(order.StatusPaid),
+		OldPaymentMethod: string(oldMethod),
+		NewPaymentMethod: string(newMethod),
+		Amount:           amount,
+		AuditedAt:        time.Now(),
+		CreatedAt:        time.Now(),
+	}
+	return s.auditRepo.Create(audit)
 }

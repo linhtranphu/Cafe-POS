@@ -5,24 +5,27 @@ import (
 )
 
 type PaymentAudit struct {
-	ID        string    `json:"id" bson:"_id,omitempty"`
-	OrderID   string    `json:"order_id" bson:"order_id"`
-	Action    string    `json:"action" bson:"action"` // CANCEL, REFUND, OVERRIDE, LOCK
-	CashierID string    `json:"cashier_id" bson:"cashier_id"`
-	Reason    string    `json:"reason" bson:"reason"`
-	OldStatus string    `json:"old_status" bson:"old_status"`
-	NewStatus string    `json:"new_status" bson:"new_status"`
-	Amount    float64   `json:"amount" bson:"amount"`
-	AuditedAt time.Time `json:"audited_at" bson:"audited_at"`
-	CreatedAt time.Time `json:"created_at" bson:"created_at"`
+	ID               string    `json:"id" bson:"_id,omitempty"`
+	OrderID          string    `json:"order_id" bson:"order_id"`
+	Action           string    `json:"action" bson:"action"` // CANCEL, REFUND, OVERRIDE, LOCK, PAYMENT_METHOD_CHANGE
+	CashierID        string    `json:"cashier_id" bson:"cashier_id"`
+	Reason           string    `json:"reason" bson:"reason"`
+	OldStatus        string    `json:"old_status" bson:"old_status"`
+	NewStatus        string    `json:"new_status" bson:"new_status"`
+	OldPaymentMethod string    `json:"old_payment_method,omitempty" bson:"old_payment_method,omitempty"`
+	NewPaymentMethod string    `json:"new_payment_method,omitempty" bson:"new_payment_method,omitempty"`
+	Amount           float64   `json:"amount" bson:"amount"`
+	AuditedAt        time.Time `json:"audited_at" bson:"audited_at"`
+	CreatedAt        time.Time `json:"created_at" bson:"created_at"`
 }
 
 // Constants
 const (
-	AuditActionCancel   = "CANCEL"
-	AuditActionRefund   = "REFUND"
-	AuditActionOverride = "OVERRIDE"
-	AuditActionLock     = "LOCK"
+	AuditActionCancel              = "CANCEL"
+	AuditActionRefund              = "REFUND"
+	AuditActionOverride            = "OVERRIDE"
+	AuditActionLock                = "LOCK"
+	AuditActionPaymentMethodChange = "PAYMENT_METHOD_CHANGE"
 )
 
 // Methods

@@ -16,6 +16,8 @@ type MenuCategoryRepository interface {
 	FindByName(ctx context.Context, name string) (*menu.MenuCategory, error)
 	Update(ctx context.Context, id primitive.ObjectID, category *menu.MenuCategory) error
 	Delete(ctx context.Context, id primitive.ObjectID) error
+	CountAll(ctx context.Context) (int64, error)
+	UpdateSortOrder(ctx context.Context, id primitive.ObjectID, sortOrder int) error
 }
 
 // MenuCategoryService handles menu category business logic
@@ -40,8 +42,14 @@ func (s *MenuCategoryService) CreateCategory(ctx context.Context, req *menu.Crea
 		return nil, fmt.Errorf("category with name '%s' already exists", req.Name)
 	}
 
+	count, err := s.categoryRepo.CountAll(ctx)
+	if err != nil {
+		count = 0
+	}
+
 	category := &menu.MenuCategory{
-		Name: req.Name,
+		Name:      req.Name,
+		SortOrder: int(count),
 	}
 
 	err = s.categoryRepo.Create(ctx, category)
@@ -50,6 +58,20 @@ func (s *MenuCategoryService) CreateCategory(ctx context.Context, req *menu.Crea
 	}
 
 	return category, nil
+}
+
+// ReorderCategories updates the sort order of multiple categories
+func (s *MenuCategoryService) ReorderCategories(ctx context.Context, req *menu.ReorderCategoriesRequest) error {
+	for _, order := range req.Orders {
+		id, err := primitive.ObjectIDFromHex(order.ID)
+		if err != nil {
+			return fmt.Errorf("invalid category id '%s': %w", order.ID, err)
+		}
+		if err := s.categoryRepo.UpdateSortOrder(ctx, id, order.SortOrder); err != nil {
+			return fmt.Errorf("failed to update sort order for '%s': %w", order.ID, err)
+		}
+	}
+	return nil
 }
 
 // GetAllCategories returns all menu categories

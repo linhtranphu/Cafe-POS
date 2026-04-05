@@ -19,5 +19,16 @@ export const menuCategoryService = {
   async deleteCategory(id) {
     const response = await api.delete(`/manager/menu-categories/${id}`)
     return response.data
+  },
+
+  async reorderCategories(orders) {
+    // orders: [{id, sort_order}, ...]
+    const response = await api.put('/manager/menu-categories/reorder', { orders })
+    return response.data
+  },
+
+  async getWaiterCategories() {
+    const response = await api.get('/waiter/menu-categories')
+    return response.data
   }
 }

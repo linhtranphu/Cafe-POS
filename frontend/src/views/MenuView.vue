@@ -179,7 +179,7 @@
                 <p class="text-xs mt-2">Loading: {{ categoriesLoading }}</p>
               </div>
               
-              <div v-for="cat in menuCategories" :key="cat.id" 
+              <div v-for="(cat, idx) in menuCategories" :key="cat.id"
                 class="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
                 <div class="flex items-center gap-3 flex-1 min-w-0">
                   <div class="w-12 h-12 rounded-lg flex items-center justify-center text-2xl flex-shrink-0" :class="getCategoryColor(cat.name)">
@@ -190,9 +190,19 @@
                     <div class="text-xs text-gray-500">{{ getMenuCountByCategory(cat.name) }} món</div>
                   </div>
                 </div>
-                <button @click="deleteCategory(cat.id, cat.name)" class="text-red-500 hover:text-red-700 p-2 flex-shrink-0 ml-2">
-                  🗑️
-                </button>
+                <div class="flex items-center gap-1 flex-shrink-0 ml-2">
+                  <button @click="moveCategoryUp(idx)" :disabled="idx === 0"
+                    class="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 disabled:opacity-30 active:bg-gray-200">
+                    ↑
+                  </button>
+                  <button @click="moveCategoryDown(idx)" :disabled="idx === menuCategories.length - 1"
+                    class="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 disabled:opacity-30 active:bg-gray-200">
+                    ↓
+                  </button>
+                  <button @click="deleteCategory(cat.id, cat.name)" class="text-red-500 hover:text-red-700 p-2">
+                    🗑️
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1720,6 +1730,31 @@ const addCategory = async () => {
   } catch (err) {
     console.error('Failed to create category:', err)
     alert('Lỗi: Không thể tạo danh mục. ' + (err.response?.data?.error || err.message))
+  }
+}
+
+const moveCategoryUp = async (idx) => {
+  if (idx === 0) return
+  const cats = [...menuCategories.value]
+  ;[cats[idx - 1], cats[idx]] = [cats[idx], cats[idx - 1]]
+  menuCategories.value = cats
+  await saveCategoryOrder()
+}
+
+const moveCategoryDown = async (idx) => {
+  if (idx === menuCategories.value.length - 1) return
+  const cats = [...menuCategories.value]
+  ;[cats[idx], cats[idx + 1]] = [cats[idx + 1], cats[idx]]
+  menuCategories.value = cats
+  await saveCategoryOrder()
+}
+
+const saveCategoryOrder = async () => {
+  try {
+    const orders = menuCategories.value.map((cat, i) => ({ id: cat.id, sort_order: i }))
+    await menuCategoryService.reorderCategories(orders)
+  } catch (err) {
+    console.error('Failed to save category order:', err)
   }
 }
 

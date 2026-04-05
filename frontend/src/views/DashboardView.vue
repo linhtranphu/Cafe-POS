@@ -363,12 +363,17 @@
                   <div class="text-4xl mb-2">📋</div>
                   <div class="font-bold">Orders</div>
                 </button>
-                <button @click="$router.push('/shifts')" 
+                <button @click="$router.push('/shifts')"
                   class="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
                   <div class="text-4xl mb-2">⏰</div>
                   <div class="font-bold">Ca làm</div>
                 </button>
-                
+                <button v-if="user?.role !== USER_ROLES.MANAGER" @click="$router.push('/schedule')"
+                  class="bg-gradient-to-br from-indigo-500 to-blue-600 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+                  <div class="text-4xl mb-2">📅</div>
+                  <div class="font-bold">Lịch ca</div>
+                </button>
+
                 <!-- Manager Actions -->
                 <button v-if="user?.role === USER_ROLES.MANAGER" @click="$router.push('/menu')" 
                   class="bg-gradient-to-br from-orange-500 to-red-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">

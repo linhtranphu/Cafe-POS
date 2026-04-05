@@ -19,117 +19,102 @@
       </div>
     </div>
 
-    <!-- Category Filter Buttons -->
-    <div class="bg-white border-b px-4 py-2 flex-shrink-0">
-      <div class="flex flex-wrap gap-2 mb-2">
+    <!-- 2-column layout: Category sidebar + Menu items -->
+    <div class="flex flex-1 overflow-hidden min-h-0">
+
+      <!-- Left: Category Sidebar -->
+      <div class="w-20 bg-white border-r flex-shrink-0 overflow-hidden">
         <button
           @click="selectedCategory = 'all'"
           :class="[
-            'py-2 px-4 rounded-xl text-sm font-semibold transition-all touch-manipulation active:scale-95',
+            'w-full py-3 px-1 flex flex-col items-center gap-1 transition-all touch-manipulation border-b border-gray-100',
             selectedCategory === 'all'
-              ? 'bg-blue-500 text-white shadow-md'
-              : 'bg-gray-100 text-gray-600 active:bg-gray-200'
+              ? 'bg-blue-50 border-l-4 border-l-blue-500'
+              : 'active:bg-gray-100'
           ]">
-          📋 Tất cả
+          <span :class="['text-xs font-semibold leading-tight text-center', selectedCategory === 'all' ? 'text-blue-600' : 'text-gray-600']">Tất cả</span>
         </button>
         <button
           v-for="cat in categories.filter(c => c.id !== 'all')" :key="cat.id"
           @click="selectedCategory = cat.id"
           :class="[
-            'py-2 px-4 rounded-xl text-sm font-semibold transition-all touch-manipulation active:scale-95',
+            'w-full py-3 px-1 flex flex-col items-center gap-1 transition-all touch-manipulation border-b border-gray-100',
             selectedCategory === cat.id
-              ? 'bg-blue-500 text-white shadow-md'
-              : 'bg-gray-100 text-gray-600 active:bg-gray-200'
+              ? 'bg-blue-50 border-l-4 border-l-blue-500'
+              : 'active:bg-gray-100'
           ]">
-          {{ cat.icon }} {{ cat.name }}
+          <span :class="['text-xs font-semibold leading-tight text-center', selectedCategory === cat.id ? 'text-blue-600' : 'text-gray-600']">{{ cat.name }}</span>
         </button>
       </div>
-      
-      <!-- Filter Selected Items Button -->
-      <button
-        v-if="totalItems > 0"
-        @click="showSelectedOnly = !showSelectedOnly"
-        :class="[
-          'w-full py-2 px-4 rounded-xl text-sm font-semibold transition-all touch-manipulation active:scale-95',
-          showSelectedOnly
-            ? 'bg-orange-500 text-white shadow-md'
-            : 'bg-orange-100 text-orange-700 active:bg-orange-200'
-        ]">
-        {{ showSelectedOnly ? '✓ Đang xem món đã chọn' : '🛒 Xem món đã chọn' }} ({{ totalItems }})
-      </button>
-    </div>
 
-    <!-- Menu Items -->
-    <div class="flex-1 overflow-y-auto bg-gray-50" 
-      :style="{ paddingBottom: '100px' }">
-      
-      <!-- Empty State -->
-      <div v-if="filteredGroupedItems.length === 0" class="text-center py-20">
-        <div class="text-6xl mb-3">🍽️</div>
-        <p class="text-gray-500 font-medium">Không có món nào</p>
-      </div>
+      <!-- Right: Menu Items (single column list) -->
+      <div class="flex-1 overflow-y-auto bg-gray-50" :style="{ paddingBottom: '100px' }">
 
-      <!-- Category Groups -->
-      <div v-for="group in filteredGroupedItems" :key="group.category.id" class="mb-6">
-        <!-- Category Header -->
-        <div class="sticky top-0 z-10 bg-gradient-to-b from-gray-50 to-gray-100 px-4 py-3 border-b-2 border-gray-200">
-          <div class="flex items-center gap-2">
-            <span class="text-3xl">{{ group.category.icon }}</span>
-            <span class="font-bold text-gray-800 text-xl">{{ group.category.name }}</span>
-            <span class="text-lg text-gray-500">({{ group.items.length }})</span>
-          </div>
+        <!-- Filter Selected Items Button -->
+        <div v-if="totalItems > 0" class="px-3 pt-2">
+          <button
+            @click="showSelectedOnly = !showSelectedOnly"
+            :class="[
+              'w-full py-2 px-3 rounded-xl text-xs font-semibold transition-all touch-manipulation active:scale-95',
+              showSelectedOnly
+                ? 'bg-orange-500 text-white shadow-md'
+                : 'bg-orange-100 text-orange-700 active:bg-orange-200'
+            ]">
+            {{ showSelectedOnly ? '✓ Đang xem món đã chọn' : '🛒 Xem món đã chọn' }} ({{ totalItems }})
+          </button>
         </div>
 
-        <!-- Items Grid -->
-        <div class="grid grid-cols-2 gap-3 px-4 py-3">
-          <template v-for="item in group.items" :key="item.id">
-            <!-- Single-size item -->
-            <div v-if="!item.has_variants"
-              :class="[
-                'rounded-2xl p-4 shadow-sm transition-all flex flex-col',
-                getItemQty(item.id) > 0 
-                  ? 'border-2 border-orange-400 bg-orange-100 shadow-md' 
-                  : 'bg-white border border-gray-200'
-              ]">
-              <div class="flex-1 mb-3">
-                <h3 class="font-bold text-gray-900 mb-2 line-clamp-2 min-h-[2.5rem] leading-tight text-lg">
-                  {{ item.name }}
-                </h3>
-                <p class="text-xs font-bold text-blue-600">
-                  {{ formatPrice(item.price) }}
-                </p>
-              </div>
+        <!-- Empty State -->
+        <div v-if="filteredGroupedItems.length === 0" class="text-center py-20">
+          <div class="text-6xl mb-3">🍽️</div>
+          <p class="text-gray-500 font-medium">Không có món nào</p>
+        </div>
 
-              <div class="mt-auto">
-                <button v-if="getItemQty(item.id) === 0"
-                  @click="addItem(item.id)"
-                  class="w-full py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold rounded-xl active:from-blue-600 active:to-blue-700 active:scale-95 transition-all shadow-sm text-2xl">
-                  +
-                </button>
+        <!-- Category Groups -->
+        <div v-for="group in filteredGroupedItems" :key="group.category.id" class="mb-4">
+          <!-- Category Header (only show when viewing all) -->
+          <div v-if="selectedCategory === 'all'"
+            class="sticky top-0 z-10 bg-gray-100 px-3 py-2 border-b border-gray-200 flex items-center gap-2">
+            <span class="text-xl">{{ group.category.icon }}</span>
+            <span class="font-bold text-gray-700 text-sm">{{ group.category.name }}</span>
+            <span class="text-xs text-gray-400">({{ group.items.length }})</span>
+          </div>
 
-                <div v-else class="space-y-2">
-                  <!-- +/- buttons right under price -->
-                  <div class="flex gap-2">
-                    <button @click="addItem(item.id)"
-                      class="flex-1 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg text-xl font-bold active:from-blue-600 active:to-blue-700 active:scale-95 transition-all shadow-md">
-                      +
-                    </button>
-                    <button @click="removeItem(item.id)"
-                      class="flex-1 py-2 bg-white border-2 border-red-500 text-red-600 rounded-lg text-xl font-bold active:bg-red-50 active:scale-95 transition-all shadow-sm">
+          <!-- Item Rows -->
+          <div class="px-3 py-2 space-y-2">
+            <template v-for="item in group.items" :key="item.id">
+
+              <!-- Single-size item row -->
+              <div v-if="!item.has_variants"
+                :class="[
+                  'rounded-xl px-4 py-3 shadow-sm border transition-all',
+                  getItemQty(item.id) > 0
+                    ? 'border-orange-400 bg-orange-50 shadow-md'
+                    : 'bg-white border-gray-200'
+                ]">
+                <div class="flex items-center gap-3">
+                  <div class="flex-1 min-w-0">
+                    <p class="font-bold text-gray-900 text-sm leading-tight">{{ item.name }}</p>
+                    <p class="text-xs font-bold text-blue-600 mt-0.5">{{ formatPrice(item.price) }}</p>
+                  </div>
+                  <div class="flex items-center gap-2 flex-shrink-0">
+                    <button v-if="getItemQty(item.id) > 0"
+                      @click="removeItem(item.id)"
+                      class="w-8 h-8 bg-white border-2 border-red-400 text-red-500 rounded-lg text-lg font-bold active:bg-red-50 active:scale-95 transition-all flex items-center justify-center">
                       −
                     </button>
-                  </div>
-                  
-                  <!-- Quantity display with note icon -->
-                  <div class="flex items-center gap-2">
-                    <div class="flex-1 text-center py-1 bg-blue-50 rounded-lg">
-                      <span class="text-base font-bold text-blue-600">
-                        Số lượng: {{ getItemQty(item.id) }}
-                      </span>
-                    </div>
-                    <button @click="toggleNoteInput(item.id)"
+                    <span v-if="getItemQty(item.id) > 0"
+                      class="w-6 text-center font-bold text-blue-600 text-sm">
+                      {{ getItemQty(item.id) }}
+                    </span>
+                    <button @click="addItem(item.id)"
+                      class="w-8 h-8 bg-blue-500 text-white rounded-lg text-lg font-bold active:bg-blue-600 active:scale-95 transition-all flex items-center justify-center">
+                      +
+                    </button>
+                    <button v-if="getItemQty(item.id) > 0"
+                      @click="toggleNoteInput(item.id)"
                       :class="[
-                        'p-2 rounded-lg transition-all active:scale-95',
+                        'w-8 h-8 rounded-lg transition-all active:scale-95 flex items-center justify-center text-sm',
                         getItemNote(item.id) || showNoteInput[item.id]
                           ? 'bg-amber-500 text-white'
                           : 'bg-gray-200 text-gray-600'
@@ -137,102 +122,71 @@
                       📝
                     </button>
                   </div>
-                  
-                  <!-- Note input -->
-                  <div v-if="showNoteInput[item.id]" class="pt-2 border-t border-gray-200">
-                    <textarea v-model="itemNotes[item.id]"
-                      placeholder="Ghi chú cho món này..."
-                      rows="2"
-                      class="w-full px-3 py-2 rounded-lg border-2 border-amber-300 bg-amber-50 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 resize-none"></textarea>
-                  </div>
                 </div>
-              </div>
-            </div>
-
-            <!-- Multi-size item -->
-            <div v-else
-              :class="[
-                'rounded-2xl p-4 shadow-sm transition-all flex flex-col',
-                getItemQtyWithVariants(item.id) > 0 
-                  ? 'border-2 border-orange-400 bg-orange-100 shadow-md' 
-                  : 'bg-white border border-gray-200'
-              ]">
-              <div class="mb-3">
-                <h3 class="font-bold text-gray-900 mb-2 line-clamp-2 min-h-[2.5rem] leading-tight text-lg">
-                  {{ item.name }}
-                </h3>
-              </div>
-
-              <div class="space-y-3 flex-1">
-                <div v-for="variant in item.variants" :key="variant.id" class="space-y-2">
-                  <div class="flex items-center justify-between gap-2">
-                    <div class="flex-1">
-                      <p class="text-base font-semibold text-gray-700">{{ variant.name }}</p>
-                      <p class="text-xs font-bold text-blue-600">{{ formatPrice(variant.price) }}</p>
-                    </div>
-                    
-                    <div v-if="getItemQty(item.id, variant.id) === 0">
-                      <button @click="addItem(item.id, variant.id)"
-                        class="px-4 py-2 bg-blue-500 text-white text-xl font-bold rounded-lg active:bg-blue-600 active:scale-95 transition-all">
-                        +
-                      </button>
-                    </div>
-                    <div v-else class="flex items-center gap-2">
-                      <span class="text-base font-bold text-blue-600">
-                        {{ getItemQty(item.id, variant.id) }}
-                      </span>
-                      <button @click="toggleNoteInput(item.id, variant.id)"
-                        :class="[
-                          'p-1.5 rounded-lg transition-all active:scale-95 text-sm',
-                          getItemNote(item.id, variant.id) || showNoteInput[`${item.id}_${variant.id}`]
-                            ? 'bg-amber-500 text-white'
-                            : 'bg-gray-200 text-gray-600'
-                        ]">
-                        📝
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <!-- Note input for variant -->
-                  <div v-if="showNoteInput[`${item.id}_${variant.id}`]" class="pt-2 border-t border-gray-200">
-                    <textarea v-model="itemNotes[`${item.id}_${variant.id}`]"
-                      placeholder="Ghi chú cho size này..."
-                      rows="2"
-                      class="w-full px-3 py-2 rounded-lg border-2 border-amber-300 bg-amber-50 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 resize-none"></textarea>
-                  </div>
-                  
-                  <!-- +/- buttons for variant (only show when qty > 0) -->
-                  <div v-if="getItemQty(item.id, variant.id) > 0" class="flex gap-2">
-                    <button @click="addItem(item.id, variant.id)"
-                      class="flex-1 py-2 bg-blue-500 text-white rounded-lg text-xl font-bold active:bg-blue-600 active:scale-95 transition-all">
-                      +
-                    </button>
-                    <button @click="removeItem(item.id, variant.id)"
-                      class="flex-1 py-2 bg-white border-2 border-red-500 text-red-600 rounded-lg text-xl font-bold active:bg-red-50 active:scale-95 transition-all">
-                      −
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div v-if="getItemQtyWithVariants(item.id) > 0" 
-                class="mt-3 pt-3 border-t border-gray-200">
-                <div class="text-center mb-2">
-                  <span class="text-xs font-bold text-blue-600">
-                    🛒 {{ getItemQtyWithVariants(item.id) }} món
-                  </span>
-                </div>
-                
-                <!-- Note input at bottom for multi-variant item -->
-                <div v-if="showNoteInput[item.id]" class="mt-2">
+                <!-- Note input -->
+                <div v-if="showNoteInput[item.id]" class="mt-2 pt-2 border-t border-gray-200">
                   <textarea v-model="itemNotes[item.id]"
-                    placeholder="Ghi chú chung cho món này..."
+                    placeholder="Ghi chú cho món này..."
                     rows="2"
                     class="w-full px-3 py-2 rounded-lg border-2 border-amber-300 bg-amber-50 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 resize-none"></textarea>
                 </div>
               </div>
-            </div>
-          </template>
+
+              <!-- Multi-size item row -->
+              <div v-else
+                :class="[
+                  'rounded-xl px-4 py-3 shadow-sm border transition-all',
+                  getItemQtyWithVariants(item.id) > 0
+                    ? 'border-orange-400 bg-orange-50 shadow-md'
+                    : 'bg-white border-gray-200'
+                ]">
+                <p class="font-bold text-gray-900 text-sm mb-2">{{ item.name }}</p>
+                <div class="space-y-2">
+                  <div v-for="variant in item.variants" :key="variant.id">
+                    <div class="flex items-center gap-3">
+                      <div class="flex-1 min-w-0">
+                        <span class="text-sm text-gray-700 font-medium">{{ variant.name }}</span>
+                        <span class="text-xs font-bold text-blue-600 ml-2">{{ formatPrice(variant.price) }}</span>
+                      </div>
+                      <div class="flex items-center gap-2 flex-shrink-0">
+                        <button v-if="getItemQty(item.id, variant.id) > 0"
+                          @click="removeItem(item.id, variant.id)"
+                          class="w-8 h-8 bg-white border-2 border-red-400 text-red-500 rounded-lg text-lg font-bold active:bg-red-50 active:scale-95 transition-all flex items-center justify-center">
+                          −
+                        </button>
+                        <span v-if="getItemQty(item.id, variant.id) > 0"
+                          class="w-6 text-center font-bold text-blue-600 text-sm">
+                          {{ getItemQty(item.id, variant.id) }}
+                        </span>
+                        <button @click="addItem(item.id, variant.id)"
+                          class="w-8 h-8 bg-blue-500 text-white rounded-lg text-lg font-bold active:bg-blue-600 active:scale-95 transition-all flex items-center justify-center">
+                          +
+                        </button>
+                        <button v-if="getItemQty(item.id, variant.id) > 0"
+                          @click="toggleNoteInput(item.id, variant.id)"
+                          :class="[
+                            'w-8 h-8 rounded-lg transition-all active:scale-95 flex items-center justify-center text-sm',
+                            getItemNote(item.id, variant.id) || showNoteInput[`${item.id}_${variant.id}`]
+                              ? 'bg-amber-500 text-white'
+                              : 'bg-gray-200 text-gray-600'
+                          ]">
+                          📝
+                        </button>
+                      </div>
+                    </div>
+                    <!-- Note input for variant -->
+                    <div v-if="showNoteInput[`${item.id}_${variant.id}`]" class="mt-2 pt-2 border-t border-gray-200">
+                      <textarea v-model="itemNotes[`${item.id}_${variant.id}`]"
+                        placeholder="Ghi chú cho size này..."
+                        rows="2"
+                        class="w-full px-3 py-2 rounded-lg border-2 border-amber-300 bg-amber-50 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 resize-none"></textarea>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </template>
+          </div>
         </div>
       </div>
     </div>
@@ -349,6 +303,7 @@ import { useRouter } from 'vue-router'
 import { useOrderStore } from '../stores/order'
 import { useShiftStore } from '../stores/shift'
 import { useMenuStore } from '../stores/menu'
+import { menuCategoryService } from '../services/menuCategory'
 import BottomNav from '../components/BottomNav.vue'
 
 const router = useRouter()
@@ -359,6 +314,7 @@ const menuStore = useMenuStore()
 // State
 const cart = ref({})
 const selectedCategory = ref('all')
+const categoryOrder = ref([]) // ordered list of category names from API
 const showSelectedOnly = ref(false)
 const itemNotes = ref({})
 const showNoteInput = ref({})
@@ -387,31 +343,25 @@ const sugarLevels = [
 const menuItems = computed(() => menuStore.items)
 
 const categories = computed(() => {
-  const allCategory = { id: 'all', name: 'Tất cả', icon: '📋' }
-  
+  const allCategory = { id: 'all', name: 'Tất cả' }
+
   if (!menuItems.value || menuItems.value.length === 0) {
     return [allCategory]
   }
-  
-  const uniqueCategories = [...new Set(menuItems.value.map(item => item.category))]
-  
-  const categoryIcons = {
-    'Cà phê': '☕',
-    'Trà': '🍵',
-    'Nước ép': '🧃',
-    'Bánh ngọt': '🍰',
-    'Món nhẹ': '🍴',
-    'Sinh tố': '🥤',
-    'Đồ uống khác': '🥛'
+
+  const uniqueNames = new Set(menuItems.value.map(item => item.category))
+
+  let ordered
+  if (categoryOrder.value.length > 0) {
+    // Sort by manager-defined order, append any unknown categories at the end
+    const known = categoryOrder.value.filter(name => uniqueNames.has(name))
+    const unknown = [...uniqueNames].filter(name => !categoryOrder.value.includes(name))
+    ordered = [...known, ...unknown]
+  } else {
+    ordered = [...uniqueNames]
   }
-  
-  const menuCategories = uniqueCategories.map(cat => ({
-    id: cat,
-    name: cat,
-    icon: categoryIcons[cat] || '🍽️'
-  }))
-  
-  return [allCategory, ...menuCategories]
+
+  return [allCategory, ...ordered.map(name => ({ id: name, name }))]
 })
 
 const groupedItems = computed(() => {
@@ -650,9 +600,18 @@ const finalizeOrder = async () => {
 onMounted(async () => {
   await Promise.all([
     shiftStore.fetchCurrentShift(),
-    menuStore.fetchMenuItems()
+    menuStore.fetchMenuItems(),
+    (async () => {
+      try {
+        const res = await menuCategoryService.getWaiterCategories()
+        const cats = Array.isArray(res) ? res : (res?.data || [])
+        categoryOrder.value = cats.map(c => c.name)
+      } catch (e) {
+        // fallback: no predefined order
+      }
+    })()
   ])
-  
+
   if (!shiftStore.hasOpenShift) {
     alert('Vui lòng mở ca làm việc trước')
     router.push('/shifts')

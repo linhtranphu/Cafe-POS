@@ -93,6 +93,23 @@ func (h *MenuCategoryHandler) UpdateCategory(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": category})
 }
 
+// ReorderCategories updates the sort order of categories
+// PUT /api/manager/menu-categories/reorder
+func (h *MenuCategoryHandler) ReorderCategories(c *gin.Context) {
+	var req menu.ReorderCategoriesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.categoryService.ReorderCategories(c.Request.Context(), &req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "categories reordered successfully"})
+}
+
 // DeleteCategory deletes a menu category
 // DELETE /api/manager/menu-categories/:id
 func (h *MenuCategoryHandler) DeleteCategory(c *gin.Context) {

@@ -186,6 +186,20 @@ export const useCashierStore = defineStore('cashier', {
       }
     },
 
+    async changePaymentMethod(orderId, paymentMethod) {
+      this.loading = true
+      this.error = null
+      try {
+        await cashierService.changePaymentMethod(orderId, paymentMethod)
+        return true
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Failed to change payment method'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
     // FR-CASH-09: Khóa order
     async lockOrder(orderId) {
       this.loading = true

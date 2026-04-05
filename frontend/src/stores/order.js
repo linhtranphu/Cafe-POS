@@ -108,6 +108,17 @@ export const useOrderStore = defineStore('order', {
       }
     },
 
+    async changePaymentMethod(id, paymentMethod) {
+      this.error = null
+      try {
+        await orderService.changePaymentMethod(id, paymentMethod)
+        await this.fetchOrders()
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi sửa HTTT'
+        throw error
+      }
+    },
+
     async printTemporaryBill(id) {
       this.error = null
       try {

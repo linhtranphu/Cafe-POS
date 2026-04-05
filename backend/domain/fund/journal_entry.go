@@ -28,9 +28,10 @@ const (
 	EventFundTransfer      JournalEventType = "fund_transfer"
 	EventManagerDeposit    JournalEventType = "manager_deposit"    // Nạp tiền từ ngoài vào quỹ
 	EventManagerWithdrawal JournalEventType = "manager_withdrawal" // Rút tiền từ quỹ ra ngoài
-	EventExpense           JournalEventType = "expense"            // Chi tiêu từ quỹ vận hành
-	EventIngredientRestock JournalEventType = "ingredient_restock" // Mua nguyên liệu từ quỹ hàng hóa
-	EventFacilityPurchase  JournalEventType = "facility_purchase"  // Mua tài sản từ quỹ hàng hóa
+	EventExpense                  JournalEventType = "expense"                    // Chi tiêu từ quỹ vận hành
+	EventIngredientRestock        JournalEventType = "ingredient_restock"         // Mua nguyên liệu từ quỹ hàng hóa
+	EventFacilityPurchase         JournalEventType = "facility_purchase"          // Mua tài sản từ quỹ hàng hóa
+	EventOrderPaymentCorrection   JournalEventType = "order_payment_correction"   // Sửa phương thức thanh toán
 )
 
 // LedgerLine is one side of a double-entry journal entry

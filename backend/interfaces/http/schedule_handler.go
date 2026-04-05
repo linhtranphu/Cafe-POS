@@ -113,6 +113,26 @@ func (h *ScheduleHandler) GetPeriods(c *gin.Context) {
 	c.JSON(http.StatusOK, list)
 }
 
+func (h *ScheduleHandler) UpdatePeriodMaxHoursPercent(c *gin.Context) {
+	id, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	var body struct {
+		MaxHoursPercent float64 `json:"max_hours_percent"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.svc.UpdatePeriodMaxHoursPercent(c.Request.Context(), id, body.MaxHoursPercent); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "ok"})
+}
+
 func (h *ScheduleHandler) SetPeriodStatus(c *gin.Context) {
 	id, err := primitive.ObjectIDFromHex(c.Param("id"))
 	if err != nil {

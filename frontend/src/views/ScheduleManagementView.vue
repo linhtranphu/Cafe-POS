@@ -273,6 +273,12 @@
               </button>
               <button
                 v-if="p.status !== 'cancelled'"
+                @click="openMaxHoursModal(p)"
+                class="py-2 px-3 rounded-xl bg-indigo-50 text-indigo-600 text-sm font-semibold active:bg-indigo-100 touch-manipulation whitespace-nowrap">
+                % Giờ{{ p.max_hours_percent > 0 ? `: ${p.max_hours_percent}%` : '' }}
+              </button>
+              <button
+                v-if="p.status !== 'cancelled'"
                 @click="selectPeriod(p)"
                 class="flex-1 py-2 rounded-xl bg-gray-100 text-gray-700 text-sm font-semibold active:bg-gray-200 touch-manipulation">
                 {{ selectedPeriod?.id === p.id ? 'Ẩn ca' : 'Xem & thêm ca' }}
@@ -745,6 +751,41 @@
       </div>
     </div>
 
+    <!-- ── Max Hours Percent Modal ── -->
+    <div v-if="showMaxHoursModal"
+      class="fixed inset-0 z-50 flex items-end justify-center bg-black bg-opacity-40"
+      @click.self="showMaxHoursModal = false">
+      <div class="bg-white rounded-t-3xl w-full max-w-lg p-6 pb-8">
+        <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+        <h3 class="text-xl font-bold text-gray-900 mb-1">Điều chỉnh % giờ đăng ký</h3>
+        <p class="text-xs text-gray-400 mb-5">Mỗi nhân viên không được đăng ký vượt quá X% tổng số giờ của kỳ. Đặt 0 = không giới hạn.</p>
+
+        <div class="flex items-center gap-3 mb-2">
+          <input type="number" v-model.number="maxHoursForm.percent"
+            min="0" max="100" step="5"
+            class="w-28 px-4 py-3 border border-gray-200 rounded-xl text-2xl font-bold text-center focus:border-indigo-400 focus:outline-none" />
+          <span class="text-gray-500 text-lg font-semibold">% tổng giờ kỳ</span>
+        </div>
+        <p v-if="maxHoursForm.percent > 0" class="text-xs text-indigo-600 mb-4">
+          Tối đa {{ maxHoursForm.percent }}% số giờ trong kỳ mỗi nhân viên.
+        </p>
+        <p v-else class="text-xs text-gray-400 mb-4">Không giới hạn giờ đăng ký.</p>
+
+        <p v-if="maxHoursError" class="text-red-500 text-sm mb-3">{{ maxHoursError }}</p>
+
+        <div class="flex gap-3">
+          <button @click="showMaxHoursModal = false"
+            class="flex-1 py-3 rounded-xl border border-gray-200 text-gray-700 font-semibold active:bg-gray-50 touch-manipulation">
+            Hủy
+          </button>
+          <button @click="saveMaxHoursPercent" :disabled="savingMaxHours"
+            class="flex-1 py-3 rounded-xl bg-indigo-500 text-white font-semibold active:bg-indigo-600 touch-manipulation disabled:opacity-50">
+            {{ savingMaxHours ? 'Đang lưu...' : 'Lưu' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <BottomNav />
   </div>
 </template>
@@ -1025,6 +1066,34 @@ async function cancelReg(p, sl, reg) {
     await scheduleApi.cancelRegistration(reg.id)
     await loadPeriodDetail(p.id)
   } catch (e) { alert(e.response?.data?.error || e.message) }
+}
+
+// ── Max Hours Percent ───────────────────────────────────
+const showMaxHoursModal = ref(false)
+const maxHoursForm = ref({ percent: 0 })
+const maxHoursError = ref('')
+const savingMaxHours = ref(false)
+let maxHoursPeriod = null
+
+function openMaxHoursModal(p) {
+  maxHoursPeriod = p
+  maxHoursForm.value = { percent: p.max_hours_percent || 0 }
+  maxHoursError.value = ''
+  showMaxHoursModal.value = true
+}
+
+async function saveMaxHoursPercent() {
+  maxHoursError.value = ''
+  savingMaxHours.value = true
+  try {
+    await scheduleApi.updatePeriodMaxHoursPercent(maxHoursPeriod.id, maxHoursForm.value.percent)
+    showMaxHoursModal.value = false
+    await loadPeriods()
+  } catch (e) {
+    maxHoursError.value = e.response?.data?.error || e.message
+  } finally {
+    savingMaxHours.value = false
+  }
 }
 
 // ── Weekly slot creation ────────────────────────────────

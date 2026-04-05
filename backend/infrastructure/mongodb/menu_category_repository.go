@@ -33,7 +33,7 @@ func (r *MenuCategoryRepository) Create(ctx context.Context, category *menu.Menu
 }
 
 func (r *MenuCategoryRepository) FindAll(ctx context.Context) ([]*menu.MenuCategory, error) {
-	opts := options.Find().SetSort(bson.D{{"name", 1}})
+	opts := options.Find().SetSort(bson.D{{Key: "sort_order", Value: 1}, {Key: "name", Value: 1}})
 	cursor, err := r.collection.Find(ctx, bson.M{}, opts)
 	if err != nil {
 		return nil, err
@@ -45,6 +45,19 @@ func (r *MenuCategoryRepository) FindAll(ctx context.Context) ([]*menu.MenuCateg
 		return nil, err
 	}
 	return categories, nil
+}
+
+func (r *MenuCategoryRepository) CountAll(ctx context.Context) (int64, error) {
+	return r.collection.CountDocuments(ctx, bson.M{})
+}
+
+func (r *MenuCategoryRepository) UpdateSortOrder(ctx context.Context, id primitive.ObjectID, sortOrder int) error {
+	_, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"_id": id},
+		bson.M{"$set": bson.M{"sort_order": sortOrder, "updated_at": time.Now()}},
+	)
+	return err
 }
 
 func (r *MenuCategoryRepository) FindByID(ctx context.Context, id primitive.ObjectID) (*menu.MenuCategory, error) {

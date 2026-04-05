@@ -74,8 +74,6 @@ const navItems = computed(() => {
     { path: '/dashboard', icon: '🏠', label: 'Trang chủ' },
     { path: '/create-order', icon: '➕', label: 'Tạo order' },
     { path: '/orders', icon: '📋', label: 'Orders' },
-    { path: '/schedule', icon: '📅', label: 'Lịch ca' },
-    { path: '/shifts', icon: '⏰', label: 'Ca làm' },
     { path: '/profile', icon: '👤', label: 'Cá nhân' }
   ]
 })

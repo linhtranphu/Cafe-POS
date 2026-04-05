@@ -384,10 +384,15 @@
                 class="w-full bg-red-100 text-red-600 py-3 rounded-xl font-medium text-center text-sm">
                 🔒 Order đã in tem – chỉ cashier mới được hủy
               </div>
-              <button v-if="isStatus(selectedOrder, ORDER_STATUS.PAID) && selectedOrder.amount_due <= 0" 
+              <button v-if="isStatus(selectedOrder, ORDER_STATUS.PAID) && selectedOrder.amount_due <= 0"
                 @click="sendToBar(selectedOrder.id)"
                 class="w-full bg-blue-500 text-white py-3 rounded-xl font-medium active:bg-blue-600">
                 🍹 Gửi quầy bar
+              </button>
+              <button v-if="isStatus(selectedOrder, ORDER_STATUS.PAID)"
+                @click="openChangePaymentMethod(selectedOrder)"
+                class="w-full bg-indigo-500 text-white py-3 rounded-xl font-medium active:bg-indigo-600">
+                💳 Sửa hình thức thanh toán
               </button>
               <button v-if="isStatus(selectedOrder, ORDER_STATUS.READY)" 
                 @click="serveOrder(selectedOrder.id)"
@@ -539,6 +544,52 @@
         </div>
       </div>
     </transition>
+
+    <!-- Change Payment Method Modal -->
+    <transition name="slide-up">
+      <div v-if="showChangePaymentModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
+        <div class="bg-white rounded-t-3xl w-full p-6">
+          <h3 class="text-xl font-bold mb-2">💳 Sửa hình thức thanh toán</h3>
+          <p class="text-sm text-gray-600 mb-4">
+            Order <strong>#{{ changePaymentOrder?.order_number }}</strong>
+            - {{ formatPrice(changePaymentOrder?.total) }}
+            - Hiện tại: <span class="font-semibold">{{ getPaymentMethodLabel(changePaymentOrder?.payment_method) }}</span>
+          </p>
+          <div class="grid grid-cols-3 gap-3 mb-6">
+            <button
+              v-for="method in changePaymentMethods"
+              :key="method.value"
+              @click="newPaymentMethod = method.value"
+              :disabled="method.value === changePaymentOrder?.payment_method"
+              :class="[
+                'py-4 rounded-xl font-semibold text-sm border-2 transition-all touch-manipulation',
+                newPaymentMethod === method.value
+                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                  : method.value === changePaymentOrder?.payment_method
+                    ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                    : 'border-gray-200 bg-white text-gray-700 active:bg-gray-50'
+              ]"
+            >
+              <div class="text-2xl mb-1">{{ method.icon }}</div>
+              <div>{{ method.label }}</div>
+              <div v-if="method.value === changePaymentOrder?.payment_method" class="text-xs mt-1 text-gray-400">(hiện tại)</div>
+            </button>
+          </div>
+          <div class="flex gap-2">
+            <button @click="showChangePaymentModal = false; newPaymentMethod = ''"
+              class="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-medium">
+              Quay lại
+            </button>
+            <button
+              @click="processChangePaymentMethod"
+              :disabled="!newPaymentMethod || newPaymentMethod === changePaymentOrder?.payment_method"
+              class="flex-1 bg-indigo-500 disabled:bg-gray-300 text-white py-3 rounded-xl font-medium">
+              Xác nhận sửa
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -585,6 +636,16 @@ const showMergeModal = ref(false)
 const showCancelModal = ref(false)
 const cancelReason = ref('')
 const cancelingOrder = ref(null)
+
+// Change Payment Method State
+const showChangePaymentModal = ref(false)
+const changePaymentOrder = ref(null)
+const newPaymentMethod = ref('')
+const changePaymentMethods = [
+  { value: 'CASH', label: 'Tiền mặt', icon: '💵' },
+  { value: 'TRANSFER', label: 'Chuyển khoản', icon: '🏦' },
+  { value: 'QR', label: 'QR Code', icon: '📱' },
+]
 
 // Reprint State
 const reprintingBill = ref(false)
@@ -854,6 +915,31 @@ const confirmCancelOrder = (order) => {
   cancelReason.value = ''
   showCancelModal.value = true
   selectedOrder.value = null
+}
+
+const openChangePaymentMethod = (order) => {
+  changePaymentOrder.value = order
+  newPaymentMethod.value = ''
+  showChangePaymentModal.value = true
+  selectedOrder.value = null
+}
+
+const getPaymentMethodLabel = (method) => {
+  if (!method) return ''
+  const m = changePaymentMethods.find(p => p.value === method?.toUpperCase())
+  return m ? m.label : method
+}
+
+const processChangePaymentMethod = async () => {
+  if (!newPaymentMethod.value || newPaymentMethod.value === changePaymentOrder.value?.payment_method) return
+  try {
+    await orderStore.changePaymentMethod(changePaymentOrder.value.id, newPaymentMethod.value)
+    showChangePaymentModal.value = false
+    newPaymentMethod.value = ''
+    alert('✅ Đã sửa hình thức thanh toán')
+  } catch (error) {
+    alert('❌ Lỗi: ' + (error.response?.data?.error || error.message))
+  }
 }
 
 const closeCancelModal = () => {

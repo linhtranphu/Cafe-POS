@@ -27,6 +27,7 @@ type SchedulePeriodRepository interface {
 	FindByID(ctx context.Context, id primitive.ObjectID) (*schedule.SchedulePeriod, error)
 	FindOpenOrPublished(ctx context.Context) (*schedule.SchedulePeriod, error)
 	UpdateStatus(ctx context.Context, id primitive.ObjectID, status schedule.PeriodStatus) error
+	UpdateMaxHoursPercent(ctx context.Context, id primitive.ObjectID, percent float64) error
 }
 
 type ScheduleSlotRepository interface {
@@ -236,6 +237,20 @@ func (s *ScheduleService) SetPeriodStatus(ctx context.Context, id primitive.Obje
 
 func (s *ScheduleService) GetCurrentPeriod(ctx context.Context) (*schedule.SchedulePeriod, error) {
 	return s.periods.FindOpenOrPublished(ctx)
+}
+
+func (s *ScheduleService) UpdatePeriodMaxHoursPercent(ctx context.Context, id primitive.ObjectID, percent float64) error {
+	p, err := s.periods.FindByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("không tìm thấy kỳ đăng ký")
+	}
+	if p.Status == schedule.PeriodStatusCancelled {
+		return fmt.Errorf("không thể chỉnh kỳ đã huỷ")
+	}
+	if percent < 0 || percent > 100 {
+		return fmt.Errorf("% giờ phải từ 0 đến 100")
+	}
+	return s.periods.UpdateMaxHoursPercent(ctx, id, percent)
 }
 
 // ─── Slot methods ─────────────────────────────────────────────────────────────

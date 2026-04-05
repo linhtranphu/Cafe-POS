@@ -39,6 +39,11 @@ export const setPeriodStatus = async (id, status) => {
   return res.data
 }
 
+export const updatePeriodMaxHoursPercent = async (id, maxHoursPercent) => {
+  const res = await api.patch(`/manager/schedule/periods/${id}/max-hours`, { max_hours_percent: maxHoursPercent })
+  return res.data
+}
+
 export const getPeriodDetail = async (id) => {
   const res = await api.get(`/manager/schedule/periods/${id}`)
   return res.data
