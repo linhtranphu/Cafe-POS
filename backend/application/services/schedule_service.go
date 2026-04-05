@@ -447,10 +447,6 @@ func (s *ScheduleService) Unregister(ctx context.Context, slotID primitive.Objec
 	if err := s.registrations.Cancel(ctx, reg.ID); err != nil {
 		return err
 	}
-	count, err := s.registrations.CountBySlot(ctx, slotID)
-	if err == nil && count == 0 {
-		_ = s.slots.Delete(ctx, slotID)
-	}
 	return nil
 }
 

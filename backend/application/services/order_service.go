@@ -725,6 +725,12 @@ func (s *OrderService) PrintTemporaryBill(ctx context.Context, id primitive.Obje
 		return nil, fmt.Errorf("can only print temporary bill for unpaid orders")
 	}
 
+	// Idempotency guard: if already printed, skip to avoid double printing
+	if o.BillPrinted {
+		log.Printf("[ORDER] Order %s already has bill_printed=true, skipping duplicate print", o.OrderNumber)
+		return o, nil
+	}
+
 	// Mark as bill printed
 	o.BillPrinted = true
 	o.UpdatedAt = time.Now()

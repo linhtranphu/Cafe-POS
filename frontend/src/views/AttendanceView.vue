@@ -295,37 +295,53 @@
           </button>
         </div>
 
-        <!-- Result -->
+        <!-- Result Report -->
         <div v-if="summaryData" class="flex-1 overflow-y-auto">
-          <!-- Total banner -->
-          <div class="flex items-center justify-between bg-violet-50 rounded-2xl px-4 py-3 mb-3">
-            <div>
-              <div class="font-bold text-violet-800 text-base">{{ summaryData.staff_name }}</div>
-              <div class="text-xs text-violet-500 mt-0.5">
-                {{ fmtDateShort(summaryForm.from) }} — {{ fmtDateShort(summaryForm.to) }}
-              </div>
+          <div class="border border-gray-200 rounded-2xl overflow-hidden">
+            <!-- Report header -->
+            <div class="bg-gradient-to-br from-violet-600 to-violet-500 px-4 py-4 text-white">
+              <div class="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-1">Báo cáo giờ công</div>
+              <div class="text-lg font-bold leading-tight">{{ summaryData.staff_name }}</div>
+              <div class="text-xs opacity-80 mt-1">{{ fmtDateShort(summaryForm.from) }} — {{ fmtDateShort(summaryForm.to) }}</div>
             </div>
-            <div :class="['text-2xl font-bold', summaryData.total_hours >= 0 ? 'text-green-600' : 'text-red-500']">
-              {{ summaryData.total_hours > 0 ? '+' : '' }}{{ summaryData.total_hours }}h
-            </div>
-          </div>
 
-          <!-- Entries table -->
-          <div v-if="!summaryData.entries.length" class="text-center py-6 text-gray-400 text-sm">
-            Không có giờ công nào trong khoảng thời gian này.
-          </div>
-          <div v-else class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-            <div v-for="(e, idx) in summaryData.entries" :key="e.id"
-              :class="['px-4 py-3 flex items-center justify-between', idx > 0 ? 'border-t border-gray-100' : '']">
-              <div class="flex-1 min-w-0">
-                <div class="text-sm font-semibold text-gray-800">
-                  {{ new Date(e.date + 'T12:00:00Z').toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit' }) }}
-                </div>
-                <div v-if="e.note" class="text-xs text-gray-400 mt-0.5 truncate">{{ e.note }}</div>
-              </div>
-              <span :class="['text-base font-bold ml-3 shrink-0', e.hours > 0 ? 'text-green-600' : 'text-red-500']">
-                {{ e.hours > 0 ? '+' : '' }}{{ e.hours }}h
+            <!-- Total row -->
+            <div class="flex items-center justify-between px-4 py-3 bg-violet-50 border-b border-violet-100">
+              <span class="text-xs font-bold text-violet-600 uppercase tracking-wide">Tổng giờ công</span>
+              <span :class="['text-2xl font-bold', summaryData.total_hours >= 0 ? 'text-green-600' : 'text-red-500']">
+                {{ summaryData.total_hours > 0 ? '+' : '' }}{{ summaryData.total_hours }}h
               </span>
+            </div>
+
+            <!-- Column header -->
+            <div class="grid grid-cols-[1fr_auto] px-4 py-2 bg-gray-50 border-b border-gray-100">
+              <span class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Ngày / Ghi chú</span>
+              <span class="text-[10px] font-bold uppercase tracking-widest text-gray-400 text-right">Giờ</span>
+            </div>
+
+            <!-- Entries -->
+            <div v-if="!summaryData.entries.length" class="text-center py-8 text-gray-400 text-sm">
+              Không có giờ công nào trong khoảng thời gian này.
+            </div>
+            <div v-else>
+              <div v-for="(e, idx) in summaryData.entries" :key="e.id"
+                :class="['grid grid-cols-[1fr_auto] gap-3 px-4 py-3 items-center', idx > 0 ? 'border-t border-gray-100' : '', idx % 2 === 1 ? 'bg-gray-50/60' : 'bg-white']">
+                <div class="min-w-0">
+                  <div class="text-sm font-semibold text-gray-800">{{ fmtDateShort(e.date.split('T')[0]) }}</div>
+                  <div v-if="e.note" class="text-xs text-gray-500 mt-0.5 truncate">{{ e.note }}</div>
+                </div>
+                <span :class="['text-sm font-bold shrink-0', e.hours > 0 ? 'text-green-600' : 'text-red-500']">
+                  {{ e.hours > 0 ? '+' : '' }}{{ e.hours }}h
+                </span>
+              </div>
+
+              <!-- Footer total -->
+              <div class="grid grid-cols-[1fr_auto] gap-3 px-4 py-3 bg-gray-50 border-t border-gray-200">
+                <span class="text-xs text-gray-500">{{ summaryData.entries.length }} mục</span>
+                <span :class="['text-sm font-bold', summaryData.total_hours >= 0 ? 'text-green-600' : 'text-red-500']">
+                  {{ summaryData.total_hours > 0 ? '+' : '' }}{{ summaryData.total_hours }}h
+                </span>
+              </div>
             </div>
           </div>
         </div>

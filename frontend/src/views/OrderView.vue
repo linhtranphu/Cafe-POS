@@ -227,10 +227,11 @@
 
           <!-- Quick Actions -->
           <div class="mt-3 flex gap-2">
-            <button v-if="isStatus(order, ORDER_STATUS.CREATED) && !order.bill_printed" 
+            <button v-if="isStatus(order, ORDER_STATUS.CREATED) && !order.bill_printed"
               @click.stop="printTempBill(order.id)"
-              class="flex-1 bg-amber-500 active:bg-amber-600 text-white py-3 rounded-xl text-sm font-semibold shadow-md touch-manipulation active:scale-98 transition-all">
-              📄 In bill tạm
+              :disabled="printingTempBill !== null"
+              class="flex-1 bg-amber-500 active:bg-amber-600 text-white py-3 rounded-xl text-sm font-semibold shadow-md touch-manipulation active:scale-98 transition-all disabled:opacity-50 disabled:pointer-events-none">
+              {{ printingTempBill === order.id ? '⏳ Đang in...' : '📄 In bill tạm' }}
             </button>
             <button v-if="isStatus(order, ORDER_STATUS.CREATED)" 
               @click.stop="quickPayment(order)"
@@ -360,10 +361,11 @@
 
             <!-- Actions -->
             <div class="space-y-2">
-              <button v-if="isStatus(selectedOrder, ORDER_STATUS.CREATED) && !selectedOrder.bill_printed" 
+              <button v-if="isStatus(selectedOrder, ORDER_STATUS.CREATED) && !selectedOrder.bill_printed"
                 @click="printTempBill(selectedOrder.id)"
-                class="w-full bg-amber-500 text-white py-3 rounded-xl font-medium active:bg-amber-600">
-                📄 In bill tạm
+                :disabled="printingTempBill !== null"
+                class="w-full bg-amber-500 text-white py-3 rounded-xl font-medium active:bg-amber-600 disabled:opacity-50 disabled:pointer-events-none">
+                {{ printingTempBill === selectedOrder.id ? '⏳ Đang in...' : '📄 In bill tạm' }}
               </button>
               <button v-if="isStatus(selectedOrder, ORDER_STATUS.CREATED)" 
                 @click="showPaymentModal(selectedOrder)"
@@ -650,6 +652,7 @@ const changePaymentMethods = [
 // Reprint State
 const reprintingBill = ref(false)
 const reprintingLabel = ref(null)
+const printingTempBill = ref(null) // orderId being printed, prevents double-tap
 
 // Check if user can reprint (only cashier and manager)
 const canReprint = computed(() => {
@@ -850,11 +853,15 @@ const viewOrderDetail = (order) => {
 }
 
 const printTempBill = async (orderId) => {
+  if (printingTempBill.value !== null) return
+  printingTempBill.value = orderId
   try {
     await orderStore.printTemporaryBill(orderId)
     alert('✅ Đã in tem thành công')
   } catch (error) {
     alert('❌ Lỗi: ' + error.message)
+  } finally {
+    printingTempBill.value = null
   }
 }
 
