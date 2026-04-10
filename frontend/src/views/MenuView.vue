@@ -1250,6 +1250,14 @@ const validateVariants = () => {
       if (variant.is_default) {
         hasDefault = true
       }
+      // Validate ingredient quantities
+      if (variant.ingredients && variant.ingredients.length > 0) {
+        variant.ingredients.forEach((ing, iIndex) => {
+          if (!ing.quantity || ing.quantity <= 0) {
+            errors.push(`Size ${index + 1} - Nguyên liệu "${ing.name || iIndex + 1}": Số lượng phải lớn hơn 0`)
+          }
+        })
+      }
     })
     
     // Must have exactly 1 default
@@ -1685,8 +1693,9 @@ const saveItem = async () => {
   }
   
   if (success) {
+    const wasEditing = !!editingItem.value
     cancelEdit()
-    alert(editingItem.value ? 'Cập nhật món thành công' : 'Thêm món thành công')
+    alert(wasEditing ? 'Cập nhật món thành công' : 'Thêm món thành công')
   } else {
     alert('Lỗi: ' + (menuStore.error || 'Có lỗi xảy ra'))
   }

@@ -48,6 +48,8 @@ func (g *TSPLGenerator) GenerateLabelCommands(data LabelData, templateContent st
 		return "", fmt.Errorf("failed to parse template: %w", err)
 	}
 
+	itemName := removeDiacritics(data.ItemName)
+	itemNameLines := splitLines(itemName, 20)
 	customerName := removeDiacritics(truncateText(data.CustomerName, 30))
 	customerNameLines := splitLines(customerName, 15)
 
@@ -55,7 +57,9 @@ func (g *TSPLGenerator) GenerateLabelCommands(data LabelData, templateContent st
 		"Width":             g.Width,
 		"Height":            g.Height,
 		"OrderNumber":       shortOrderNumber(data.OrderNumber),
-		"ItemName":          removeDiacritics(truncateText(data.ItemName, 20)),
+		"ItemName":          itemName,
+		"ItemNameLines":     itemNameLines,
+		"ItemNameLineCount": len(itemNameLines),
 		"Note":              removeDiacritics(truncateText(data.Note, 25)),
 		"Time":              data.Time,
 		"CustomerName":      customerName,

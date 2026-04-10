@@ -45,6 +45,7 @@ export const useMenuStore = defineStore('menu', {
     },
 
     async createMenuItem(item) {
+      this.error = null
       try {
         const newItem = await menuService.createMenuItem(item)
         this.items.push(newItem)

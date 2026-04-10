@@ -212,6 +212,39 @@ func (h *CashierHandler) GetDailyReport(c *gin.Context) {
 	c.JSON(http.StatusOK, report)
 }
 
+// GetRevenueReport returns revenue breakdown by day for a date range
+func (h *CashierHandler) GetRevenueReport(c *gin.Context) {
+	fromStr := c.Query("from")
+	toStr := c.Query("to")
+	if fromStr == "" || toStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Thiếu tham số from hoặc to (YYYY-MM-DD)"})
+		return
+	}
+
+	fromDate, err := time.Parse("2006-01-02", fromStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Định dạng from không hợp lệ. Dùng YYYY-MM-DD"})
+		return
+	}
+	toDate, err := time.Parse("2006-01-02", toStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Định dạng to không hợp lệ. Dùng YYYY-MM-DD"})
+		return
+	}
+	if toDate.Before(fromDate) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Ngày kết thúc phải sau ngày bắt đầu"})
+		return
+	}
+
+	report, err := h.reportService.GenerateRevenueReport(fromDate, toDate)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, report)
+}
+
 // Get audit trail for order
 func (h *CashierHandler) GetOrderAudits(c *gin.Context) {
 	orderID := c.Param("id")

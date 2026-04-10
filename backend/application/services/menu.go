@@ -177,7 +177,10 @@ func (s *MenuService) UpdateMenuItem(ctx context.Context, id primitive.ObjectID,
 				// Multi-size: update variants if provided
 				if len(req.Variants) > 0 {
 					item.Variants = req.Variants
-					
+					// Ensure root-level ingredients are cleared for multi-size items
+					item.Ingredients = nil
+					item.Price = 0
+
 					// Validate batch ingredients in variants
 					for _, variant := range req.Variants {
 						if err := s.validateBatchIngredients(ctx, variant.Ingredients); err != nil {
@@ -209,7 +212,10 @@ func (s *MenuService) UpdateMenuItem(ctx context.Context, id primitive.ObjectID,
 			// Multi-size: update variants if provided
 			if len(req.Variants) > 0 {
 				item.Variants = req.Variants
-				
+				// Ensure root-level ingredients are cleared for multi-size items
+				item.Ingredients = nil
+				item.Price = 0
+
 				// Validate batch ingredients in variants
 				for _, variant := range req.Variants {
 					if err := s.validateBatchIngredients(ctx, variant.Ingredients); err != nil {

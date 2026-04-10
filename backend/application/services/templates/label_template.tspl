@@ -4,16 +4,19 @@ DIRECTION 1
 CLS
 
 TEXT 10,10,"3",0,1,1,"#{{.OrderNumber}}"
-TEXT 10,50,"3",0,1,1,"{{.ItemName}}"
+{{- range $i, $line := .ItemNameLines}}
+TEXT 10,{{add 50 (mul $i 40)}},"3",0,1,1,"{{$line}}"
+{{- end}}
+{{- $baseY := add 50 (mul .ItemNameLineCount 40)}}
 {{- if .Note}}
-TEXT 10,90,"2",0,1,1,"({{.Note}})"
-TEXT 10,125,"2",0,1,1,"{{.Time}}  {{index .CustomerNameLines 0}}"
+TEXT 10,{{$baseY}},"2",0,1,1,"({{.Note}})"
+TEXT 10,{{add $baseY 35}},"2",0,1,1,"{{.Time}}  {{index .CustomerNameLines 0}}"
 {{- range $i, $line := .CustomerNameLines}}{{if gt $i 0}}
-TEXT 10,{{add 125 (mul $i 20)}},"2",0,1,1,"{{$line}}"{{end}}{{end}}
+TEXT 10,{{add (add $baseY 35) (mul $i 20)}},"2",0,1,1,"{{$line}}"{{end}}{{end}}
 {{- else}}
-TEXT 10,90,"2",0,1,1,"{{.Time}}  {{index .CustomerNameLines 0}}"
+TEXT 10,{{$baseY}},"2",0,1,1,"{{.Time}}  {{index .CustomerNameLines 0}}"
 {{- range $i, $line := .CustomerNameLines}}{{if gt $i 0}}
-TEXT 10,{{add 90 (mul $i 20)}},"2",0,1,1,"{{$line}}"{{end}}{{end}}
+TEXT 10,{{add $baseY (mul $i 20)}},"2",0,1,1,"{{$line}}"{{end}}{{end}}
 {{- end}}
 
 PRINT 1,1

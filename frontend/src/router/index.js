@@ -263,6 +263,12 @@ const routes = [
     component: () => import('../views/AttendanceView.vue'),
     meta: { requiresAuth: true, requiresManager: true }
   },
+  {
+    path: '/manager/attendance/summary',
+    name: 'AttendanceSummary',
+    component: () => import('../views/AttendanceSummaryView.vue'),
+    meta: { requiresAuth: true, requiresManager: true }
+  },
 ]
 
 const router = createRouter({

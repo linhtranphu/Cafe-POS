@@ -93,6 +93,36 @@
             {{ loading ? '⏳ Đang tạo...' : '✓ Tạo báo cáo ngày' }}
           </button>
         </div>
+
+        <!-- Revenue Range Report -->
+        <div class="bg-white rounded-2xl p-4 shadow-sm">
+          <h3 class="font-bold text-gray-800 mb-3">📈 Doanh thu theo khoảng thời gian</h3>
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <div>
+              <label class="text-xs text-gray-500 mb-1 block">Từ ngày</label>
+              <input
+                v-model="revenueFrom"
+                type="date"
+                class="w-full border-2 border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-500 appearance-none"
+              />
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 mb-1 block">Đến ngày</label>
+              <input
+                v-model="revenueTo"
+                type="date"
+                class="w-full border-2 border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-500 appearance-none"
+              />
+            </div>
+          </div>
+          <button
+            @click="generateRevenueReport"
+            :disabled="!revenueFrom || !revenueTo || loading"
+            class="w-full py-3 bg-orange-500 text-white rounded-xl font-medium active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {{ loading ? '⏳ Đang tạo...' : '✓ Xem doanh thu' }}
+          </button>
+        </div>
       </div>
 
       <!-- Current Report Display -->
@@ -133,6 +163,59 @@
             <div class="bg-purple-50 rounded-xl p-3 text-center">
               <div class="text-sm font-bold text-purple-600">{{ formatCompactPrice(currentReport.transfer_revenue + currentReport.qr_revenue) }}</div>
               <div class="text-xs text-gray-600">💳 Chuyển khoản</div>
+            </div>
+          </div>
+
+          <!-- Per-shift breakdown (only for daily report) -->
+          <div v-if="currentReport.shifts && currentReport.shifts.length > 0" class="space-y-2">
+            <h3 class="font-bold text-gray-800 text-sm">🔄 Chi tiết theo ca</h3>
+            <div class="space-y-2">
+              <div
+                v-for="s in currentReport.shifts"
+                :key="s.shift?.id"
+                class="border border-gray-100 rounded-xl overflow-hidden"
+              >
+                <!-- Shift header -->
+                <div class="flex justify-between items-center px-3 py-2 bg-gray-50">
+                  <div>
+                    <span class="font-medium text-gray-800 text-sm">{{ getShiftTypeText(s.shift?.type) }}</span>
+                    <span class="text-xs text-gray-500 ml-1">{{ s.shift?.user_name }}</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span :class="getShiftStatusClass(s.shift?.status)" class="text-[10px] px-2 py-0.5 rounded-full font-medium">
+                      {{ getShiftStatusText(s.shift?.status) }}
+                    </span>
+                    <span class="text-xs font-bold text-green-700">{{ formatCompactPrice(s.total_revenue) }}</span>
+                  </div>
+                </div>
+                <!-- Shift stats -->
+                <div class="px-3 py-2 flex justify-between items-center text-xs text-gray-600">
+                  <span>{{ s.total_orders }} đơn đã thanh toán</span>
+                  <span class="text-gray-400 text-[10px]">
+                    {{ s.shift?.started_at ? formatDate(s.shift.started_at) : '' }}
+                  </span>
+                </div>
+                <!-- Handover info for this shift -->
+                <div v-if="s.handover" class="px-3 py-2 border-t border-gray-50">
+                  <div class="text-[10px] font-medium text-gray-500 mb-1">Bàn giao ca</div>
+                  <div
+                    v-for="(entry, idx) in s.handover.entries"
+                    :key="idx"
+                    class="flex justify-between items-center text-xs"
+                  >
+                    <span class="text-gray-600">{{ entry.waiter_name }}</span>
+                    <div class="flex items-center gap-2">
+                      <span :class="getHandoverStatusClass(entry.status)" class="text-[10px] px-1.5 py-0.5 rounded-full font-medium">
+                        {{ getHandoverStatusText(entry.status) }}
+                      </span>
+                      <span class="text-gray-500">{{ formatCompactPrice(entry.cash_declared + entry.transfer_declared) }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="px-3 py-2 border-t border-gray-50 text-[10px] text-gray-400">
+                  Chưa bàn giao
+                </div>
+              </div>
             </div>
           </div>
 
@@ -296,6 +379,74 @@
         </div>
       </div>
 
+      <!-- Revenue Report Display -->
+      <div v-if="!currentReport && revenueReport" class="bg-white rounded-2xl p-4 shadow-sm mb-4">
+        <div class="flex justify-between items-center mb-4">
+          <div>
+            <h2 class="text-base font-bold text-gray-800">📈 Doanh thu</h2>
+            <p class="text-xs text-gray-500">{{ revenueReport.from_date }} → {{ revenueReport.to_date }}</p>
+          </div>
+          <button @click="revenueReport = null" class="text-gray-400 text-xl font-bold">×</button>
+        </div>
+
+        <!-- Summary -->
+        <div class="grid grid-cols-3 gap-2 mb-4">
+          <div class="bg-orange-50 rounded-xl p-3 text-center">
+            <div class="text-xs font-bold text-orange-600">{{ formatCompactPrice(revenueReport.total_revenue) }}</div>
+            <div class="text-[10px] text-gray-500">Doanh thu</div>
+          </div>
+          <div class="bg-blue-50 rounded-xl p-3 text-center">
+            <div class="text-sm font-bold text-blue-600">{{ revenueReport.total_orders }}</div>
+            <div class="text-[10px] text-gray-500">Đơn hàng</div>
+          </div>
+          <div class="bg-purple-50 rounded-xl p-3 text-center">
+            <div class="text-sm font-bold text-purple-600">{{ revenueReport.total_items }}</div>
+            <div class="text-[10px] text-gray-500">Ly nước</div>
+          </div>
+        </div>
+
+        <!-- Daily breakdown -->
+        <div class="space-y-3">
+          <div
+            v-for="day in revenueReport.days"
+            :key="day.date"
+            class="border border-gray-100 rounded-xl overflow-hidden"
+          >
+            <!-- Day header -->
+            <div class="flex justify-between items-center px-3 py-2 bg-gray-50">
+              <span class="font-bold text-gray-800 text-sm">{{ formatDateLabel(day.date) }}</span>
+              <div class="flex items-center gap-3 text-xs">
+                <span class="text-purple-600 font-medium">{{ day.total_items }} ly</span>
+                <span class="text-green-600 font-bold">{{ formatCompactPrice(day.total_revenue) }}</span>
+              </div>
+            </div>
+
+            <!-- No activity -->
+            <div v-if="!day.by_shift || day.by_shift.length === 0" class="px-3 py-2 text-xs text-gray-400 text-center">
+              Không có ca làm
+            </div>
+
+            <!-- Shifts breakdown -->
+            <div v-else class="divide-y divide-gray-50">
+              <div
+                v-for="shift in day.by_shift"
+                :key="shift.shift_id"
+                class="px-3 py-2 flex justify-between items-center"
+              >
+                <div>
+                  <span class="text-xs font-medium text-gray-700">{{ getShiftTypeText(shift.shift_type) }}</span>
+                  <span class="text-[10px] text-gray-400 ml-1">{{ shift.user_name }}</span>
+                </div>
+                <div class="flex items-center gap-3 text-xs text-right">
+                  <span class="text-gray-500">{{ shift.total_orders }} đơn · {{ shift.total_items }} ly</span>
+                  <span class="font-bold text-gray-800">{{ formatCompactPrice(shift.total_revenue) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Report History (only show when no current report) -->
       <div v-if="!currentReport" class="mb-4">
         <h2 class="text-base font-bold text-gray-800 mb-3">📚 Lịch sử báo cáo</h2>
@@ -348,6 +499,12 @@ const shiftStore = useShiftStore()
 const selectedShiftForReport = ref('')
 const selectedDate = ref(new Date().toISOString().split('T')[0])
 const currentReport = ref(null)
+const revenueReport = ref(null)
+
+const today = new Date().toISOString().split('T')[0]
+const sevenDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+const revenueFrom = ref(sevenDaysAgo)
+const revenueTo = ref(today)
 
 // Computed
 const loading = computed(() => cashierStore.loading)
@@ -374,6 +531,7 @@ const quickStats = computed(() => {
 const generateShiftReport = async () => {
   try {
     const report = await cashierStore.generateShiftReport(selectedShiftForReport.value)
+    revenueReport.value = null
     currentReport.value = {
       ...report,
       title: `Báo cáo ca ${report.shift?.type || 'N/A'}`
@@ -386,12 +544,22 @@ const generateShiftReport = async () => {
 const generateDailyReport = async () => {
   try {
     const report = await cashierStore.getDailyReport(selectedDate.value)
+    revenueReport.value = null
     currentReport.value = {
       ...report,
       title: `Báo cáo ngày ${formatDate(selectedDate.value)}`
     }
   } catch (error) {
     console.error('Generate daily report failed:', error)
+  }
+}
+
+const generateRevenueReport = async () => {
+  try {
+    const report = await cashierStore.getRevenueReport(revenueFrom.value, revenueTo.value)
+    revenueReport.value = report
+  } catch (error) {
+    console.error('Generate revenue report failed:', error)
   }
 }
 
@@ -518,11 +686,28 @@ const formatDateTime = (date) => {
 
 const getShiftTypeText = (type) => {
   const types = {
-    MORNING: '☀️ Ca sáng',
-    AFTERNOON: '🌤️ Ca chiều',
-    EVENING: '🌙 Ca tối'
+    MORNING: '☀️ Sáng',
+    AFTERNOON: '🌤️ Chiều',
+    EVENING: '🌙 Tối'
   }
   return types[type] || type
+}
+
+const getShiftStatusClass = (status) => {
+  return status === 'OPEN'
+    ? 'bg-green-100 text-green-700'
+    : 'bg-gray-100 text-gray-600'
+}
+
+const getShiftStatusText = (status) => {
+  return status === 'OPEN' ? '🟢 Đang mở' : '✅ Đã đóng'
+}
+
+const formatDateLabel = (dateStr) => {
+  const date = new Date(dateStr + 'T00:00:00')
+  const weekdays = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
+  const wd = weekdays[date.getDay()]
+  return `${wd}, ${date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}`
 }
 
 const getPercentage = (value, total) => {

@@ -32,7 +32,7 @@
           class="flex-1 py-3 rounded-2xl bg-emerald-500 text-white font-bold text-base shadow-sm active:bg-emerald-600 touch-manipulation">
           ⚡ Tạo từ lịch
         </button>
-        <button @click="openSummaryModal"
+        <button @click="$router.push({ name: 'AttendanceSummary', query: { from: toLocalDateStr(weekStart), to: toLocalDateStr(weekEnd) } })"
           class="flex-1 py-3 rounded-2xl bg-violet-500 text-white font-bold text-base shadow-sm active:bg-violet-600 touch-manipulation">
           📊 Tổng kết
         </button>
@@ -258,103 +258,6 @@
       </div>
     </div>
 
-    <!-- Summary Modal -->
-    <div v-if="showSummaryModal"
-      class="fixed inset-0 z-50 flex items-end justify-center bg-black bg-opacity-40"
-      @click.self="showSummaryModal = false">
-      <div class="bg-white rounded-t-3xl w-full max-w-lg p-6 pb-8 max-h-[90vh] flex flex-col">
-        <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-4"></div>
-        <h3 class="text-xl font-bold text-gray-900 mb-4">📊 Tổng kết giờ làm</h3>
-
-        <!-- Filters -->
-        <div class="flex flex-col gap-3 mb-4">
-          <div>
-            <label class="text-xs font-semibold text-gray-500 mb-1 block">Nhân viên</label>
-            <input v-model="summaryForm.staffName" list="staff-names-list"
-              placeholder="Nhập tên nhân viên..."
-              class="w-full px-4 py-3 border border-gray-200 rounded-xl text-base" />
-            <datalist id="staff-names-list">
-              <option v-for="name in knownStaffNames" :key="name" :value="name" />
-            </datalist>
-          </div>
-          <div class="flex gap-2">
-            <div class="flex-1">
-              <label class="text-xs font-semibold text-gray-500 mb-1 block">Từ ngày</label>
-              <input type="date" v-model="summaryForm.from"
-                class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm" />
-            </div>
-            <div class="flex-1">
-              <label class="text-xs font-semibold text-gray-500 mb-1 block">Đến ngày</label>
-              <input type="date" v-model="summaryForm.to"
-                class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm" />
-            </div>
-          </div>
-          <button @click="loadSummary" :disabled="loadingSummary || !summaryForm.staffName || !summaryForm.from || !summaryForm.to"
-            class="w-full py-3 rounded-xl bg-violet-500 text-white font-semibold active:bg-violet-600 touch-manipulation disabled:opacity-50">
-            {{ loadingSummary ? 'Đang tải...' : 'Xem tổng kết' }}
-          </button>
-        </div>
-
-        <!-- Result Report -->
-        <div v-if="summaryData" class="flex-1 overflow-y-auto">
-          <div class="border border-gray-200 rounded-2xl overflow-hidden">
-            <!-- Report header -->
-            <div class="bg-gradient-to-br from-violet-600 to-violet-500 px-4 py-4 text-white">
-              <div class="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-1">Báo cáo giờ công</div>
-              <div class="text-lg font-bold leading-tight">{{ summaryData.staff_name }}</div>
-              <div class="text-xs opacity-80 mt-1">{{ fmtDateShort(summaryForm.from) }} — {{ fmtDateShort(summaryForm.to) }}</div>
-            </div>
-
-            <!-- Total row -->
-            <div class="flex items-center justify-between px-4 py-3 bg-violet-50 border-b border-violet-100">
-              <span class="text-xs font-bold text-violet-600 uppercase tracking-wide">Tổng giờ công</span>
-              <span :class="['text-2xl font-bold', summaryData.total_hours >= 0 ? 'text-green-600' : 'text-red-500']">
-                {{ summaryData.total_hours > 0 ? '+' : '' }}{{ summaryData.total_hours }}h
-              </span>
-            </div>
-
-            <!-- Column header -->
-            <div class="grid grid-cols-[1fr_auto] px-4 py-2 bg-gray-50 border-b border-gray-100">
-              <span class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Ngày / Ghi chú</span>
-              <span class="text-[10px] font-bold uppercase tracking-widest text-gray-400 text-right">Giờ</span>
-            </div>
-
-            <!-- Entries -->
-            <div v-if="!summaryData.entries.length" class="text-center py-8 text-gray-400 text-sm">
-              Không có giờ công nào trong khoảng thời gian này.
-            </div>
-            <div v-else>
-              <div v-for="(e, idx) in summaryData.entries" :key="e.id"
-                :class="['grid grid-cols-[1fr_auto] gap-3 px-4 py-3 items-center', idx > 0 ? 'border-t border-gray-100' : '', idx % 2 === 1 ? 'bg-gray-50/60' : 'bg-white']">
-                <div class="min-w-0">
-                  <div class="text-sm font-semibold text-gray-800">{{ fmtDateShort(e.date.split('T')[0]) }}</div>
-                  <div v-if="e.note" class="text-xs text-gray-500 mt-0.5 truncate">{{ e.note }}</div>
-                </div>
-                <span :class="['text-sm font-bold shrink-0', e.hours > 0 ? 'text-green-600' : 'text-red-500']">
-                  {{ e.hours > 0 ? '+' : '' }}{{ e.hours }}h
-                </span>
-              </div>
-
-              <!-- Footer total -->
-              <div class="grid grid-cols-[1fr_auto] gap-3 px-4 py-3 bg-gray-50 border-t border-gray-200">
-                <span class="text-xs text-gray-500">{{ summaryData.entries.length }} mục</span>
-                <span :class="['text-sm font-bold', summaryData.total_hours >= 0 ? 'text-green-600' : 'text-red-500']">
-                  {{ summaryData.total_hours > 0 ? '+' : '' }}{{ summaryData.total_hours }}h
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <p v-if="summaryError" class="mt-3 text-red-500 text-sm">{{ summaryError }}</p>
-
-        <button @click="showSummaryModal = false"
-          class="mt-4 w-full py-3 rounded-xl border border-gray-200 text-gray-700 font-semibold active:bg-gray-50 touch-manipulation">
-          Đóng
-        </button>
-      </div>
-    </div>
-
     <BottomNav />
   </div>
 </template>
@@ -363,7 +266,6 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import BottomNav from '../components/BottomNav.vue'
 import * as attendanceApi from '../services/attendance.js'
-const { getStaffSummary } = attendanceApi
 import { getRegistrationsByDate, getRegistrationsByPeriod, getCurrentPeriod } from '../services/schedule.js'
 
 const quickHours = [-4, -2, -1, -0.5, 0.5, 1, 2, 4, 8]
@@ -605,43 +507,6 @@ async function confirmGenerate() {
   }
 }
 
-// ── Summary ──────────────────────────────────────────
-const showSummaryModal = ref(false)
-const loadingSummary = ref(false)
-const summaryData = ref(null)
-const summaryError = ref('')
-const summaryForm = ref({ staffName: '', from: '', to: '' })
-
-const knownStaffNames = computed(() => {
-  const names = new Set(entries.value.map(e => e.staff_name).filter(Boolean))
-  return [...names].sort()
-})
-
-function openSummaryModal() {
-  summaryData.value = null
-  summaryError.value = ''
-  // Default: current week
-  summaryForm.value = {
-    staffName: '',
-    from: toLocalDateStr(weekStart.value),
-    to: toLocalDateStr(weekEnd.value),
-  }
-  showSummaryModal.value = true
-}
-
-async function loadSummary() {
-  summaryError.value = ''
-  summaryData.value = null
-  loadingSummary.value = true
-  try {
-    summaryData.value = await getStaffSummary(summaryForm.value.staffName, summaryForm.value.from, summaryForm.value.to)
-  } catch (e) {
-    summaryError.value = e.response?.data?.error || e.message
-  } finally {
-    loadingSummary.value = false
-  }
-}
-
 // ── Helpers ──────────────────────────────────────────
 function fmtDate(d) {
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -649,7 +514,7 @@ function fmtDate(d) {
 
 function fmtDateShort(dateStr) {
   return new Date(dateStr + 'T12:00:00Z').toLocaleDateString('vi-VN', {
-    weekday: 'short', day: '2-digit', month: '2-digit',
+    day: '2-digit', month: '2-digit',
   })
 }
 

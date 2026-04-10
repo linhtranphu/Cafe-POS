@@ -62,8 +62,16 @@ type HandoverSummary struct {
 	TotalOverage     float64         `json:"total_overage"`
 }
 
+type ShiftSummary struct {
+	Shift        *order.Shift     `json:"shift"`
+	TotalOrders  int              `json:"total_orders"`
+	TotalRevenue float64          `json:"total_revenue"`
+	Handover     *HandoverSummary `json:"handover,omitempty"`
+}
+
 type ShiftReport struct {
 	Shift           *order.Shift                `json:"shift"`
+	Shifts          []ShiftSummary              `json:"shifts,omitempty"`
 	TotalOrders     int                         `json:"total_orders"`
 	TotalRevenue    float64                     `json:"total_revenue"`
 	CashRevenue     float64                     `json:"cash_revenue"`
@@ -221,11 +229,112 @@ func (s *CashierReportService) GenerateShiftReport(shiftID string) (*ShiftReport
 	return report, nil
 }
 
+type ShiftRevenue struct {
+	ShiftID      string  `json:"shift_id"`
+	ShiftType    string  `json:"shift_type"`
+	UserName     string  `json:"user_name"`
+	TotalRevenue float64 `json:"total_revenue"`
+	TotalOrders  int     `json:"total_orders"`
+	TotalItems   int     `json:"total_items"`
+}
+
+type DailyRevenue struct {
+	Date         string         `json:"date"`
+	TotalRevenue float64        `json:"total_revenue"`
+	TotalOrders  int            `json:"total_orders"`
+	TotalItems   int            `json:"total_items"`
+	ByShift      []ShiftRevenue `json:"by_shift"`
+}
+
+type RevenueReport struct {
+	FromDate     string         `json:"from_date"`
+	ToDate       string         `json:"to_date"`
+	TotalRevenue float64        `json:"total_revenue"`
+	TotalOrders  int            `json:"total_orders"`
+	TotalItems   int            `json:"total_items"`
+	Days         []DailyRevenue `json:"days"`
+	GeneratedAt  time.Time      `json:"generated_at"`
+}
+
+func (s *CashierReportService) GenerateRevenueReport(fromDate, toDate time.Time) (*RevenueReport, error) {
+	loc := fromDate.Location()
+	startDate := time.Date(fromDate.Year(), fromDate.Month(), fromDate.Day(), 0, 0, 0, 0, loc)
+	endDate := time.Date(toDate.Year(), toDate.Month(), toDate.Day(), 23, 59, 59, 999999999, loc)
+
+	shifts, err := s.shiftRepo.FindByDateRange(context.Background(), startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+
+	// Group shifts by day (using local date)
+	shiftsByDay := make(map[string][]*order.Shift)
+	for _, shift := range shifts {
+		dayStr := shift.StartedAt.Local().Format("2006-01-02")
+		shiftsByDay[dayStr] = append(shiftsByDay[dayStr], shift)
+	}
+
+	report := &RevenueReport{
+		FromDate:    fromDate.Format("2006-01-02"),
+		ToDate:      toDate.Format("2006-01-02"),
+		GeneratedAt: time.Now(),
+	}
+
+	// Iterate over each day in the range
+	endDay := time.Date(toDate.Year(), toDate.Month(), toDate.Day(), 0, 0, 0, 0, loc)
+	for d := startDate; !d.After(endDay); d = d.AddDate(0, 0, 1) {
+		dayStr := d.Format("2006-01-02")
+		daily := DailyRevenue{
+			Date:    dayStr,
+			ByShift: []ShiftRevenue{},
+		}
+
+		for _, shift := range shiftsByDay[dayStr] {
+			orders, err := s.orderRepo.FindByShiftID(context.Background(), shift.ID)
+			if err != nil {
+				continue
+			}
+
+			shiftRev := ShiftRevenue{
+				ShiftID:   shift.ID.Hex(),
+				ShiftType: string(shift.Type),
+				UserName:  shift.UserName,
+			}
+
+			for _, ord := range orders {
+				if ord.PaymentMethod == "" {
+					continue
+				}
+				if ord.Status == order.StatusPaid || ord.Status == order.StatusQueued ||
+					ord.Status == order.StatusInProgress || ord.Status == order.StatusReady ||
+					ord.Status == order.StatusServed || ord.Status == order.StatusLocked {
+					shiftRev.TotalRevenue += ord.Total
+					shiftRev.TotalOrders++
+					for _, item := range ord.Items {
+						shiftRev.TotalItems += item.Quantity
+					}
+				}
+			}
+
+			daily.TotalRevenue += shiftRev.TotalRevenue
+			daily.TotalOrders += shiftRev.TotalOrders
+			daily.TotalItems += shiftRev.TotalItems
+			daily.ByShift = append(daily.ByShift, shiftRev)
+		}
+
+		report.Days = append(report.Days, daily)
+		report.TotalRevenue += daily.TotalRevenue
+		report.TotalOrders += daily.TotalOrders
+		report.TotalItems += daily.TotalItems
+	}
+
+	return report, nil
+}
+
 func (s *CashierReportService) GetDailyReport(date time.Time) (*ShiftReport, error) {
 	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
 	endOfDay := startOfDay.Add(24 * time.Hour)
 
-	shifts, err := s.shiftRepo.FindByDateRange(context.Background(), startOfDay, endOfDay)
+	shifts, err := s.shiftRepo.FindOpenedOrClosedOnDay(context.Background(), startOfDay, endOfDay)
 	if err != nil {
 		return nil, err
 	}
@@ -234,15 +343,17 @@ func (s *CashierReportService) GetDailyReport(date time.Time) (*ShiftReport, err
 		GeneratedAt: time.Now(),
 	}
 
-	// Aggregate data from all shifts
+	// Aggregate data from all shifts, and build per-shift summaries
 	var allOrders []*order.Order
+	var allHandovers []*handover.CashHandover
 	for _, shift := range shifts {
 		orders, err := s.orderRepo.FindByShiftID(context.Background(), shift.ID)
 		if err != nil {
 			continue
 		}
 
-		report.TotalOrders += len(orders)
+		shiftSummary := ShiftSummary{Shift: shift}
+
 		for _, ord := range orders {
 			if ord.PaymentMethod == "" {
 				continue // chưa thanh toán (cancelled trước khi pay)
@@ -251,6 +362,8 @@ func (s *CashierReportService) GetDailyReport(date time.Time) (*ShiftReport, err
 				ord.Status == order.StatusInProgress || ord.Status == order.StatusReady ||
 				ord.Status == order.StatusServed || ord.Status == order.StatusLocked {
 				report.TotalRevenue += ord.Total
+				shiftSummary.TotalRevenue += ord.Total
+				shiftSummary.TotalOrders++
 				switch ord.PaymentMethod {
 				case order.PaymentCash:
 					report.CashRevenue += ord.Total
@@ -261,19 +374,26 @@ func (s *CashierReportService) GetDailyReport(date time.Time) (*ShiftReport, err
 				}
 			}
 		}
+		report.TotalOrders += len(orders)
 		allOrders = append(allOrders, orders...)
+
+		// Fetch handovers for this specific shift (reliable: by shift ID, not by timestamp)
+		if s.handoverRepo != nil {
+			hs, err := s.handoverRepo.FindByWaiterShift(context.Background(), shift.ID)
+			if err == nil && len(hs) > 0 {
+				shiftSummary.Handover = aggregateHandovers(hs)
+				allHandovers = append(allHandovers, hs...)
+			}
+		}
+
+		report.Shifts = append(report.Shifts, shiftSummary)
 	}
 
 	// Item breakdown
 	report.ItemsSold, report.TotalItemsSold = aggregateItems(allOrders)
 
-	// Handover summary across all shifts
-	if s.handoverRepo != nil {
-		handovers, err := s.handoverRepo.FindByDateRange(context.Background(), startOfDay, endOfDay)
-		if err == nil {
-			report.Handover = aggregateHandovers(handovers)
-		}
-	}
+	// Aggregate handover summary across all shifts
+	report.Handover = aggregateHandovers(allHandovers)
 
 	return report, nil
 }

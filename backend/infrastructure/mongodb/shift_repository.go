@@ -154,6 +154,28 @@ func (r *ShiftRepository) FindByDateRange(ctx context.Context, startDate, endDat
 	return shifts, nil
 }
 
+// FindOpenedOrClosedOnDay returns shifts that started OR ended within the given date range.
+// This is used by the daily report to catch shifts that carry over midnight.
+func (r *ShiftRepository) FindOpenedOrClosedOnDay(ctx context.Context, startDate, endDate time.Time) ([]*order.Shift, error) {
+	opts := options.Find().SetSort(bson.D{{"started_at", 1}})
+	cursor, err := r.collection.Find(ctx, bson.M{
+		"$or": bson.A{
+			bson.M{"started_at": bson.M{"$gte": startDate, "$lte": endDate}},
+			bson.M{"ended_at": bson.M{"$gte": startDate, "$lte": endDate}},
+		},
+	}, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var shifts []*order.Shift
+	if err = cursor.All(ctx, &shifts); err != nil {
+		return nil, err
+	}
+	return shifts, nil
+}
+
 func (r *ShiftRepository) FindByRoleType(ctx context.Context, roleType order.RoleType) ([]*order.Shift, error) {
 	opts := options.Find().SetSort(bson.D{{"started_at", -1}})
 	cursor, err := r.collection.Find(ctx, bson.M{"role_type": roleType}, opts)

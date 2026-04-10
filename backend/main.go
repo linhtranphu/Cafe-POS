@@ -627,6 +627,7 @@ func main() {
 				cashier.POST("/orders/:id/lock", cashierHandler.LockOrder)
 				cashier.GET("/reports/shift/:id", cashierHandler.GenerateShiftReport)
 				cashier.GET("/reports/daily", cashierHandler.GetDailyReport)
+				cashier.GET("/reports/revenue", cashierHandler.GetRevenueReport)
 				cashier.GET("/orders/:id/audits", cashierHandler.GetOrderAudits)
 			}
 

@@ -246,6 +246,20 @@ export const useCashierStore = defineStore('cashier', {
       }
     },
 
+    async getRevenueReport(from, to) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await cashierService.getRevenueReport(from, to)
+        return response.data
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Không thể tải báo cáo doanh thu'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
     async getOrderAudits(orderId) {
       this.loading = true
       this.error = null
