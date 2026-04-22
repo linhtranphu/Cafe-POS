@@ -269,6 +269,12 @@ const routes = [
     component: () => import('../views/AttendanceSummaryView.vue'),
     meta: { requiresAuth: true, requiresManager: true }
   },
+  {
+    path: '/manager/ai-command',
+    name: 'AICommand',
+    component: () => import('../views/AICommandView.vue'),
+    meta: { requiresAuth: true, requiresManager: true }
+  },
 ]
 
 const router = createRouter({

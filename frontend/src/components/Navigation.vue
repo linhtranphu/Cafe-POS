@@ -88,6 +88,11 @@
           <div class="text-3xl mb-2">👤</div>
           <span class="text-base font-medium text-center">Cá nhân</span>
         </router-link>
+        <router-link to="/manager/ai-command" @click="handleNavClick"
+          class="bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl p-6 flex flex-col items-center justify-center min-h-[120px] shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+          <div class="text-3xl mb-2">🤖</div>
+          <span class="text-base font-medium text-center">AI Command</span>
+        </router-link>
       </div>
 
       <!-- Non-Manager Navigation (Original layout) -->
