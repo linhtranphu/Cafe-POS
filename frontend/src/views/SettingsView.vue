@@ -161,6 +161,32 @@
           </div>
         </div>
 
+        <!-- AI Settings Card -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm">
+          <h3 class="text-lg font-bold mb-4">🤖 AI Settings</h3>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Gemini API Key</label>
+              <input
+                v-model="shopSettings.gemini_api_key"
+                type="password"
+                placeholder="Nhập Gemini API key..."
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Gemini Model</label>
+              <input
+                v-model="shopSettings.gemini_model"
+                type="text"
+                placeholder="gemini-2.5-flash"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <p class="text-xs text-gray-500">API key và model được lưu cùng thông tin cửa hàng. Nhấn "Lưu thông tin cửa hàng" ở trên để cập nhật.</p>
+          </div>
+        </div>
+
         <!-- Operating Expenses Section -->
         <div class="bg-white rounded-2xl p-6 shadow-sm">
           <div class="flex items-center justify-between mb-4">
@@ -259,7 +285,9 @@ const shopSettings = ref({
   show_address: true,
   show_phone: true,
   show_custom_message: true,
-  auto_print_enabled: true
+  auto_print_enabled: true,
+  gemini_api_key: '',
+  gemini_model: '',
 })
 
 // Fetch settings
@@ -291,7 +319,9 @@ const fetchShopSettings = async () => {
         show_address: response.show_address !== false,
         show_phone: response.show_phone !== false,
         show_custom_message: response.show_custom_message !== false,
-        auto_print_enabled: response.auto_print_enabled !== false
+        auto_print_enabled: response.auto_print_enabled !== false,
+        gemini_api_key: response.gemini_api_key || '',
+        gemini_model: response.gemini_model || '',
       }
     }
   } catch (error) {
@@ -332,7 +362,9 @@ const saveShopSettings = async () => {
       show_address: shopSettings.value.show_address,
       show_phone: shopSettings.value.show_phone,
       show_custom_message: shopSettings.value.show_custom_message,
-      auto_print_enabled: shopSettings.value.auto_print_enabled
+      auto_print_enabled: shopSettings.value.auto_print_enabled,
+      gemini_api_key: shopSettings.value.gemini_api_key,
+      gemini_model: shopSettings.value.gemini_model,
     })
     alert('Thông tin cửa hàng đã được lưu!')
   } catch (error) {
