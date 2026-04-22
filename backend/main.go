@@ -244,7 +244,6 @@ func main() {
 	}()
 
 	// Handlers
-	aiHandler := http.NewAIHandler(aiLogRepo)
 	authHandler := http.NewAuthHandler(authService)
 	userManagementHandler := http.NewUserManagementHandler(userManagementService)
 	orderHandler := http.NewOrderHandler(orderService, smManager, printService)
@@ -353,6 +352,8 @@ func main() {
 	expenseHandler := http.NewExpenseHandler(expenseService, fundExpenseIntegrationService)
 	ingredientHandler.SetFundExpenseIntegrationService(fundExpenseIntegrationService)
 	facilityHandler.SetFundExpenseIntegrationService(fundExpenseIntegrationService)
+	geminiService := services.NewGeminiService(shopSettingsRepo, ingredientRepo, expenseRepo)
+	aiHandler := http.NewAIHandler(aiLogRepo, geminiService)
 
 	attendanceRepo := mongodb.NewHoursEntryRepository(db)
 	attendanceService := services.NewAttendanceService(attendanceRepo)
