@@ -29,7 +29,11 @@ type ShopSettings struct {
 	LabelPrinterPort    int    `bson:"label_printer_port" json:"label_printer_port"`
 	LabelWidth          int    `bson:"label_width" json:"label_width"`   // mm
 	LabelHeight         int    `bson:"label_height" json:"label_height"` // mm
-	
+
+	// AI Settings
+	GeminiAPIKey string `bson:"gemini_api_key" json:"gemini_api_key"`
+	GeminiModel  string `bson:"gemini_model" json:"gemini_model"`
+
 	CreatedAt          time.Time          `bson:"created_at" json:"created_at"`
 	UpdatedAt          time.Time          `bson:"updated_at" json:"updated_at"`
 }
