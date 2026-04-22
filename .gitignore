@@ -145,3 +145,4 @@ Thumbs.db
 # Uncomment if you have sensitive docs
 # **/INTERNAL_*.md
 # **/PRIVATE_*.md
+.worktrees/
