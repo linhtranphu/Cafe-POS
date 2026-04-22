@@ -72,6 +72,7 @@ func main() {
 	printNotificationRepo := mongodb.NewPrintNotificationRepository(db)
 	// Fund repositories
 	journalRepo := mongodb.NewJournalRepository(db)
+	aiLogRepo := mongodb.NewAILogRepository(db)
 
 	// State Machine Manager
 	smManager := domain.NewStateMachineManager()
@@ -243,6 +244,7 @@ func main() {
 	}()
 
 	// Handlers
+	aiHandler := http.NewAIHandler(aiLogRepo)
 	authHandler := http.NewAuthHandler(authService)
 	userManagementHandler := http.NewUserManagementHandler(userManagementService)
 	orderHandler := http.NewOrderHandler(orderService, smManager, printService)
@@ -886,6 +888,9 @@ func main() {
 				manager.GET("/attendance/summary", attendanceHandler.GetStaffSummary)
 				manager.PATCH("/attendance/:id", attendanceHandler.UpdateEntry)
 				manager.DELETE("/attendance/:id", attendanceHandler.DeleteEntry)
+
+				manager.POST("/ai/parse", aiHandler.ParseCommand)
+				manager.GET("/ai/history", aiHandler.GetHistory)
 			}
 		}
 
