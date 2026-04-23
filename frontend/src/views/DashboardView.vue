@@ -117,6 +117,12 @@
               <div class="font-bold text-base">Tồn kho</div>
               <div class="text-xs opacity-80 mt-1">Thống kê tồn kho</div>
             </button>
+            <button @click="$router.push('/ingredients/fast-input')"
+              class="bg-gradient-to-br from-lime-500 to-green-500 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+              <div class="text-4xl mb-2">➕</div>
+              <div class="font-bold text-base">Nhập nhanh</div>
+              <div class="text-xs opacity-80 mt-1">Nhập kho siêu nhanh</div>
+            </button>
           </div>
         </div>
 
@@ -179,11 +185,17 @@
               <div class="font-bold text-base">In ấn</div>
               <div class="text-xs opacity-80 mt-1">Máy in & templates</div>
             </button>
-            <button @click="$router.push('/settings')" 
+            <button @click="$router.push('/settings')"
               class="bg-gradient-to-br from-gray-500 to-gray-600 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
               <div class="text-4xl mb-2">⚙️</div>
               <div class="font-bold text-base">Cài đặt</div>
               <div class="text-xs opacity-80 mt-1">Cấu hình hệ thống</div>
+            </button>
+            <button @click="$router.push('/manager/ai-command')"
+              class="bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-2xl p-6 shadow-lg active:scale-95 transition-transform">
+              <div class="text-4xl mb-2">🤖</div>
+              <div class="font-bold text-base">AI Command</div>
+              <div class="text-xs opacity-80 mt-1">Trợ lý AI</div>
             </button>
           </div>
         </div>
