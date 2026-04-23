@@ -125,3 +125,72 @@ func (r *IngredientRestockRepository) FindByID(ctx context.Context, id primitive
 func (r *IngredientRestockRepository) CountByIngredientID(ctx context.Context, ingredientID primitive.ObjectID) (int64, error) {
 	return r.collection.CountDocuments(ctx, bson.M{"ingredient_id": ingredientID})
 }
+
+// FindLatestByIngredientSince returns the most recent restock record per ingredient
+// for restocks created on or after `since`. Results are sorted by created_at DESC.
+func (r *IngredientRestockRepository) FindLatestByIngredientSince(
+	ctx context.Context,
+	since time.Time,
+) ([]*ingredient.IngredientRestockRecord, error) {
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: bson.M{
+			"created_at": bson.M{"$gte": since},
+		}}},
+		{{Key: "$sort", Value: bson.D{{Key: "created_at", Value: -1}}}},
+		{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$ingredient_id"},
+			{Key: "ingredient_id", Value: bson.M{"$first": "$ingredient_id"}},
+			{Key: "quantity", Value: bson.M{"$first": "$quantity"}},
+			{Key: "cost_per_unit", Value: bson.M{"$first": "$cost_per_unit"}},
+			{Key: "total_cost", Value: bson.M{"$first": "$total_cost"}},
+			{Key: "performed_by", Value: bson.M{"$first": "$performed_by"}},
+			{Key: "performed_by_name", Value: bson.M{"$first": "$performed_by_name"}},
+			{Key: "reason", Value: bson.M{"$first": "$reason"}},
+			{Key: "created_at", Value: bson.M{"$first": "$created_at"}},
+		}}},
+		{{Key: "$sort", Value: bson.D{{Key: "created_at", Value: -1}}}},
+	}
+
+	cursor, err := r.collection.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var rawResults []bson.M
+	if err := cursor.All(ctx, &rawResults); err != nil {
+		return nil, err
+	}
+
+	records := make([]*ingredient.IngredientRestockRecord, 0, len(rawResults))
+	for _, raw := range rawResults {
+		rec := &ingredient.IngredientRestockRecord{}
+		if id, ok := raw["ingredient_id"].(primitive.ObjectID); ok {
+			rec.IngredientID = id
+		}
+		if q, ok := raw["quantity"].(float64); ok {
+			rec.Quantity = q
+		}
+		if c, ok := raw["cost_per_unit"].(float64); ok {
+			rec.CostPerUnit = c
+		}
+		if t, ok := raw["total_cost"].(float64); ok {
+			rec.TotalCost = t
+		}
+		if pb, ok := raw["performed_by"].(string); ok {
+			rec.PerformedBy = pb
+		}
+		if pbn, ok := raw["performed_by_name"].(string); ok {
+			rec.PerformedByName = pbn
+		}
+		if reason, ok := raw["reason"].(string); ok {
+			rec.Reason = reason
+		}
+		if ca, ok := raw["created_at"].(primitive.DateTime); ok {
+			rec.CreatedAt = ca.Time()
+		}
+		records = append(records, rec)
+	}
+
+	return records, nil
+}
