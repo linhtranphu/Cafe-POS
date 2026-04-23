@@ -518,3 +518,21 @@ func (h *IngredientHandler) GetRestockHistory(c *gin.Context) {
 		"offset":  offset,
 	})
 }
+
+func (h *IngredientHandler) GetRecentRestockedIngredients(c *gin.Context) {
+	days := 30
+	if daysStr := c.Query("days"); daysStr != "" {
+		var parsed int
+		if _, err := fmt.Sscanf(daysStr, "%d", &parsed); err == nil {
+			days = parsed
+		}
+	}
+
+	items, err := h.ingredientService.GetRecentRestockedIngredients(c.Request.Context(), days)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, items)
+}

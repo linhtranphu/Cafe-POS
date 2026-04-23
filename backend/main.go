@@ -383,6 +383,7 @@ func main() {
 	// Wire up ingredient service with cost calculator for recalculation triggers
 	// Requirements: 1.3, 9.1
 	ingredientService.SetCostCalculatorService(costCalculatorService)
+	ingredientService.SetRestockRepository(ingredientRestockRepo)
 
 	// Router
 	r := gin.Default()
@@ -562,6 +563,7 @@ func main() {
 				waiter.POST("/orders/:id/serve", orderHandler.ServeOrder)
 				waiter.POST("/orders/:id/cancel", orderHandler.CancelOrder)
 				waiter.PATCH("/orders/:id/payment-method", cashierHandler.ChangePaymentMethod)
+				waiter.PATCH("/orders/:id/rename", orderHandler.RenameOrder)
 	waiter.POST("/orders/:id/print-temp-bill", orderHandler.PrintTemporaryBill)
 				waiter.POST("/orders/merge", orderHandler.MergeOrders)
 				waiter.GET("/orders", orderHandler.GetMyOrders)
@@ -691,6 +693,7 @@ func main() {
 				manager.GET("/ingredients", ingredientHandler.GetAllIngredients)
 				manager.GET("/ingredients/low-stock", ingredientHandler.GetLowStock)
 				manager.GET("/ingredients/summary", ingredientHandler.GetStockSummary)
+				manager.GET("/ingredients/recent-restocks", ingredientHandler.GetRecentRestockedIngredients)
 				manager.GET("/ingredients/:id", ingredientHandler.GetIngredient)
 				manager.GET("/ingredients/:id/history", ingredientHandler.GetStockHistory)
 				manager.PUT("/ingredients/:id", ingredientHandler.UpdateIngredient)
