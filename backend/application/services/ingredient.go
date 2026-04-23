@@ -25,6 +25,25 @@ type StockHistoryRepository interface {
 	GetSummaryByDateRange(ctx context.Context, from, to time.Time) ([]*ingredient.IngredientStockSummary, error)
 }
 
+type RestockRepository interface {
+	FindLatestByIngredientSince(ctx context.Context, since time.Time) ([]*ingredient.IngredientRestockRecord, error)
+}
+
+type LastRestockInfo struct {
+	Quantity    float64   `json:"quantity"`
+	CostPerUnit float64   `json:"cost_per_unit"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type RecentRestockedIngredient struct {
+	ID          string           `json:"id"`
+	Name        string           `json:"name"`
+	Unit        string           `json:"unit"`
+	Quantity    float64          `json:"quantity"`
+	CostPerUnit float64          `json:"cost_per_unit"`
+	LastRestock *LastRestockInfo `json:"last_restock,omitempty"`
+}
+
 // StockReportItem combines an ingredient with its period stats
 type StockReportItem struct {
 	ID         primitive.ObjectID `json:"id"`
@@ -42,9 +61,10 @@ type StockReportItem struct {
 }
 
 type IngredientService struct {
-	ingredientRepo      IngredientRepository
-	stockHistoryRepo    StockHistoryRepository
-	autoExpenseService  *AutoExpenseService
+	ingredientRepo        IngredientRepository
+	stockHistoryRepo      StockHistoryRepository
+	restockRepo           RestockRepository
+	autoExpenseService    *AutoExpenseService
 	costCalculatorService *CostCalculatorService
 }
 
@@ -66,6 +86,10 @@ func (s *IngredientService) SetAutoExpenseService(autoExpenseService *AutoExpens
 // Requirements: 1.3, 9.1
 func (s *IngredientService) SetCostCalculatorService(costCalculatorService *CostCalculatorService) {
 	s.costCalculatorService = costCalculatorService
+}
+
+func (s *IngredientService) SetRestockRepository(repo RestockRepository) {
+	s.restockRepo = repo
 }
 
 // triggerCostRecalculation queues cost recalculation for menu items using this ingredient
@@ -672,4 +696,52 @@ func (s *IngredientService) GetStockSummaryReport(ctx context.Context, from, to 
 	}
 
 	return items, nil
+}
+
+func (s *IngredientService) GetRecentRestockedIngredients(ctx context.Context, days int) ([]*RecentRestockedIngredient, error) {
+	if days < 1 {
+		days = 1
+	}
+	if days > 365 {
+		days = 365
+	}
+
+	since := time.Now().AddDate(0, 0, -days)
+
+	restocks, err := s.restockRepo.FindLatestByIngredientSince(ctx, since)
+	if err != nil {
+		return nil, err
+	}
+
+	allIngredients, err := s.ingredientRepo.FindAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	ingMap := make(map[primitive.ObjectID]*ingredient.Ingredient, len(allIngredients))
+	for _, ing := range allIngredients {
+		ingMap[ing.ID] = ing
+	}
+
+	results := make([]*RecentRestockedIngredient, 0, len(restocks))
+	for _, r := range restocks {
+		ing, ok := ingMap[r.IngredientID]
+		if !ok {
+			continue
+		}
+		results = append(results, &RecentRestockedIngredient{
+			ID:          ing.ID.Hex(),
+			Name:        ing.Name,
+			Unit:        string(ing.Unit),
+			Quantity:    ing.Quantity,
+			CostPerUnit: ing.CostPerUnit,
+			LastRestock: &LastRestockInfo{
+				Quantity:    r.Quantity,
+				CostPerUnit: r.CostPerUnit,
+				CreatedAt:   r.CreatedAt,
+			},
+		})
+	}
+
+	return results, nil
 }
