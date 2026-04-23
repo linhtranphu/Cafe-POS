@@ -102,17 +102,24 @@
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Đơn giá (₫ / {{ ing.unit }})</label>
               <input
-                v-model.number="costPerUnit"
+                :value="costPerUnit"
+                @input="onCostPerUnitInput"
                 type="number"
                 min="0"
                 class="w-full h-12 px-4 text-base border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
               />
             </div>
 
-            <!-- Total (read-only) -->
-            <div class="bg-lime-50 rounded-xl px-4 py-3 flex justify-between items-center">
-              <span class="text-sm text-gray-600">Tổng tiền</span>
-              <span class="text-lg font-bold text-lime-700">{{ formatCurrency(quantity * costPerUnit) }}</span>
+            <!-- Total cost (editable — back-calculates cost per unit) -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Tổng tiền (₫)</label>
+              <input
+                :value="totalCostInput"
+                @input="onTotalCostInput"
+                type="number"
+                min="0"
+                class="w-full h-12 px-4 text-base border-2 border-lime-300 rounded-xl focus:ring-2 focus:ring-lime-500 focus:border-lime-500 bg-lime-50"
+              />
             </div>
 
             <!-- Payment method -->
@@ -178,6 +185,7 @@ const activeId = ref(null)
 const step = ref(1)
 const quantity = ref(0)
 const costPerUnit = ref(0)
+const totalCostInput = ref(0)
 const moneyType = ref('cash')
 const submitting = ref(false)
 
@@ -237,15 +245,35 @@ function selectIngredient(ing) {
   step.value = ing.last_restock?.quantity ?? 1
   quantity.value = 0
   costPerUnit.value = ing.last_restock?.cost_per_unit ?? ing.cost_per_unit ?? 0
+  totalCostInput.value = 0
   moneyType.value = 'cash'
+}
+
+function syncTotal() {
+  totalCostInput.value = +(quantity.value * costPerUnit.value).toFixed(0)
+}
+
+function onCostPerUnitInput(e) {
+  costPerUnit.value = Math.max(0, Number(e.target.value) || 0)
+  syncTotal()
+}
+
+function onTotalCostInput(e) {
+  const total = Math.max(0, Number(e.target.value) || 0)
+  totalCostInput.value = total
+  if (quantity.value > 0) {
+    costPerUnit.value = Math.round(total / quantity.value)
+  }
 }
 
 function increment() {
   quantity.value = Math.max(0, +(quantity.value + step.value).toFixed(6))
+  syncTotal()
 }
 
 function decrement() {
   quantity.value = Math.max(0, +(quantity.value - step.value).toFixed(6))
+  syncTotal()
 }
 
 async function submit(ing) {
@@ -258,6 +286,7 @@ async function submit(ing) {
     await fundIngredientService.restockIngredientFromFund(ing.id, {
       quantity: quantity.value,
       cost_per_unit: costPerUnit.value,
+      total_cost: totalCostInput.value || quantity.value * costPerUnit.value,
       reason: 'Nhập nhanh',
       money_type: moneyType.value
     })
