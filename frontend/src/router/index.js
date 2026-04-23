@@ -4,6 +4,7 @@ import LoginView from '../views/LoginView.vue'
 import DashboardView from '../views/DashboardView.vue'
 import MenuView from '../views/MenuView.vue'
 import IngredientManagementView from '../views/IngredientManagementView.vue'
+import FastIngredientInputView from '../views/FastIngredientInputView.vue'
 import FacilityManagementView from '../views/FacilityManagementView.vue'
 import FacilityAddEditView from '../views/FacilityAddEditView.vue'
 import ExpenseManagementView from '../views/ExpenseManagementView.vue'
@@ -52,6 +53,12 @@ const routes = [
     path: '/ingredients',
     name: 'Ingredients',
     component: IngredientManagementView,
+    meta: { requiresAuth: true, requiresManager: true }
+  },
+  {
+    path: '/ingredients/fast-input',
+    name: 'FastIngredientInput',
+    component: FastIngredientInputView,
     meta: { requiresAuth: true, requiresManager: true }
   },
   {
