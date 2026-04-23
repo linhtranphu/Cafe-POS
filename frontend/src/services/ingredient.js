@@ -81,5 +81,10 @@ export const ingredientService = {
     if (to) params.to = to
     const response = await api.get('/manager/ingredients/summary', { params })
     return response.data
+  },
+
+  async getRecentRestocked(days = 30) {
+    const response = await api.get('/manager/ingredients/recent-restocks', { params: { days } })
+    return response.data
   }
 }
