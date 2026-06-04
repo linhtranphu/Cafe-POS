@@ -372,10 +372,15 @@
                 class="w-full bg-green-500 text-white py-3 rounded-xl font-medium active:bg-green-600">
                 💰 Thu tiền
               </button>
-              <button v-if="isStatus(selectedOrder, ORDER_STATUS.CREATED)" 
+              <button v-if="isStatus(selectedOrder, ORDER_STATUS.CREATED)"
                 @click="editOrder(selectedOrder)"
                 class="w-full bg-blue-500 text-white py-3 rounded-xl font-medium active:bg-blue-600">
                 ✏️ Chỉnh sửa
+              </button>
+              <button v-if="isStatus(selectedOrder, ORDER_STATUS.CREATED)"
+                @click="openRenameModal(selectedOrder)"
+                class="w-full bg-indigo-500 text-white py-3 rounded-xl font-medium active:bg-indigo-600">
+                🏷️ Đổi tên bill
               </button>
               <button v-if="isStatus(selectedOrder, ORDER_STATUS.CREATED) && (!selectedOrder.bill_printed || canReprint)"
                 @click="confirmCancelOrder(selectedOrder)"
@@ -505,7 +510,7 @@
     <!-- Cancel Order Modal -->
     <transition name="slide-up">
       <div v-if="showCancelModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
-        <div class="bg-white rounded-t-3xl w-full p-6">
+        <div class="bg-white rounded-t-3xl w-full p-6 mb-20">
           <h3 class="text-xl font-bold mb-4 text-red-600">❌ Hủy Order</h3>
           
           <div class="mb-4 p-4 bg-red-50 rounded-lg border border-red-200">
@@ -519,28 +524,46 @@
             </div>
           </div>
 
-          <div class="mb-4">
-            <label class="block text-sm font-medium mb-2 text-gray-700">
-              Lý do hủy <span class="text-red-500">*</span>
-            </label>
-            <textarea 
-              v-model="cancelReason" 
-              rows="3"
-              placeholder="Nhập lý do hủy order (bắt buộc)..."
-              class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 resize-none"
-            ></textarea>
-          </div>
-
           <div class="flex gap-2">
-            <button @click="closeCancelModal" 
+            <button @click="closeCancelModal"
               class="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-medium active:bg-gray-300">
               Quay lại
             </button>
-            <button 
-              @click="processCancelOrder" 
-              :disabled="!cancelReason.trim()"
-              class="flex-1 bg-red-500 text-white py-3 rounded-xl font-medium active:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed">
+            <button @click="processCancelOrder"
+              class="flex-1 bg-red-500 text-white py-3 rounded-xl font-medium active:bg-red-600">
               Xác nhận hủy
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Rename Order Modal -->
+    <transition name="slide-up">
+      <div v-if="showRenameModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
+        <div class="bg-white rounded-t-3xl w-full p-6">
+          <h3 class="text-xl font-bold mb-4 text-indigo-600">🏷️ Đổi tên Bill</h3>
+          <p class="text-sm text-gray-600 mb-4">
+            Order <strong>#{{ renamingOrder?.order_number }}</strong>
+          </p>
+          <div class="mb-4">
+            <label class="block text-sm font-medium mb-2 text-gray-700">Tên khách hàng</label>
+            <input
+              v-model="newCustomerName"
+              type="text"
+              placeholder="Nhập tên khách (để trống = Khách lẻ)"
+              class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+              @keyup.enter="processRenameOrder"
+            />
+          </div>
+          <div class="flex gap-2">
+            <button @click="showRenameModal = false; renamingOrder = null"
+              class="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-medium active:bg-gray-300">
+              Quay lại
+            </button>
+            <button @click="processRenameOrder"
+              class="flex-1 bg-indigo-500 text-white py-3 rounded-xl font-medium active:bg-indigo-600">
+              Xác nhận
             </button>
           </div>
         </div>
@@ -638,6 +661,11 @@ const showMergeModal = ref(false)
 const showCancelModal = ref(false)
 const cancelReason = ref('')
 const cancelingOrder = ref(null)
+
+// Rename Order State
+const showRenameModal = ref(false)
+const renamingOrder = ref(null)
+const newCustomerName = ref('')
 
 // Change Payment Method State
 const showChangePaymentModal = ref(false)
@@ -917,6 +945,25 @@ const editOrder = (order) => {
   alert('Chức năng chỉnh sửa order đang được phát triển')
 }
 
+const openRenameModal = (order) => {
+  renamingOrder.value = order
+  newCustomerName.value = order.customer_name || ''
+  showRenameModal.value = true
+  selectedOrder.value = null
+}
+
+const processRenameOrder = async () => {
+  try {
+    await orderStore.renameOrder(renamingOrder.value.id, newCustomerName.value.trim())
+    showRenameModal.value = false
+    renamingOrder.value = null
+    newCustomerName.value = ''
+    alert('✅ Đã đổi tên bill thành công')
+  } catch (error) {
+    alert('❌ Lỗi: ' + (error.response?.data?.error || error.message))
+  }
+}
+
 const confirmCancelOrder = (order) => {
   cancelingOrder.value = order
   cancelReason.value = ''
@@ -956,13 +1003,8 @@ const closeCancelModal = () => {
 }
 
 const processCancelOrder = async () => {
-  if (!cancelReason.value.trim()) {
-    alert('Vui lòng nhập lý do hủy order')
-    return
-  }
-
   try {
-    await orderStore.cancelOrder(cancelingOrder.value.id, cancelReason.value.trim())
+    await orderStore.cancelOrder(cancelingOrder.value.id, '')
     showCancelModal.value = false
     cancelingOrder.value = null
     cancelReason.value = ''

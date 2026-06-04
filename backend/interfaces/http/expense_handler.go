@@ -6,6 +6,7 @@ import (
 	"time"
 	"cafe-pos/backend/application/services"
 	"cafe-pos/backend/domain/expense"
+	"cafe-pos/backend/domain/fund"
 	"cafe-pos/backend/domain/user"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
@@ -100,6 +101,7 @@ func (h *ExpenseHandler) CreateExpenseFromFund(c *gin.Context) {
 		Vendor      string  `json:"vendor,omitempty"`
 		Notes       string  `json:"notes,omitempty"`
 		MoneyType   string  `json:"money_type,omitempty"` // "cash" or "transfer"
+		FundType    string  `json:"fund_type,omitempty"`  // "operating" or "inventory"
 	}
 	
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -161,6 +163,7 @@ func (h *ExpenseHandler) CreateExpenseFromFund(c *gin.Context) {
 		Vendor:      req.Vendor,
 		Notes:       req.Notes,
 		MoneyType:   req.MoneyType,
+		FundType:    fund.FundType(req.FundType),
 		UserID:      userIDObj,
 		UserName:    userName,
 		UserRole:    role,

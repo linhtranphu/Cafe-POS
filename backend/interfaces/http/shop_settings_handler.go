@@ -54,6 +54,8 @@ type UpdateSettingsRequest struct {
 	ShowPhone         bool   `json:"show_phone"`
 	ShowCustomMessage bool   `json:"show_custom_message"`
 	AutoPrintEnabled  bool   `json:"auto_print_enabled"`
+	GeminiAPIKey      string `json:"gemini_api_key"`
+	GeminiModel       string `json:"gemini_model"`
 }
 
 // UpdateSettings updates the shop settings
@@ -100,6 +102,8 @@ func (h *ShopSettingsHandler) UpdateSettings(c *gin.Context) {
 		req.ShowCustomMessage,
 	)
 	shopSettings.SetAutoPrintEnabled(req.AutoPrintEnabled)
+	shopSettings.GeminiAPIKey = req.GeminiAPIKey
+	shopSettings.GeminiModel = req.GeminiModel
 
 	// Save to database
 	if err := h.repo.UpdateSettings(c.Request.Context(), shopSettings); err != nil {

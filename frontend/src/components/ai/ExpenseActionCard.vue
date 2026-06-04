@@ -29,7 +29,7 @@
         <label class="text-xs text-gray-500">Danh mục</label>
         <select v-model="edit.category_id" class="border rounded-lg px-3 py-2 text-sm w-full">
           <option value="">-- Chọn danh mục --</option>
-          <option v-for="cat in categories" :key="cat._id" :value="cat._id">{{ cat.name }}</option>
+          <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
         </select>
         <label class="text-xs text-gray-500">Ngày</label>
         <input v-model="edit.date" type="date" class="border rounded-lg px-3 py-2 text-sm w-full" />
@@ -66,7 +66,7 @@ const edit = reactive({ ...props.fields })
 const today = new Date().toISOString().slice(0, 10)
 
 const categoryName = computed(() => {
-  const cat = props.categories.find(c => c._id === props.fields.category_id)
+  const cat = props.categories.find(c => c.id === props.fields.category_id)
   return cat ? cat.name : '—'
 })
 function toggleEdit() {
@@ -78,9 +78,14 @@ function formatPrice(v) {
 }
 async function confirm() {
   error.value = ''
+  const data = editing.value ? edit : props.fields
+  if (!data.category_id) {
+    if (!editing.value) { editing.value = true; Object.assign(edit, props.fields) }
+    error.value = 'Vui lòng chọn danh mục chi phí'
+    return
+  }
   loading.value = true
   try {
-    const data = editing.value ? edit : props.fields
     await fundExpenseService.createExpenseFromFund({
       description: data.description,
       amount: data.amount,

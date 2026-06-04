@@ -393,7 +393,7 @@
     <!-- Change Payment Method Modal -->
     <transition name="slide-up">
       <div v-if="showChangePaymentForm" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
-        <div class="bg-white rounded-t-3xl w-full p-6">
+        <div class="bg-white rounded-t-3xl w-full p-6 mb-20">
           <h3 class="text-xl font-bold mb-2">💳 Sửa hình thức thanh toán</h3>
           <p class="text-sm text-gray-600 mb-4">
             Order <strong>#{{ changePaymentTarget?.order_number }}</strong>
@@ -439,7 +439,7 @@
     <!-- Cancel Order Modal -->
     <transition name="slide-up">
       <div v-if="showCancelForm" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
-        <div class="bg-white rounded-t-3xl w-full p-6">
+        <div class="bg-white rounded-t-3xl w-full p-6 mb-20">
           <h3 class="text-xl font-bold mb-2">🚫 Huỷ order</h3>
           <p class="text-sm text-gray-600 mb-3">
             Order <strong>#{{ cancelTarget?.order_number }}</strong>
@@ -450,23 +450,13 @@
             <span class="text-lg">🖨️</span>
             <p class="text-sm text-red-700 font-medium">Order này đã in tem — cashier xác nhận huỷ</p>
           </div>
-          <div class="mb-4">
-            <label class="block text-sm font-medium mb-2">Lý do huỷ *</label>
-            <textarea
-              v-model="cancelReason"
-              rows="3"
-              class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-red-500"
-              placeholder="Nhập lý do huỷ order..."
-            ></textarea>
-          </div>
           <div class="flex gap-2">
-            <button type="button" @click="showCancelForm = false; cancelReason = ''"
+            <button type="button" @click="showCancelForm = false"
               class="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-xl font-medium">
               Quay lại
             </button>
             <button @click="confirmCancelOrder"
-              :disabled="!cancelReason.trim()"
-              class="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white px-4 py-3 rounded-xl font-medium">
+              class="flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-xl font-medium">
               Xác nhận huỷ
             </button>
           </div>
@@ -492,7 +482,7 @@
     <!-- Close Shift Modal -->
     <transition name="slide-up">
       <div v-if="showCloseForm" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
-        <div class="bg-white rounded-t-3xl w-full p-6">
+        <div class="bg-white rounded-t-3xl w-full p-6 mb-20">
           <h3 class="text-xl font-bold mb-4">Chốt ca</h3>
           <p class="text-sm text-gray-600 mb-4">Chốt ca sẽ khóa tất cả orders trong ca này</p>
           <form @submit.prevent="closeShift" class="space-y-4">
@@ -702,9 +692,8 @@ const showCancelOrderModal = (order) => {
 }
 
 const confirmCancelOrder = async () => {
-  if (!cancelReason.value.trim()) return
   try {
-    await cashierStore.cancelOrder(cancelTarget.value.order_id, cancelReason.value)
+    await cashierStore.cancelOrder(cancelTarget.value.order_id, '')
     showCancelForm.value = false
     cancelReason.value = ''
     await cashierStore.getOrdersByShift(selectedShiftId.value)

@@ -87,6 +87,8 @@ func (r *ShopSettingsRepository) UpdateSettings(ctx context.Context, shopSetting
 			"show_custom_message":  shopSettings.ShowCustomMessage,
 			"low_margin_threshold": shopSettings.LowMarginThreshold,
 			"auto_print_enabled":   shopSettings.AutoPrintEnabled,
+			"gemini_api_key":       shopSettings.GeminiAPIKey,
+			"gemini_model":         shopSettings.GeminiModel,
 			"updated_at":           shopSettings.UpdatedAt,
 		},
 	}

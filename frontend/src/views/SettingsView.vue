@@ -169,7 +169,7 @@
               <label class="block text-sm font-medium text-gray-700 mb-1">Gemini API Key</label>
               <input
                 v-model="shopSettings.gemini_api_key"
-                type="password"
+                type="text"
                 placeholder="Nhập Gemini API key..."
                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -183,7 +183,12 @@
                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <p class="text-xs text-gray-500">API key và model được lưu cùng thông tin cửa hàng. Nhấn "Lưu thông tin cửa hàng" ở trên để cập nhật.</p>
+            <button
+              @click="saveAISettings"
+              :disabled="savingAISettings"
+              class="w-full bg-purple-500 text-white py-3 rounded-lg font-medium hover:bg-purple-600 active:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              {{ savingAISettings ? 'Đang lưu...' : 'Lưu AI Settings' }}
+            </button>
           </div>
         </div>
 
@@ -268,6 +273,7 @@ const authStore = useAuthStore()
 const loading = ref(false)
 const savingSettings = ref(false)
 const savingShopSettings = ref(false)
+const savingAISettings = ref(false)
 const showExpenseForm = ref(false)
 const selectedExpense = ref(null)
 const expenses = ref([])
@@ -372,6 +378,31 @@ const saveShopSettings = async () => {
     alert('Lỗi khi lưu thông tin: ' + (error.response?.data?.error || error.message))
   } finally {
     savingShopSettings.value = false
+  }
+}
+
+// Save AI settings
+const saveAISettings = async () => {
+  try {
+    savingAISettings.value = true
+    await shopSettingsService.updateSettings(shopSettings.value.id, {
+      shop_name: shopSettings.value.shop_name,
+      shop_address: shopSettings.value.shop_address,
+      shop_phone: shopSettings.value.shop_phone,
+      custom_message: shopSettings.value.custom_message,
+      show_address: shopSettings.value.show_address,
+      show_phone: shopSettings.value.show_phone,
+      show_custom_message: shopSettings.value.show_custom_message,
+      auto_print_enabled: shopSettings.value.auto_print_enabled,
+      gemini_api_key: shopSettings.value.gemini_api_key,
+      gemini_model: shopSettings.value.gemini_model,
+    })
+    alert('AI Settings đã được lưu!')
+  } catch (error) {
+    console.error('Error saving AI settings:', error)
+    alert('Lỗi khi lưu AI Settings: ' + (error.response?.data?.error || error.message))
+  } finally {
+    savingAISettings.value = false
   }
 }
 

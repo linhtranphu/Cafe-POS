@@ -585,6 +585,24 @@ func (s *OrderService) CancelOrder(ctx context.Context, id primitive.ObjectID, r
 	return o, nil
 }
 
+func (s *OrderService) RenameOrder(ctx context.Context, id primitive.ObjectID, req *order.RenameOrderRequest) (*order.Order, error) {
+	o, err := s.orderRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if o.Status != order.StatusCreated {
+		return nil, fmt.Errorf("chỉ có thể đổi tên bill chưa thanh toán")
+	}
+
+	o.CustomerName = req.CustomerName
+	if err := s.orderRepo.Update(ctx, id, o); err != nil {
+		return nil, err
+	}
+
+	return o, nil
+}
+
 // GetQueuedOrders - Get orders waiting for barista
 func (s *OrderService) GetQueuedOrders(ctx context.Context) ([]*order.Order, error) {
 	return s.orderRepo.FindByStatus(ctx, order.StatusQueued)

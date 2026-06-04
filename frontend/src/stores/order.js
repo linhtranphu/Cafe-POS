@@ -119,6 +119,18 @@ export const useOrderStore = defineStore('order', {
       }
     },
 
+    async renameOrder(id, customerName) {
+      this.error = null
+      try {
+        const order = await orderService.renameOrder(id, customerName)
+        this.updateOrderInList(order)
+        return order
+      } catch (error) {
+        this.error = error.response?.data?.error || 'Lỗi đổi tên bill'
+        throw error
+      }
+    },
+
     async printTemporaryBill(id) {
       this.error = null
       try {

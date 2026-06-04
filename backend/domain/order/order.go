@@ -105,8 +105,12 @@ type RefundRequest struct {
 	Reason string  `json:"reason" binding:"required"`
 }
 
+type RenameOrderRequest struct {
+	CustomerName string `json:"customer_name"`
+}
+
 type CancelOrderRequest struct {
-	Reason string `json:"reason" binding:"required"`
+	Reason string `json:"reason"`
 }
 
 type MergeOrdersRequest struct {

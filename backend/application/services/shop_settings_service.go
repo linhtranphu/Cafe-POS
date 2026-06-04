@@ -57,6 +57,14 @@ func (s *ShopSettingsService) UpdateSettings(ctx context.Context, req *UpdateSet
 		}
 	}
 
+	if req.GeminiAPIKey != nil {
+		shopSettings.GeminiAPIKey = *req.GeminiAPIKey
+	}
+
+	if req.GeminiModel != nil {
+		shopSettings.GeminiModel = *req.GeminiModel
+	}
+
 	// Save to database
 	if err := s.repo.UpdateSettings(ctx, shopSettings); err != nil {
 		return nil, fmt.Errorf("failed to update shop settings: %w", err)
@@ -69,4 +77,6 @@ func (s *ShopSettingsService) UpdateSettings(ctx context.Context, req *UpdateSet
 type UpdateSettingsRequest struct {
 	ShopName           *string  `json:"shop_name"`
 	LowMarginThreshold *float64 `json:"low_margin_threshold"`
+	GeminiAPIKey       *string  `json:"gemini_api_key"`
+	GeminiModel        *string  `json:"gemini_model"`
 }

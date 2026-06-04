@@ -1,4 +1,8 @@
-.PHONY: help build up down restart logs clean
+.PHONY: help build up down restart restart-no-bridge docker-restart logs clean dev dev-stop dev-backend dev-frontend \
+        docker-build docker-build-backend docker-build-frontend docker-build-bridge \
+        docker-push docker-push-backend docker-push-push-frontend docker-push-bridge \
+        docker-publish docker-publish-backend docker-publish-frontend docker-publish-bridge \
+        docker-clean
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -15,7 +19,13 @@ up: ## Start all services
 down: ## Stop all services
 	docker-compose down
 
-restart: ## Restart all services
+restart: ## Restart local dev environment (MongoDB + backend + frontend)
+	@bash restart_local.sh
+
+restart-no-bridge: ## Restart local dev without Print Bridge
+	@bash restart_local.sh --no-bridge
+
+docker-restart: ## Restart all Docker services
 	docker-compose restart
 
 logs: ## Show logs from all services
@@ -57,3 +67,83 @@ deploy: build up ## Build and deploy all services
 	@echo "Frontend: http://localhost"
 	@echo "Backend API: http://localhost:8080"
 	@echo "MongoDB: mongodb://localhost:27017"
+
+# ── Local Development ─────────────────────────────────────────────────────────
+
+dev: ## Start local dev environment (MongoDB + backend + frontend)
+	@bash restart_local.sh
+
+dev-no-bridge: ## Start local dev without Print Bridge
+	@bash restart_local.sh --no-bridge
+
+dev-stop: ## Stop local dev (backend + frontend)
+	@bash stop_local.sh
+
+dev-backend: ## Build and run backend only (local)
+	@bash start-backend.sh
+
+dev-frontend: ## Start frontend dev server only
+	@cd frontend && npm run dev -- --host
+
+dev-logs-backend: ## Tail backend log
+	@tail -f backend.log
+
+dev-logs-frontend: ## Tail frontend log
+	@tail -f frontend.log
+
+dev-logs-mongo: ## Tail MongoDB container log
+	@docker logs -f cafe-pos-mongodb
+
+dev-logs-bridge: ## Tail Print Bridge container log
+	@docker logs -f local-print-bridge
+
+# ── Docker Hub Build & Push ───────────────────────────────────────────────────
+
+DOCKER_USER := linhtranphu
+
+docker-build-backend: ## Build backend Docker image
+	cd backend && docker build --no-cache -t $(DOCKER_USER)/cafe-pos-backend:latest .
+
+docker-build-frontend: ## Build frontend Docker image
+	cd frontend && docker build --no-cache -t $(DOCKER_USER)/cafe-pos-frontend:latest .
+
+docker-build-bridge: ## Build Print Bridge Docker image
+	cd local-print-bridge && docker build --no-cache -t $(DOCKER_USER)/local-print-bridge:latest .
+
+docker-build: docker-build-backend docker-build-frontend ## Build backend + frontend images
+
+docker-build-all: docker-build-backend docker-build-frontend docker-build-bridge ## Build all images
+
+docker-push-backend: ## Push backend image to Docker Hub
+	docker push $(DOCKER_USER)/cafe-pos-backend:latest
+
+docker-push-frontend: ## Push frontend image to Docker Hub
+	docker push $(DOCKER_USER)/cafe-pos-frontend:latest
+
+docker-push-bridge: ## Push Print Bridge image to Docker Hub
+	docker push $(DOCKER_USER)/local-print-bridge:latest
+
+docker-push: docker-push-backend docker-push-frontend ## Push backend + frontend to Docker Hub
+
+docker-push-all: docker-push-backend docker-push-frontend docker-push-bridge ## Push all images to Docker Hub
+
+docker-publish: docker-build docker-push docker-clean ## Build and push backend + frontend
+	@echo "✅ Backend + Frontend published to Docker Hub"
+
+docker-publish-backend: docker-build-backend docker-push-backend docker-clean ## Build and push backend only
+	@echo "✅ Backend published to Docker Hub"
+
+docker-publish-frontend: docker-build-frontend docker-push-frontend docker-clean ## Build and push frontend only
+	@echo "✅ Frontend published to Docker Hub"
+
+docker-publish-bridge: docker-build-bridge docker-push-bridge docker-clean ## Build and push Print Bridge only
+	@echo "✅ Print Bridge published to Docker Hub"
+
+docker-publish-all: docker-build-all docker-push-all docker-clean ## Build and push all images
+	@echo "✅ All images published to Docker Hub"
+
+docker-clean: ## Remove dangling images, unused cache, and stopped containers
+	docker image prune -f
+	docker builder prune -f
+	docker container prune -f
+	docker system df

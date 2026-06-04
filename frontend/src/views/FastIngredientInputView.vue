@@ -193,7 +193,7 @@ const toast = ref({ show: false, success: true, message: '' })
 
 const paymentOptions = [
   { value: 'cash', label: 'Tiền mặt' },
-  { value: 'bank', label: 'Chuyển khoản' }
+  { value: 'transfer', label: 'Chuyển khoản' }
 ]
 
 const displayList = computed(() => {

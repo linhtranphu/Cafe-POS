@@ -36,6 +36,11 @@ export const orderService = {
     return response.data
   },
 
+  async renameOrder(id, customerName) {
+    const response = await api.patch(`/waiter/orders/${id}/rename`, { customer_name: customerName })
+    return response.data
+  },
+
   async printTemporaryBill(id) {
     const response = await api.post(`/waiter/orders/${id}/print-temp-bill`)
     return response.data

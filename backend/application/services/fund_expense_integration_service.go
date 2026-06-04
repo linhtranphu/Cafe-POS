@@ -62,7 +62,8 @@ type CreateExpenseFromFundRequest struct {
 	Description string
 	Vendor      string
 	Notes       string
-	MoneyType   string // "cash" or "transfer"
+	MoneyType   string        // "cash" or "transfer"
+	FundType    fund.FundType // optional override: "operating" or "inventory"
 	UserID      primitive.ObjectID
 	UserName    string
 	UserRole    string
@@ -125,6 +126,9 @@ func (s *FundExpenseIntegrationService) CreateExpenseFromFund(
 	}
 
 	expenseFundType := fund.FundTypeForSource(fund.SourceTypeExpense)
+	if req.FundType != "" {
+		expenseFundType = req.FundType
+	}
 	if err := s.ValidateFundBalanceForType(ctx, req.Amount, req.MoneyType, expenseFundType); err != nil {
 		return nil, err
 	}

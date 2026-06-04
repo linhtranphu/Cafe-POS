@@ -142,6 +142,29 @@ func (h *OrderHandler) EditOrder(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+func (h *OrderHandler) RenameOrder(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	var req order.RenameOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	o, err := h.orderService.RenameOrder(c.Request.Context(), id, &req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, o)
+}
+
 func (h *OrderHandler) RefundPartial(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := primitive.ObjectIDFromHex(idStr)
